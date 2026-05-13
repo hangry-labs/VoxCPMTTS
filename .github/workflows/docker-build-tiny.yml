@@ -1,0 +1,79 @@
+name: Build and Push Docker Image (TINY)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*"
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Optional Docker tag to publish, for example v0.2"
+        required: false
+        type: string
+      checkout_ref:
+        description: "Optional git ref to build. Defaults to image_tag when image_tag is set."
+        required: false
+        type: string
+      push_latest:
+        description: "Also publish latest_tiny"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  IMAGE_NAME: hangrylabs/voxcpmtts
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || inputs.image_tag || github.ref }}
+
+      - name: Free up disk space
+        run: |
+          echo "Initial disk usage:"
+          df -h
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/hostedtoolcache || true
+          docker system prune -af || true
+          echo "Disk usage after cleanup:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Extract version if tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF##refs/tags/}" >> $GITHUB_ENV
+          elif [[ -n "${{ inputs.image_tag }}" ]]; then
+            echo "VERSION=${{ inputs.image_tag }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build tiny Docker image
+        run: |
+          docker build --target tiny -t $IMAGE_NAME:latest_tiny .
+          if [[ -n "$VERSION" ]]; then
+            docker tag $IMAGE_NAME:latest_tiny $IMAGE_NAME:${VERSION}_tiny
+          fi
+
+      - name: Push tiny Docker image
+        run: |
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "${{ inputs.push_latest }}" == "true" ]]; then
+            docker push $IMAGE_NAME:latest_tiny
+          fi
+          if [[ -n "$VERSION" ]]; then
+            docker push $IMAGE_NAME:${VERSION}_tiny
+          fi

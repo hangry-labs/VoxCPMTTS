@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hangry Labs VoxCPMTTS</title>
+    <link rel="icon" type="image/png" href="../hangrylabs/favicon_small.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        overflow-x: hidden;
+        background: #000;
+        color: #ffb076;
+        scroll-behavior: smooth;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .page-shell {
+        position: relative;
+        z-index: 10;
+        min-height: 100vh;
+        background: rgba(0, 0, 0, 0.42);
+      }
+
+      .page-shell::before {
+        background:
+          linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.82)),
+          url("../hangrylabs/hero_background_small.png") center top / cover no-repeat;
+        content: "";
+        inset: 0;
+        opacity: 0.22;
+        pointer-events: none;
+        position: fixed;
+        z-index: -1;
+      }
+
+      .brand-card {
+        background: rgba(20, 20, 20, 0.94);
+        border: 2px solid rgba(255, 107, 0, 0.3);
+        border-radius: 8px;
+        box-shadow: 0 0 28px rgba(255, 107, 0, 0.12);
+      }
+
+      .brand-glow {
+        color: #ff6b00;
+        text-shadow:
+          0 0 20px rgba(255, 107, 0, 0.62),
+          0 0 48px rgba(255, 60, 0, 0.28);
+      }
+
+      .pill {
+        border: 1px solid rgba(255, 107, 0, 0.42);
+        background: rgba(255, 107, 0, 0.12);
+        border-radius: 999px;
+        color: #ffb076;
+      }
+
+      a {
+        color: #ff6b00;
+      }
+
+      a:hover {
+        color: #ff8a33;
+        text-shadow: 0 0 12px rgba(255, 107, 0, 0.42);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="shapes" aria-hidden="true"></canvas>
+    <main class="page-shell">
+      <section class="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+        <header class="mb-8 pt-0">
+          <div class="flex flex-col gap-8 lg:grid lg:grid-cols-[1fr_320px] lg:items-start">
+            <div>
+              <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-500/25 bg-black/80 p-3">
+                <a class="flex items-center gap-3 no-underline" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">
+                  <img class="h-12 w-12 rounded-lg border border-orange-500/40 object-cover" src="../hangrylabs/favicon_small.png" alt="Hangry Labs logo">
+                  <div>
+                    <div class="font-extrabold text-[#ffb076]">Hangry Labs</div>
+                    <div class="text-sm font-semibold text-orange-400">Useful tools, easy to run</div>
+                  </div>
+                </a>
+                <nav class="flex flex-wrap gap-2" aria-label="Project links">
+                  <a class="pill px-4 py-2 text-sm font-semibold no-underline" href="https://hub.docker.com/r/hangrylabs/voxcpmtts/tags">Docker Hub</a>
+                  <a class="pill px-4 py-2 text-sm font-semibold no-underline" href="https://github.com/Hangry-Labs/VoxCPMTTS">GitHub</a>
+                </nav>
+              </div>
+              <h1 class="brand-glow max-w-4xl text-4xl font-extrabold leading-none sm:text-6xl">
+                VoxCPMTTS
+              </h1>
+              <p class="mt-5 max-w-3xl text-base leading-7 text-[#ffb076] sm:text-lg">
+                Easy-to-run Docker packaging for VoxCPM2, a realistic multilingual text-to-speech model with voice design, controllable cloning, and transcript-guided cloning. Run the image, open the browser UI, or call the same HTTP API from your own application.
+              </p>
+              <div class="mt-5 flex flex-wrap gap-2">
+                <span class="pill px-3 py-1 text-sm font-semibold">30 languages</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">48 kHz output</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">Voice clone</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">Voice design</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">UI + API</span>
+              </div>
+            </div>
+            <a class="block" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">
+              <img class="w-full rounded-lg border-2 border-orange-500/30 object-cover shadow-[0_0_60px_rgba(255,107,0,0.18)]" src="../hangrylabs/logo_small.png" alt="Hangry Labs">
+            </a>
+          </div>
+        </header>
+
+        <section class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <article class="brand-card p-5">
+            <h2 class="mb-3 text-lg font-bold text-orange-400">Run</h2>
+            <pre class="overflow-auto rounded-lg bg-black/60 p-3 text-xs text-orange-100"><code>docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:v0.1</code></pre>
+          </article>
+          <article class="brand-card p-5">
+            <h2 class="mb-3 text-lg font-bold text-orange-400">Open</h2>
+            <a class="text-lg font-bold" href="http://localhost:8808">http://localhost:8808</a>
+          </article>
+          <article class="brand-card p-5">
+            <h2 class="mb-3 text-lg font-bold text-orange-400">API Docs</h2>
+            <a class="text-lg font-bold" href="http://localhost:8808/tts/docs">/tts/docs</a>
+          </article>
+        </section>
+
+        <section class="grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="API examples" data-example-grid></section>
+      </section>
+    </main>
+    <script src="voices.js"></script>
+    <script src="player.js"></script>
+    <script src="background.js"></script>
+  </body>
+</html>

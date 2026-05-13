@@ -1,3 +1,92 @@
+<p>
+  <a href="https://github.com/Hangry-Labs/VoxCPMTTS">
+    <img src="logo.jpg" alt="Hangry Labs VoxCPMTTS logo">
+  </a>
+</p>
+
+# Hangry Labs VoxCPMTTS
+
+Easy-to-run Docker packaging for VoxCPM2 with a browser UI and HTTP API included.
+
+This fork keeps the upstream OpenBMB VoxCPM package and attribution intact, then adds Hangry Labs runtime packaging for local use: Docker images, task automation, API routes under `/tts/*`, format conversion, and a simple web UI.
+
+## Docker Quick Start
+
+```bash
+docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:v0.1
+```
+
+CPU fallback:
+
+```bash
+docker run -p 8808:8808 -e VOXCPM_DEVICE=cpu hangrylabs/voxcpmtts:v0.1
+```
+
+Open:
+
+http://localhost:8808
+
+API docs:
+
+http://localhost:8808/tts/docs
+
+The full image bakes VoxCPM2 model assets plus denoiser and ASR support assets for offline-friendly use after the image is pulled. Tiny images use the `vX.Y_tiny` tag pattern and warm caches on first online use.
+
+Docker defaults to `VOXCPM_OPTIMIZE=0` to avoid first-run Triton/C compiler requirements in the slim runtime. Advanced users can opt into optimization later by setting `VOXCPM_OPTIMIZE=1`.
+
+## Local Development
+
+```bash
+task --list
+task doctor
+task compile
+task test
+task app
+```
+
+The package CLI remains available:
+
+```bash
+python -m voxcpm.cli --help
+```
+
+## HTTP API
+
+```bash
+curl -X POST "http://localhost:8808/tts/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Hello from Hangry Labs VoxCPMTTS","output_format":"mp3"}' \
+  -o hello.mp3
+```
+
+Voice design:
+
+```bash
+curl -X POST "http://localhost:8808/tts/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"This is a designed voice.","control":"young female, warm and gentle","output_format":"mp3"}' \
+  -o designed.mp3
+```
+
+Voice cloning with a container-visible reference file:
+
+```bash
+curl -X POST "http://localhost:8808/tts/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"This follows the reference voice.","ref_audio":"/data/ref.wav","output_format":"mp3"}' \
+  -o cloned.mp3
+```
+
+## Responsible Use
+
+VoxCPM2 supports highly realistic voice cloning. Do not use this project for unauthorized voice cloning, impersonation, fraud, harassment, scams, or any illegal or unethical activity. Only clone voices when you have the rights and consent to do so, and clearly mark AI-generated speech where appropriate.
+
+## Attribution
+
+VoxCPM is an OpenBMB project released under Apache-2.0. This fork preserves upstream license, citation, and attribution; Hangry Labs maintains Docker packaging, UI/API integration, task automation, and public runtime docs for this repository.
+
+---
+
 <h2 align="center">VoxCPM2: Tokenizer-Free TTS for Multilingual Speech Generation, Creative Voice Design, and True-to-Life Cloning</h2>
 
 <p align="center">

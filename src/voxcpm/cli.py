@@ -11,6 +11,9 @@ import os
 import sys
 from pathlib import Path
 
+import soundfile as sf
+from voxcpm.core import VoxCPM
+
 DEFAULT_HF_MODEL_ID = "openbmb/VoxCPM2"
 
 # -----------------------------
@@ -169,8 +172,6 @@ def validate_batch_args(args, parser):
 
 
 def load_model(args):
-    from voxcpm.core import VoxCPM
-
     print("Loading VoxCPM model...", file=sys.stderr)
 
     zipenhancer_path = getattr(args, "zipenhancer_path", None) or os.environ.get(
@@ -263,8 +264,6 @@ def _run_single(args, parser, *, text: str, output: str, prompt_text: str | None
         and (args.prompt_audio is not None or args.reference_audio is not None),
     )
 
-    import soundfile as sf
-
     sf.write(str(output_path), audio_array, model.tts_model.sample_rate)
 
     duration = len(audio_array) / model.tts_model.sample_rate
@@ -306,8 +305,6 @@ def cmd_validate(args, parser):
 
 
 def cmd_batch(args, parser):
-    import soundfile as sf
-
     input_file = require_file_exists(args.input, parser, "input file")
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

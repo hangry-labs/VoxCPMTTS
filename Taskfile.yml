@@ -1,0 +1,170 @@
+version: '3'
+
+vars:
+  IMAGE: voxcpmtts:test
+  TINY_IMAGE: voxcpmtts:tiny
+  PORT: '8808'
+  GPU_DEVICE: '1'
+  APP_DEVICE: 'auto'
+  APP_OPTIMIZE: '0'
+  HF_TOKEN: ''
+  HF_CACHE_VOLUME: voxcpmtts_hf_cache
+  HF_HUB_OFFLINE: '1'
+  TRANSFORMERS_OFFLINE: '1'
+  CONTAINER: voxcpmtts
+  CONTAINER_LOCAL: voxcpmtts_local
+  TEMP_AUDIO: '%TEMP%\\voxcpmtts_task_audio'
+  API_TEXT: 'Hello world. This is VoxCPMTTS.'
+  API_LANGUAGE: 'English'
+  API_VOICE: 'auto'
+  API_FORMAT: 'mp3'
+  DRY_RUN: '0'
+  NEXT_VERSION: ''
+  SKIP_VALIDATION: '0'
+
+tasks:
+  list:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  gpuinfo:
+    desc: Show host GPU indexes
+    cmds:
+      - cmd /c nvidia-smi --query-gpu=index,name --format=csv,noheader
+
+  doctor:
+    desc: Show local tool and interpreter status
+    cmds:
+      - cmd /c python --version
+      - cmd /c docker --version
+      - cmd /c task --version
+      - cmd /c git status --short
+
+  compile:
+    desc: Compile Python sources
+    cmds:
+      - cmd /c python -m compileall -q src tests app.py scripts
+
+  test:
+    desc: Run checked-in tests only
+    cmds:
+      - cmd /c ".venv\\Scripts\\python.exe -m pytest -q tests"
+
+  cli-help:
+    desc: Show VoxCPM CLI help
+    cmds:
+      - cmd /c python -m voxcpm.cli --help
+
+  app:
+    desc: Run local package UI/API server
+    cmds:
+      - cmd /c "set PORT={{.PORT}}&& set VOXCPM_DEVICE={{.APP_DEVICE}}&& set VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}}&& python -m voxcpm.app"
+
+  image:
+    desc: Build local baked VoxCPMTTS Docker image
+    cmds:
+      - cmd /c docker build --target baked -t {{.IMAGE}} .
+
+  image-tiny:
+    desc: Build local tiny VoxCPMTTS Docker image without baked model cache
+    cmds:
+      - cmd /c docker build --target tiny -t {{.TINY_IMAGE}} .
+
+  cache-init:
+    desc: Seed the persistent Hugging Face cache volume from the baked image
+    cmds:
+      - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
+      - cmd /c docker run --rm -v {{.HF_CACHE_VOLUME}}:/cache {{.IMAGE}} sh -c "mkdir -p /cache && cp -an /app/.cache/huggingface/. /cache/ || true"
+
+  release:
+    desc: Release current VERSION snapshot, tag it, and prepare next snapshot
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -DryRun "{{.DRY_RUN}}" -NextVersion "{{.NEXT_VERSION}}" -SkipValidation "{{.SKIP_VALIDATION}}"
+
+  deps:
+    desc: Regenerate Linux/Python 3.11 requirements.txt from requirements.in
+    cmds:
+      - uv pip compile requirements.in --python-version 3.11 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --no-header --no-annotate --output-file requirements.txt
+
+  imagerun:
+    desc: Run baked image with UI and API on PORT
+    cmds:
+      - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
+      - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
+      - task: cache-init
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface {{.IMAGE}}
+      - cmd /c docker ps --filter "name={{.CONTAINER}}"
+
+  imagerun-tiny:
+    desc: Run tiny image online on first use, using the persistent Hugging Face cache volume
+    cmds:
+      - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
+      - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
+      - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface {{.TINY_IMAGE}}
+      - cmd /c docker ps --filter "name={{.CONTAINER}}"
+
+  localrun:
+    desc: Run baked image with local src/ bind-mounted for hot-swapping package code
+    cmds:
+      - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
+      - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
+      - task: cache-init
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\src:/app/src" {{.IMAGE}}
+      - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
+
+  localrun-tiny:
+    desc: Run tiny image with local src/ bind-mounted, online on first use
+    cmds:
+      - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
+      - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
+      - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\src:/app/src" {{.TINY_IMAGE}}
+      - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
+
+  imageweb:
+    desc: Open default browser to local VoxCPMTTS UI
+    cmds:
+      - cmd /c start "" "http://localhost:{{.PORT}}"
+
+  imageapi:
+    desc: Call API, play generated temp audio, then remove it
+    cmds:
+      - 'cmd /c curl.exe -sS --retry 60 --retry-delay 2 --retry-connrefused http://localhost:{{.PORT}}/tts/ping >nul'
+      - 'cmd /c curl.exe -sS -X POST http://localhost:{{.PORT}}/tts/generate -H "Content-Type: application/json" -d "{\"text\":\"{{.API_TEXT}}\",\"voice\":\"{{.API_VOICE}}\",\"language\":\"{{.API_LANGUAGE}}\",\"device\":\"{{.APP_DEVICE}}\",\"output_format\":\"{{.API_FORMAT}}\"}" --output {{.TEMP_AUDIO}}.{{.API_FORMAT}}'
+      - 'cmd /c if not exist {{.TEMP_AUDIO}}.{{.API_FORMAT}} exit /b 1'
+      - 'cmd /c python -c "from pathlib import Path; p=Path(r''{{.TEMP_AUDIO}}.{{.API_FORMAT}}''); assert p.exists() and p.stat().st_size > 0, p"'
+      - 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts/play-audio.ps1 -Path "{{.TEMP_AUDIO}}.{{.API_FORMAT}}"'
+      - 'cmd /c del /f /q {{.TEMP_AUDIO}}.{{.API_FORMAT}}'
+
+  imageapi-format:
+    desc: Call API for API_FORMAT and verify the output file is non-empty
+    cmds:
+      - 'cmd /c curl.exe -sS --retry 60 --retry-delay 2 --retry-connrefused http://localhost:{{.PORT}}/tts/ping >nul'
+      - 'cmd /c curl.exe -sS -X POST http://localhost:{{.PORT}}/tts/generate -H "Content-Type: application/json" -d "{\"text\":\"{{.API_TEXT}}\",\"voice\":\"{{.API_VOICE}}\",\"language\":\"{{.API_LANGUAGE}}\",\"device\":\"{{.APP_DEVICE}}\",\"output_format\":\"{{.API_FORMAT}}\"}" --output {{.TEMP_AUDIO}}.{{.API_FORMAT}}'
+      - 'cmd /c if not exist {{.TEMP_AUDIO}}.{{.API_FORMAT}} exit /b 1'
+      - 'cmd /c python -c "from pathlib import Path; p=Path(r''{{.TEMP_AUDIO}}.{{.API_FORMAT}}''); assert p.exists() and p.stat().st_size > 0, p"'
+      - 'cmd /c del /f /q {{.TEMP_AUDIO}}.{{.API_FORMAT}}'
+
+  imagestop:
+    desc: Stop running VoxCPMTTS containers
+    cmds:
+      - cmd: cmd /c docker stop {{.CONTAINER}} >nul 2>&1
+        ignore_error: true
+      - cmd: cmd /c docker stop {{.CONTAINER_LOCAL}} >nul 2>&1
+        ignore_error: true
+
+  logs:
+    desc: Show logs from active VoxCPMTTS container
+    cmds:
+      - cmd /c docker logs --tail 200 {{.CONTAINER_LOCAL}} 2>nul || docker logs --tail 200 {{.CONTAINER}}
+
+  nuke:
+    desc: Remove VoxCPMTTS local containers, images, and Hugging Face cache volume
+    cmds:
+      - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
+      - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
+      - cmd /c docker rmi -f {{.IMAGE}} >nul 2>&1
+      - cmd /c docker rmi -f {{.TINY_IMAGE}} >nul 2>&1
+      - cmd /c docker volume rm -f {{.HF_CACHE_VOLUME}} >nul 2>&1

@@ -31,6 +31,8 @@ dependencies = [
     "transformers>=4.36.2",
     "einops",
     "gradio>=6,<7",
+    "fastapi",
+    "uvicorn[standard]",
     "inflect",
     "addict",
     "wetext",
@@ -47,7 +49,8 @@ dependencies = [
     "funasr",
     "spaces",
     "argbind",
-    "safetensors"
+    "safetensors",
+    "tensorboardX"
 
 ]
 
