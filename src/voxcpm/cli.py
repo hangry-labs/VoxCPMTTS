@@ -286,24 +286,6 @@ def cmd_clone(args, parser):
     )
 
 
-def cmd_validate(args, parser):
-    from voxcpm.training.validate import (
-        print_validation_report,
-        validate_manifest,
-    )
-
-    manifest = str(require_file_exists(args.manifest, parser, "manifest file"))
-    result = validate_manifest(
-        manifest_path=manifest,
-        sample_rate=args.sample_rate,
-        max_samples=args.max_samples,
-        verbose=args.verbose,
-    )
-    print_validation_report(result, manifest)
-    if not result.is_valid:
-        sys.exit(1)
-
-
 def cmd_batch(args, parser):
     input_file = require_file_exists(args.input, parser, "input file")
     output_dir = Path(args.output_dir)
@@ -548,30 +530,6 @@ Examples:
     _add_model_args(batch_parser)
     _add_lora_args(batch_parser)
 
-    # Validate subcommand
-    validate_parser = subparsers.add_parser(
-        "validate",
-        help="Validate a training data manifest (JSONL) before fine-tuning",
-    )
-    validate_parser.add_argument(
-        "--manifest", "-m", required=True, help="Path to JSONL training manifest"
-    )
-    validate_parser.add_argument(
-        "--sample-rate",
-        type=int,
-        default=16_000,
-        help="Expected audio sample rate in Hz (default: 16000)",
-    )
-    validate_parser.add_argument(
-        "--max-samples",
-        type=int,
-        default=0,
-        help="Maximum number of samples to validate (0 = all, default: 0)",
-    )
-    validate_parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Print per-sample progress"
-    )
-
     # Legacy root arguments
     parser.add_argument("--input", "-i", help="Input text file (batch mode only)")
     parser.add_argument(
@@ -623,9 +581,6 @@ def _dispatch_legacy(args, parser):
 def main():
     parser = _build_parser()
     args = parser.parse_args()
-
-    if args.command == "validate":
-        return cmd_validate(args, parser)
 
     validate_ranges(args, parser)
 

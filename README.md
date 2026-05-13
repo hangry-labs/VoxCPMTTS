@@ -149,7 +149,7 @@ Chinese Dialect: 四川话, 粤语, 吴语, 东北话, 河南话, 陕西话, 山
 ### News
 
 * **[2026.04]** 🔥 We release **VoxCPM2** — 2B, 30 languages, Voice Design & Controllable Voice Cloning, 48kHz audio output! [Weights](https://huggingface.co/openbmb/VoxCPM2) | [Docs](https://voxcpm.readthedocs.io/en/latest/) | [Playground](https://huggingface.co/spaces/OpenBMB/VoxCPM-Demo)
-* **[2025.12]** 🎉 Open-source **VoxCPM1.5** [weights](https://huggingface.co/openbmb/VoxCPM1.5) with SFT & LoRA fine-tuning. (**🏆 #1 GitHub Trending**)
+* **[2025.12]** 🎉 Open-source **VoxCPM1.5** [weights](https://huggingface.co/openbmb/VoxCPM1.5). (**🏆 #1 GitHub Trending**)
 * **[2025.09]** 🔥 Release VoxCPM [Technical Report](https://arxiv.org/abs/2509.24650).
 * **[2025.09]** 🎉 Open-source **VoxCPM-0.5B** [weights](https://huggingface.co/openbmb/VoxCPM-0.5B) (**🏆 #1 HuggingFace Trending**)
 
@@ -165,7 +165,6 @@ Chinese Dialect: 四川话, 粤语, 吴语, 东北话, 河南话, 陕西话, 山
   - [Production Deployment](#-production-deployment-nano-vllm)
 - [Models & Versions](#-models--versions)
 - [Performance](#-performance)
-- [Fine-tuning](#%EF%B8%8F-fine-tuning)
 - [Documentation](#-documentation)
 - [Ecosystem & Community](#-ecosystem--community)
 - [Risks and Limitations](#%EF%B8%8F-risks-and-limitations)
@@ -601,29 +600,6 @@ We additionally run an internal multilingual intelligibility benchmark with **30
 
 
 
----
-
-## ⚙️ Fine-tuning
-
-VoxCPM supports both **full fine-tuning (SFT)** and **LoRA fine-tuning**. With as little as **5–10 minutes** of audio, you can adapt to a specific speaker, language, or domain.
-
-```bash
-# LoRA fine-tuning (parameter-efficient, recommended)
-python scripts/train_voxcpm_finetune.py \
-    --config_path conf/voxcpm_v2/voxcpm_finetune_lora.yaml
-
-# Full fine-tuning
-python scripts/train_voxcpm_finetune.py \
-    --config_path conf/voxcpm_v2/voxcpm_finetune_all.yaml
-
-# WebUI for training & inference
-python lora_ft_webui.py   # then open http://localhost:7860
-```
-
-> **Full guide →** [Fine-tuning Guide](https://voxcpm.readthedocs.io/en/latest/finetuning/finetune.html) (data preparation, configuration, training, LoRA hot-swapping, FAQ)
-
----
-
 ## 📚 Documentation
 
 Full documentation: **[voxcpm.readthedocs.io](https://voxcpm.readthedocs.io/en/latest/)**
@@ -633,7 +609,6 @@ Full documentation: **[voxcpm.readthedocs.io](https://voxcpm.readthedocs.io/en/l
 | Quick Start & Installation | [Quick Start](https://voxcpm.readthedocs.io/en/latest/quickstart.html) |
 | Usage Guide & Cookbook | [User Guide](https://voxcpm.readthedocs.io/en/latest/usage_guide.html) |
 | VoxCPM Series | [Models](https://voxcpm.readthedocs.io/en/latest/models/version_history.html) |
-| Fine-tuning (SFT & LoRA) | [Fine-tuning Guide](https://voxcpm.readthedocs.io/en/latest/finetuning/finetune.html) |
 | FAQ & Troubleshooting | [FAQ](https://voxcpm.readthedocs.io/en/latest/faq.html) |
 
 ---
@@ -661,7 +636,7 @@ Full documentation: **[voxcpm.readthedocs.io](https://voxcpm.readthedocs.io/en/l
 
 - **Potential for Misuse:** VoxCPM's voice cloning can generate highly realistic synthetic speech. It is **strictly forbidden** to use VoxCPM for impersonation, fraud, or disinformation. We strongly recommend clearly marking any AI-generated content.
 - **Controllable Generation Stability:** Voice Design and Controllable Voice Cloning results can vary between runs — you may try to generate 1~3 times to obtain the desired voice or style. We are actively working on improving controllability consistency.
-- **Language Coverage:** VoxCPM2 officially supports 30 languages. For languages not on the list, you are welcome to test directly or try fine-tuning on your own data. We plan to expand language coverage in future releases.
+- **Language Coverage:** VoxCPM2 officially supports 30 languages. For languages not on the list, test directly and verify quality before production use. Upstream may expand language coverage in future releases.
 - **Usage:** This model is released under the Apache-2.0 license. For production deployments, we recommend conducting thorough testing and safety evaluation tailored to your use case.
 
 ---

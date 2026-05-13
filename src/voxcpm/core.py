@@ -35,7 +35,7 @@ class VoxCPM:
             device: Runtime device. If set to ``None`` or ``"auto"``, VoxCPM
                 will choose automatically (preferring CUDA, then MPS, then CPU).
                 If set explicitly, that device is used or a clear error is raised.
-            lora_config: LoRA configuration for fine-tuning. If lora_weights_path is
+            lora_config: LoRA adapter configuration. If lora_weights_path is
                 provided without lora_config, a default config will be created.
             lora_weights_path: Path to pre-trained LoRA weights (.pth file or directory
                 containing lora_weights.ckpt). If provided, LoRA weights will be loaded.
@@ -128,7 +128,7 @@ class VoxCPM:
             device: Runtime device. Use ``None``/``"auto"`` for automatic
                 fallback, or an explicit value such as ``"cpu"``, ``"mps"``,
                 ``"cuda"``, or ``"cuda:0"``.
-            lora_config: LoRA configuration for fine-tuning. If lora_weights_path is
+            lora_config: LoRA adapter configuration. If lora_weights_path is
                 provided without lora_config, a default config will be created with
                 enable_lm=True and enable_dit=True.
             lora_weights_path: Path to pre-trained LoRA weights (.pth file or directory

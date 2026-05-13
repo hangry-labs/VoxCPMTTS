@@ -4,11 +4,45 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3049c5fe-5df1-40ed-a68b-cddc3656f932" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/icon.jpg" afterDir="false" />
+    <list default="true" id="3049c5fe-5df1-40ed-a68b-cddc3656f932" name="Changes" comment="chore: bootstrap Hangry Labs Docker runtime">
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README_zh.md" beforeDir="false" afterPath="$PROJECT_DIR$/README_zh.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1.5/voxcpm_finetune_all.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1.5/voxcpm_finetune_lora.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1/voxcpm_finetune_all.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1/voxcpm_finetune_lora.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v2/voxcpm_finetune_all.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v2/voxcpm_finetune_lora.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/examples/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/config/data_config_emilia.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/config/data_config_finetune.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/config/ds_config_zero2.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/config/train_config_emilia.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/config/train_config_finetune.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/config/train_config_finetune_sdpa.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/config/train_config_multilingual.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/run_emilia.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/run_eval.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/run_finetune.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/train_data_example.jsonl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lora_ft_webui.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.in" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.in" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test_voxcpm_ft_infer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test_voxcpm_lora_infer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/train_voxcpm_finetune.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/voxcpm/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/voxcpm/cli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/voxcpm/core.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/accelerator.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/config.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/data.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/packers.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/state.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/tracker.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/validate.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_validate.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -165,12 +199,24 @@
       <updated>1778626133641</updated>
       <workItem from="1778626134766" duration="1510000" />
       <workItem from="1778627696735" duration="1886000" />
-      <workItem from="1778629606908" duration="6541000" />
+      <workItem from="1778629606908" duration="7466000" />
     </task>
+    <task id="LOCAL−00001" summary="chore: bootstrap Hangry Labs Docker runtime">
+      <option name="closed" value="true" />
+      <created>1778636417347</created>
+      <option name="number" value="LOCAL−00001" />
+      <option name="presentableId" value="LOCAL−00001" />
+      <updated>1778636417347</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="chore: bootstrap Hangry Labs Docker runtime" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: bootstrap Hangry Labs Docker runtime" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>
