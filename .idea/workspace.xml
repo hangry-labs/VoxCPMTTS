@@ -4,45 +4,76 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3049c5fe-5df1-40ed-a68b-cddc3656f932" name="Changes" comment="chore: bootstrap Hangry Labs Docker runtime">
+    <list default="true" id="3049c5fe-5df1-40ed-a68b-cddc3656f932" name="Changes" comment="chore: remove VoxCPM training utilities and configurations">
+      <change afterPath="$PROJECT_DIR$/voxcpm/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/app.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/cli.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/core.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/model/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/model/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/model/voxcpm.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/model/voxcpm2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/audiovae/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/audiovae/audio_vae.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/audiovae/audio_vae_v2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/layers/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/layers/lora.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/layers/scalar_quantization_layer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/local_dit.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/local_dit_v2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/unified_cfm.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locenc/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locenc/local_encoder.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/cache.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/config.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/prefetch_assets.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/utils/text_normalize.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/voxcpm/zipenhancer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README_zh.md" beforeDir="false" afterPath="$PROJECT_DIR$/README_zh.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1.5/voxcpm_finetune_all.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1.5/voxcpm_finetune_lora.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1/voxcpm_finetune_all.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v1/voxcpm_finetune_lora.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v2/voxcpm_finetune_all.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/voxcpm_v2/voxcpm_finetune_lora.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/examples/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/config/data_config_emilia.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/config/data_config_finetune.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/config/ds_config_zero2.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/config/train_config_emilia.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/config/train_config_finetune.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/config/train_config_finetune_sdpa.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/config/train_config_multilingual.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/run_emilia.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/run_eval.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/run_finetune.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/train_data_example.jsonl" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lora_ft_webui.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Taskfile.yml" beforeDir="false" afterPath="$PROJECT_DIR$/Taskfile.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app_old.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.in" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.in" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/test_voxcpm_ft_infer.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/test_voxcpm_lora_infer.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/train_voxcpm_finetune.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/voxcpm/cli.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/voxcpm/core.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/accelerator.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/config.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/data.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/packers.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/state.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/tracker.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/training/validate.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_validate.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/release.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/release.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test_pick_runtime_dtype.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test_pick_runtime_dtype.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/app.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/cli.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/core.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/utils.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/voxcpm.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/voxcpm2.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/audiovae/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/audiovae/audio_vae.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/audiovae/audio_vae_v2.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/layers/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/layers/lora.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/layers/scalar_quantization_layer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/local_dit.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/local_dit_v2.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/unified_cfm.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locenc/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locenc/local_encoder.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/cache.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/config.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/model.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/prefetch_assets.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/utils/text_normalize.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/voxcpm/zipenhancer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_cli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_lora_checkpoint_loading.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_lora_checkpoint_loading.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_model_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -199,7 +230,7 @@
       <updated>1778626133641</updated>
       <workItem from="1778626134766" duration="1510000" />
       <workItem from="1778627696735" duration="1886000" />
-      <workItem from="1778629606908" duration="7466000" />
+      <workItem from="1778629606908" duration="9397000" />
     </task>
     <task id="LOCAL−00001" summary="chore: bootstrap Hangry Labs Docker runtime">
       <option name="closed" value="true" />
@@ -208,7 +239,14 @@
       <option name="presentableId" value="LOCAL−00001" />
       <updated>1778636417347</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL−00002" summary="chore: remove VoxCPM training utilities and configurations">
+      <option name="closed" value="true" />
+      <created>1778637176195</created>
+      <option name="number" value="LOCAL−00002" />
+      <option name="presentableId" value="LOCAL−00002" />
+      <updated>1778637176195</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -216,7 +254,9 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="chore: bootstrap Hangry Labs Docker runtime" />
-    <option name="LAST_COMMIT_MESSAGE" value="chore: bootstrap Hangry Labs Docker runtime" />
+    <MESSAGE value="docs: update README and AGENTS guide for clarity and accuracy" />
+    <MESSAGE value="chore: remove VoxCPM training utilities and configurations" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: remove VoxCPM training utilities and configurations" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

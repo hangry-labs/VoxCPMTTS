@@ -70,11 +70,8 @@ Documentation = "https://github.com/OpenBMB/VoxCPM#readme"
 "Bug Tracker" = "https://github.com/OpenBMB/VoxCPM/issues"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 include = ["voxcpm*"]
-
-[tool.setuptools.package-dir]
-"" = "src"
 
 [tool.setuptools_scm]
 version_scheme = "post-release"

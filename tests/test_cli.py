@@ -9,13 +9,13 @@ import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-CLI_PATH = ROOT / "src" / "voxcpm" / "cli.py"
+CLI_PATH = ROOT / "voxcpm" / "cli.py"
 V1_MODEL_PATH = ROOT / "models" / "openbmb__VoxCPM1.5"
 V2_MODEL_PATH = ROOT / "models" / "VoxCPM2-1B-newaudiovae-6hz-nope-sft"
 
 
 pkg = types.ModuleType("voxcpm")
-pkg.__path__ = [str(ROOT / "src" / "voxcpm")]
+pkg.__path__ = [str(ROOT / "voxcpm")]
 sys.modules.setdefault("voxcpm", pkg)
 
 core_stub = types.ModuleType("voxcpm.core")

@@ -100,7 +100,7 @@ Invoke-Step "Update docs for $releaseTag" {
 
 Invoke-Step "Run release validation" {
     if (-not (Test-Enabled $SkipValidation)) {
-        python -m compileall -q src app.py scripts
+        python -m compileall -q voxcpm scripts
         task image
     }
 }

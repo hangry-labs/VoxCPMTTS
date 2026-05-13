@@ -17,8 +17,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md README_zh.md LICENSE VERSION requirements.txt /app/
-COPY src /app/src
-COPY app.py /app/app.py
+COPY voxcpm /app/voxcpm
 COPY assets /app/assets
 COPY hangrylabs /app/hangrylabs
 

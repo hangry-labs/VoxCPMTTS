@@ -327,7 +327,7 @@ voxcpm --help
 ### Web Demo
 
 ```bash
-python app.py --port 8808  # then open in browser: http://localhost:8808
+python -m voxcpm.app  # then open in browser: http://localhost:8808
 ```
 
 ### 🚢 Production Deployment (Nano-vLLM)

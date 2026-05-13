@@ -44,7 +44,7 @@ tasks:
   compile:
     desc: Compile Python sources
     cmds:
-      - cmd /c python -m compileall -q src tests app.py scripts
+      - cmd /c python -m compileall -q voxcpm tests scripts
 
   test:
     desc: Run checked-in tests only
@@ -106,21 +106,21 @@ tasks:
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   localrun:
-    desc: Run baked image with local src/ bind-mounted for hot-swapping package code
+    desc: Run baked image with local voxcpm/ bind-mounted for hot-swapping package code
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - task: cache-init
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\src:/app/src" {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   localrun-tiny:
-    desc: Run tiny image with local src/ bind-mounted, online on first use
+    desc: Run tiny image with local voxcpm/ bind-mounted, online on first use
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\src:/app/src" {{.TINY_IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   imageweb:

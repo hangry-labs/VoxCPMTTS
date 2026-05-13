@@ -21,7 +21,7 @@ from voxcpm import VoxCPM
 
 
 def _read_version() -> str:
-    version_path = Path(__file__).resolve().parents[2] / "VERSION"
+    version_path = Path(__file__).resolve().parents[1] / "VERSION"
     if version_path.exists():
         return version_path.read_text(encoding="utf-8").strip()
     return "0.1-snapshot"
@@ -120,9 +120,13 @@ STREAM_FORMAT_ALIASES = {
     ".mp3": "mp3",
     "mpeg": "mp3",
 }
+ASR_MODEL_ID = os.getenv("VOXCPM_ASR_MODEL_ID", "iic/SenseVoiceSmall")
+DEFAULT_LOAD_ASR = os.getenv("VOXCPM_LOAD_ASR", "1").lower() in {"1", "true", "yes"}
 
 MODEL_CACHE: dict[tuple[str, str], VoxCPM] = {}
 MODEL_LOCK = threading.Lock()
+ASR_MODEL = None
+ASR_LOCK = threading.Lock()
 
 
 def get_cuda_devices() -> list[str]:
@@ -173,6 +177,38 @@ def get_model(device: str = DEFAULT_DEVICE) -> VoxCPM:
                 device=requested_device,
             )
         return MODEL_CACHE[cache_key]
+
+
+def get_asr_model():
+    global ASR_MODEL
+    if not DEFAULT_LOAD_ASR:
+        raise RuntimeError("ASR is disabled. Set VOXCPM_LOAD_ASR=1 to enable reference transcription.")
+    with ASR_LOCK:
+        if ASR_MODEL is None:
+            from funasr import AutoModel
+
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            ASR_MODEL = AutoModel(
+                model=ASR_MODEL_ID,
+                disable_update=True,
+                log_level="ERROR",
+                device=device,
+            )
+        return ASR_MODEL
+
+
+def transcribe_reference_audio(audio_path: str, language: str = "auto") -> str:
+    if not audio_path:
+        raise ValueError("audio_path is required")
+    if not Path(audio_path).exists():
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+    model = get_asr_model()
+    result = model.generate(input=audio_path, language=language or "auto", use_itn=True)
+    if not result:
+        return ""
+    text = result[0].get("text", "")
+    return text.split("|>")[-1].strip()
 
 
 def normalize_output_format(output_format: str | None) -> str:
@@ -336,6 +372,11 @@ class PurgeRequest(BaseModel):
     device: Optional[str] = Field(None, description="Optional cached device to clear. Omit to clear all cached models.")
 
 
+class TranscriptionRequest(BaseModel):
+    audio_path: str = Field(..., description="Container-visible audio path to transcribe.")
+    language: str = Field("auto", description="ASR language hint. Use auto for detection.")
+
+
 def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray]:
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Text must not be empty")
@@ -399,6 +440,8 @@ def get_status_payload() -> dict:
         "device": DEFAULT_DEVICE,
         "model_id": DEFAULT_MODEL_ID,
         "load_denoiser": DEFAULT_LOAD_DENOISER,
+        "load_asr": DEFAULT_LOAD_ASR,
+        "asr_model_id": ASR_MODEL_ID,
         "optimize": DEFAULT_OPTIMIZE,
         "languages": SUPPORTED_LANGUAGES,
         "loaded_model_devices": loaded_devices,
@@ -416,6 +459,7 @@ def create_ui() -> gr.Blocks:
         text: str,
         control: str,
         reference_audio: Optional[str],
+        use_ref_text: bool,
         ref_text: str,
         cfg_value: float,
         inference_timesteps: int,
@@ -426,9 +470,9 @@ def create_ui() -> gr.Blocks:
     ):
         payload = TTSRequest(
             text=text,
-            control=control or None,
+            control=None if use_ref_text else (control or None),
             ref_audio=reference_audio,
-            ref_text=(ref_text or None),
+            ref_text=(ref_text or None) if use_ref_text else None,
             cfg_value=cfg_value,
             inference_timesteps=int(inference_timesteps),
             normalize=normalize_text,
@@ -438,6 +482,27 @@ def create_ui() -> gr.Blocks:
         )
         output_format, sample_rate, waveform = synthesize_payload(payload)
         return encoded_audio_to_temp_file(waveform, output_format, sample_rate)
+
+    def toggle_ultimate_mode(enabled: bool):
+        if enabled:
+            return (
+                gr.update(visible=True),
+                gr.update(interactive=False, value=""),
+                gr.update(interactive=True),
+            )
+        return (
+            gr.update(visible=False, value=""),
+            gr.update(interactive=True),
+            gr.update(interactive=False),
+        )
+
+    def transcribe_for_ui(reference_audio: Optional[str]) -> str:
+        if not reference_audio:
+            raise gr.Error("Upload or record reference audio before transcription.")
+        try:
+            return transcribe_reference_audio(reference_audio)
+        except Exception as exc:
+            raise gr.Error(f"Reference transcription failed: {exc}") from exc
 
     with gr.Blocks(title="VoxCPMTTS") as ui:
         gr.HTML(
@@ -469,11 +534,18 @@ def create_ui() -> gr.Blocks:
                     sources=["upload", "microphone"],
                     type="filepath",
                 )
+                use_ref_text = gr.Checkbox(
+                    value=False,
+                    label="Ultimate Cloning Mode",
+                    info="Use a transcript with the reference audio. Control Instruction is disabled in this mode.",
+                )
                 ref_text = gr.Textbox(
                     label="Reference Transcript",
-                    placeholder="Optional transcript for ultimate cloning",
+                    placeholder="Use the transcribe button or enter the reference transcript manually.",
                     lines=2,
+                    visible=False,
                 )
+                transcribe_btn = gr.Button("Transcribe Reference", interactive=False)
                 with gr.Row():
                     hardware = gr.Dropdown(hardware_choices, value=default_hardware, label="Hardware")
                     output_format = gr.Dropdown(
@@ -491,17 +563,29 @@ def create_ui() -> gr.Blocks:
                 audio_output = gr.Audio(label="Generated Audio", interactive=False, autoplay=True)
                 gr.Markdown(
                     "API docs: `/tts/docs`\n\n"
-                    "Use `ref_audio` alone for controllable cloning, or pair reference audio "
-                    "with `ref_text` for transcript-guided cloning. VoxCPM2 auto-detects "
-                    "its supported languages from the input text."
+                    "Use `ref_audio` alone for controllable cloning, or enable Ultimate "
+                    "Cloning Mode to pair reference audio with `ref_text`. VoxCPM2 "
+                    "auto-detects its supported languages from the input text."
                 )
 
+        use_ref_text.change(
+            fn=toggle_ultimate_mode,
+            inputs=[use_ref_text],
+            outputs=[ref_text, control, transcribe_btn],
+        )
+        transcribe_btn.click(
+            fn=transcribe_for_ui,
+            inputs=[reference_audio],
+            outputs=[ref_text],
+            show_progress=True,
+        )
         generate_btn.click(
             fn=generate_file,
             inputs=[
                 text,
                 control,
                 reference_audio,
+                use_ref_text,
                 ref_text,
                 cfg_value,
                 inference_timesteps,
@@ -591,6 +675,17 @@ def speakers(language: str = Query("auto", description="Compatibility parameter.
 def metrics(payload: MetricsRequest = Body(...)) -> dict:
     text = payload.text or ""
     return {"metrics": {"characters": len(text), "words": len(text.split())}}
+
+
+@api.post("/tts/transcribe")
+def transcribe(payload: TranscriptionRequest = Body(...)) -> dict:
+    try:
+        text = transcribe_reference_audio(payload.audio_path, payload.language)
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Reference transcription failed: {exc}") from exc
+    return {"text": text, "language": payload.language, "model_id": ASR_MODEL_ID}
 
 
 @api.post("/tts/generate")

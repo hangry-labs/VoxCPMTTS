@@ -1,6 +1,6 @@
 """Unit checks for pick_runtime_dtype / get_dtype consistency.
 
-Loads src/voxcpm/model/utils.py directly to avoid the heavy voxcpm package
+Loads voxcpm/model/utils.py directly to avoid the heavy voxcpm package
 init. Run with: `python scripts/test_pick_runtime_dtype.py`.
 """
 import importlib.util
@@ -9,7 +9,7 @@ import pathlib
 import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-UTILS = str(REPO_ROOT / "src" / "voxcpm" / "model" / "utils.py")
+UTILS = str(REPO_ROOT / "voxcpm" / "model" / "utils.py")
 spec = importlib.util.spec_from_file_location("voxcpm_utils", UTILS)
 utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(utils)

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-UTILS_PATH = ROOT / "src" / "voxcpm" / "model" / "utils.py"
+UTILS_PATH = ROOT / "voxcpm" / "model" / "utils.py"
 
 transformers_stub = types.ModuleType("transformers")
 transformers_stub.PreTrainedTokenizer = object
