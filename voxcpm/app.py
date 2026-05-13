@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from voxcpm import VoxCPM
+from voxcpm.model.utils import resolve_runtime_device
 
 
 def _read_version() -> str:
@@ -163,19 +164,29 @@ def resolve_requested_device(device: str, use_gpu: Optional[bool] = None) -> str
     return (device or "auto").strip().lower()
 
 
-def get_model(device: str = DEFAULT_DEVICE) -> VoxCPM:
-    requested_device = resolve_requested_device(device)
+def canonical_model_device(device: str) -> str:
+    resolved = resolve_runtime_device(device, configured_device="cuda")
+    if resolved == "cuda":
+        return "cuda:0"
+    return resolved
+
+
+def get_model(device: str = DEFAULT_DEVICE, load_denoiser: bool = False) -> VoxCPM:
+    requested_device = canonical_model_device(resolve_requested_device(device))
+    should_load_denoiser = DEFAULT_LOAD_DENOISER and load_denoiser
     cache_key = (DEFAULT_MODEL_ID, requested_device)
     with MODEL_LOCK:
         if cache_key not in MODEL_CACHE:
             MODEL_CACHE[cache_key] = VoxCPM.from_pretrained(
                 hf_model_id=DEFAULT_MODEL_ID,
-                load_denoiser=DEFAULT_LOAD_DENOISER,
+                load_denoiser=False,
                 zipenhancer_model_id=ZIPENHANCER_MODEL_ID,
                 local_files_only=DEFAULT_LOCAL_ONLY,
                 optimize=DEFAULT_OPTIMIZE,
                 device=requested_device,
             )
+        if should_load_denoiser:
+            MODEL_CACHE[cache_key].enable_denoiser(ZIPENHANCER_MODEL_ID)
         return MODEL_CACHE[cache_key]
 
 
@@ -387,7 +398,7 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray]:
 
     requested_device = resolve_requested_device(payload.device, payload.use_gpu)
     try:
-        model = get_model(requested_device)
+        model = get_model(requested_device, load_denoiser=payload.denoise)
         wav = model.generate(**build_generate_kwargs(payload, model))
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -711,7 +722,7 @@ def stream_tts(payload: StreamingTTSRequest = Body(...)) -> StreamingResponse:
 def purge_models(payload: PurgeRequest | None = Body(None)) -> dict:
     requested_device = payload.device if payload else None
     if requested_device:
-        device = resolve_requested_device(requested_device)
+        device = canonical_model_device(resolve_requested_device(requested_device))
         purged = []
         for cache_key in list(MODEL_CACHE):
             if cache_key[1] == device:

@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS base
+FROM python:3.13-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -16,9 +16,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential ffmpeg git libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md README_zh.md LICENSE VERSION requirements.txt /app/
+COPY pyproject.toml README.md LICENSE VERSION requirements.txt /app/
 COPY voxcpm /app/voxcpm
-COPY assets /app/assets
 COPY hangrylabs /app/hangrylabs
 
 RUN python -m pip install --upgrade pip setuptools wheel \
@@ -29,7 +28,7 @@ FROM base AS baked-builder
 
 RUN python -u -m voxcpm.prefetch_assets
 
-FROM python:3.11-slim AS runtime-base
+FROM python:3.13-slim AS runtime-base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

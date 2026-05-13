@@ -106,6 +106,7 @@
                 <span class="pill px-3 py-1 text-sm font-semibold">48 kHz output</span>
                 <span class="pill px-3 py-1 text-sm font-semibold">Voice clone</span>
                 <span class="pill px-3 py-1 text-sm font-semibold">Voice design</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">Baked offline image</span>
                 <span class="pill px-3 py-1 text-sm font-semibold">UI + API</span>
               </div>
             </div>
@@ -128,6 +129,13 @@
             <h2 class="mb-3 text-lg font-bold text-orange-400">API Docs</h2>
             <a class="text-lg font-bold" href="http://localhost:8808/tts/docs">/tts/docs</a>
           </article>
+        </section>
+
+        <section class="brand-card mb-8 p-5">
+          <h2 class="mb-3 text-lg font-bold text-orange-400">Runtime Notes</h2>
+          <p class="text-sm leading-6 text-orange-100">
+            The full image includes VoxCPM2, denoiser, and ASR assets for offline-friendly use after the image is pulled. VoxCPM2 is memory-heavy, so run one VoxCPMTTS container per GPU unless separate model copies are intentional.
+          </p>
         </section>
 
         <section class="grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="API examples" data-example-grid></section>

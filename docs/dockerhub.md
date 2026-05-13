@@ -50,10 +50,15 @@ The standard `vX.Y` image is the full baked image with VoxCPM2 model assets plus
 
 The runtime defaults to `VOXCPM_OPTIMIZE=0` so the slim image does not need a C compiler for first-run Triton compilation. Set `VOXCPM_OPTIMIZE=1` only when you want to test compiled inference.
 
-Tiny tags use the `vX.Y_tiny` pattern. They keep runtime dependencies but skip baked Hugging Face model assets, and are intended for persistent-volume workflows where the cache is warmed on first online use:
+VoxCPM2 is memory-heavy. Run one VoxCPMTTS container per GPU unless you intentionally want duplicate model copies in RAM and VRAM. The service reuses one cached model for `auto` and `cuda:0`, and only attaches the denoiser to that existing model when `denoise=true`.
+
+Tiny tags use the `vX.Y_tiny` pattern. They keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face and ModelScope caches are warmed on first online use:
 
 ```bash
-docker run -p 8808:8808 --gpus all -v voxcpmtts_hf_cache:/app/.cache/huggingface hangrylabs/voxcpmtts:v0.1_tiny
+docker run -p 8808:8808 --gpus all \
+  -v voxcpmtts_hf_cache:/app/.cache/huggingface \
+  -v voxcpmtts_modelscope_cache:/app/.cache/modelscope \
+  hangrylabs/voxcpmtts:v0.1_tiny
 ```
 
 ## What You Get

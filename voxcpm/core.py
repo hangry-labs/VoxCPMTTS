@@ -4,11 +4,29 @@ import re
 import json
 import tempfile
 import numpy as np
+from pathlib import Path
 from typing import Generator, Optional
 from huggingface_hub import snapshot_download
 from .model.voxcpm import VoxCPMModel, LoRAConfig
 from .model.voxcpm2 import VoxCPM2Model
 from .model.utils import next_and_close
+
+
+def _resolve_modelscope_model_path(model_id_or_path: str) -> str:
+    if os.path.isdir(model_id_or_path):
+        return model_id_or_path
+
+    cache_root = Path(os.getenv("MODELSCOPE_CACHE", Path.home() / ".cache" / "modelscope"))
+    relative_parts = model_id_or_path.split("/")
+    candidates = [
+        cache_root / "models" / Path(*relative_parts),
+        cache_root / "hub" / Path(*relative_parts),
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return str(candidate)
+
+    return model_id_or_path
 
 
 class VoxCPM:
@@ -88,9 +106,7 @@ class VoxCPM:
         self.text_normalizer = None
         self.denoiser = None
         if enable_denoiser and zipenhancer_model_path is not None:
-            from .zipenhancer import ZipEnhancer
-
-            self.denoiser = ZipEnhancer(zipenhancer_model_path)
+            self.enable_denoiser(zipenhancer_model_path)
         else:
             self.denoiser = None
         if optimize:
@@ -160,9 +176,11 @@ class VoxCPM:
                 local_files_only=local_files_only,
             )
 
+        zipenhancer_model_path = _resolve_modelscope_model_path(zipenhancer_model_id) if load_denoiser else None
+
         return cls(
             voxcpm_model_path=local_path,
-            zipenhancer_model_path=zipenhancer_model_id if load_denoiser else None,
+            zipenhancer_model_path=zipenhancer_model_path,
             enable_denoiser=load_denoiser,
             optimize=optimize,
             device=device,
@@ -170,6 +188,14 @@ class VoxCPM:
             lora_weights_path=lora_weights_path,
             **kwargs,
         )
+
+    def enable_denoiser(self, zipenhancer_model_path: str) -> None:
+        if self.denoiser is not None:
+            return
+
+        from .zipenhancer import ZipEnhancer
+
+        self.denoiser = ZipEnhancer(_resolve_modelscope_model_path(zipenhancer_model_path))
 
     def generate(self, *args, **kwargs) -> np.ndarray:
         return next_and_close(self._generate(*args, streaming=False, **kwargs))

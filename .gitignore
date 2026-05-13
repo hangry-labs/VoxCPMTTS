@@ -1,6 +1,41 @@
-launch.json
-__pycache__
-voxcpm.egg-info
+# OS metadata
 .DS_Store
-./pretrained_models/
+Thumbs.db
+
+# Editor and IDE state
+.idea/
+.vscode/
+launch.json
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python build artifacts
+*.egg-info/
+build/
+dist/
+
+# Local Python environments
+.venv/
+venv/
+env/
+
+# Local model and runtime caches
+pretrained_models/
+.cache/
+
+# Local-only app scratch files
 app_local.py
+*.log
+
+# Generated local media
+*.mp3
+*.flac
+*.ogg

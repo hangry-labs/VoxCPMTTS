@@ -9,6 +9,7 @@ vars:
   APP_OPTIMIZE: '0'
   HF_TOKEN: ''
   HF_CACHE_VOLUME: voxcpmtts_hf_cache
+  MODELSCOPE_CACHE_VOLUME: voxcpmtts_modelscope_cache
   HF_HUB_OFFLINE: '1'
   TRANSFORMERS_OFFLINE: '1'
   CONTAINER: voxcpmtts
@@ -49,7 +50,7 @@ tasks:
   test:
     desc: Run checked-in tests only
     cmds:
-      - cmd /c ".venv\\Scripts\\python.exe -m pytest -q tests"
+      - cmd /c python -m pytest -q tests
 
   cli-help:
     desc: Show VoxCPM CLI help
@@ -72,10 +73,11 @@ tasks:
       - cmd /c docker build --target tiny -t {{.TINY_IMAGE}} .
 
   cache-init:
-    desc: Seed the persistent Hugging Face cache volume from the baked image
+    desc: Seed persistent Hugging Face and ModelScope cache volumes from the baked image
     cmds:
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker run --rm -v {{.HF_CACHE_VOLUME}}:/cache {{.IMAGE}} sh -c "mkdir -p /cache && cp -an /app/.cache/huggingface/. /cache/ || true"
+      - cmd /c docker volume create {{.MODELSCOPE_CACHE_VOLUME}} >nul
+      - cmd /c docker run --rm -v {{.HF_CACHE_VOLUME}}:/hf-cache -v {{.MODELSCOPE_CACHE_VOLUME}}:/modelscope-cache {{.IMAGE}} sh -c "mkdir -p /hf-cache /modelscope-cache && cp -an /app/.cache/huggingface/. /hf-cache/ || true && cp -an /app/.cache/modelscope/. /modelscope-cache/ || true"
 
   release:
     desc: Release current VERSION snapshot, tag it, and prepare next snapshot
@@ -83,26 +85,26 @@ tasks:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -DryRun "{{.DRY_RUN}}" -NextVersion "{{.NEXT_VERSION}}" -SkipValidation "{{.SKIP_VALIDATION}}"
 
   deps:
-    desc: Regenerate Linux/Python 3.11 requirements.txt from requirements.in
+    desc: Regenerate Linux/Python 3.13 requirements.txt from requirements.in
     cmds:
-      - uv pip compile requirements.in --python-version 3.11 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --no-header --no-annotate --output-file requirements.txt
+      - uv pip compile requirements.in --python-version 3.13 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --no-header --no-annotate --output-file requirements.txt
 
   imagerun:
-    desc: Run baked image with UI and API on PORT
+    desc: Run baked image with UI and API on PORT, without external model cache mounts
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - task: cache-init
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   imagerun-tiny:
-    desc: Run tiny image online on first use, using the persistent Hugging Face cache volume
+    desc: Run tiny image online on first use, using persistent Hugging Face and ModelScope cache volumes
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface {{.TINY_IMAGE}}
+      - cmd /c docker volume create {{.MODELSCOPE_CACHE_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.MODELSCOPE_CACHE_VOLUME}}:/app/.cache/modelscope {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   localrun:
@@ -110,8 +112,7 @@ tasks:
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - task: cache-init
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   localrun-tiny:
@@ -120,7 +121,8 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.TINY_IMAGE}}
+      - cmd /c docker volume create {{.MODELSCOPE_CACHE_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.MODELSCOPE_CACHE_VOLUME}}:/app/.cache/modelscope -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   imageweb:
@@ -161,10 +163,11 @@ tasks:
       - cmd /c docker logs --tail 200 {{.CONTAINER_LOCAL}} 2>nul || docker logs --tail 200 {{.CONTAINER}}
 
   nuke:
-    desc: Remove VoxCPMTTS local containers, images, and Hugging Face cache volume
+    desc: Remove VoxCPMTTS local containers, images, and model cache volumes
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker rmi -f {{.IMAGE}} >nul 2>&1
       - cmd /c docker rmi -f {{.TINY_IMAGE}} >nul 2>&1
       - cmd /c docker volume rm -f {{.HF_CACHE_VOLUME}} >nul 2>&1
+      - cmd /c docker volume rm -f {{.MODELSCOPE_CACHE_VOLUME}} >nul 2>&1

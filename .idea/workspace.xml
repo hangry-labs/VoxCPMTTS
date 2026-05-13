@@ -4,76 +4,30 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3049c5fe-5df1-40ed-a68b-cddc3656f932" name="Changes" comment="chore: remove VoxCPM training utilities and configurations">
-      <change afterPath="$PROJECT_DIR$/voxcpm/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/app.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/cli.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/core.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/model/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/model/utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/model/voxcpm.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/model/voxcpm2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/audiovae/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/audiovae/audio_vae.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/audiovae/audio_vae_v2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/layers/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/layers/lora.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/layers/scalar_quantization_layer.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/local_dit.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/local_dit_v2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locdit/unified_cfm.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locenc/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/locenc/local_encoder.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/cache.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/config.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/modules/minicpm4/model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/prefetch_assets.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/utils/text_normalize.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/voxcpm/zipenhancer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="3049c5fe-5df1-40ed-a68b-cddc3656f932" name="Changes" comment="chore: remove VoxCPM application and module files, deprecating related components">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/go.imports.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README_zh.md" beforeDir="false" afterPath="$PROJECT_DIR$/README_zh.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README_zh.md" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Taskfile.yml" beforeDir="false" afterPath="$PROJECT_DIR$/Taskfile.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app_old.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/discord-logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/feishu-group.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/feishu-logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/modelbest_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/thuhcsi_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/voxcpm_logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/voxcpm_model.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/dockerhub.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/dockerhub.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/examples/index.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/release.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/release.ps1" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/test_pick_runtime_dtype.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test_pick_runtime_dtype.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/app.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/cli.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/core.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/utils.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/voxcpm.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/model/voxcpm2.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/audiovae/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/audiovae/audio_vae.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/audiovae/audio_vae_v2.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/layers/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/layers/lora.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/layers/scalar_quantization_layer.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/local_dit.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/local_dit_v2.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locdit/unified_cfm.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locenc/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/locenc/local_encoder.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/cache.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/config.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/modules/minicpm4/model.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/prefetch_assets.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/utils/text_normalize.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/voxcpm/zipenhancer.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_cli.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_lora_checkpoint_loading.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_lora_checkpoint_loading.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_model_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.in" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.in" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uv.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/voxcpm/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/voxcpm/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/voxcpm/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/voxcpm/core.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -157,7 +111,10 @@
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
     "org.rust.first.attach.projects": "true",
-    "settings.editor.selected.configurable": "reference.settingsdialog.IDE.editor.colors.com.intellij.vcs.gitlab.ultimate.features.expressionLang.highlighting.GitLabCiExpressionColorSettingsPage",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.0",
+    "settings.editor.selected.configurable": "configurable.group.language",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -172,7 +129,7 @@
       <module name="VoxCPMTTS" />
       <working_directory value="$PROJECT_DIR$" />
       <go_parameters value="-i" />
-      <kind />
+      <kind value="FILE" />
       <directory value="$PROJECT_DIR$" />
       <filePath value="$PROJECT_DIR$" />
       <method v="2" />
@@ -181,7 +138,7 @@
       <module name="VoxCPMTTS" />
       <working_directory value="$PROJECT_DIR$" />
       <go_parameters value="-i" />
-      <kind />
+      <kind value="DIRECTORY" />
       <directory value="$PROJECT_DIR$" />
       <filePath value="$PROJECT_DIR$" />
       <framework value="gotest" />
@@ -192,6 +149,11 @@
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="VoxCPMTTS" />
+      <option name="filePath" />
+      <method v="2" />
     </configuration>
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="VoxCPMTTS" />
@@ -217,6 +179,20 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration default="true" type="Tox" factoryName="Tox">
+      <module name="VoxCPMTTS" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <option name="RUN_TOOL" value="" />
+      <method v="2" />
+    </configuration>
   </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
@@ -230,7 +206,10 @@
       <updated>1778626133641</updated>
       <workItem from="1778626134766" duration="1510000" />
       <workItem from="1778627696735" duration="1886000" />
-      <workItem from="1778629606908" duration="9397000" />
+      <workItem from="1778629606908" duration="9591000" />
+      <workItem from="1778682245471" duration="1623000" />
+      <workItem from="1778684751615" duration="767000" />
+      <workItem from="1778688854955" duration="13916000" />
     </task>
     <task id="LOCAL−00001" summary="chore: bootstrap Hangry Labs Docker runtime">
       <option name="closed" value="true" />
@@ -246,7 +225,14 @@
       <option name="presentableId" value="LOCAL−00002" />
       <updated>1778637176195</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL−00003" summary="chore: remove VoxCPM application and module files, deprecating related components">
+      <option name="closed" value="true" />
+      <created>1778639109206</created>
+      <option name="number" value="LOCAL−00003" />
+      <option name="presentableId" value="LOCAL−00003" />
+      <updated>1778639109206</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -256,7 +242,8 @@
     <MESSAGE value="chore: bootstrap Hangry Labs Docker runtime" />
     <MESSAGE value="docs: update README and AGENTS guide for clarity and accuracy" />
     <MESSAGE value="chore: remove VoxCPM training utilities and configurations" />
-    <option name="LAST_COMMIT_MESSAGE" value="chore: remove VoxCPM training utilities and configurations" />
+    <MESSAGE value="chore: remove VoxCPM application and module files, deprecating related components" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: remove VoxCPM application and module files, deprecating related components" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>
