@@ -1,11 +1,12 @@
 # OS metadata
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Editor and IDE state
 .idea/
 .vscode/
-launch.json
+*.code-workspace
 
 # Python bytecode and caches
 __pycache__/
@@ -21,21 +22,35 @@ htmlcov/
 *.egg-info/
 build/
 dist/
+pip-wheel-metadata/
 
 # Local Python environments
 .venv/
 venv/
 env/
+.env
+.env.*
+!.env.example
 
 # Local model and runtime caches
 pretrained_models/
 .cache/
+models/
+hf_cache/
+modelscope_cache/
 
 # Local-only app scratch files
 app_local.py
 *.log
+*.tmp
 
 # Generated local media
 *.mp3
 *.flac
 *.ogg
+*.wav
+
+# Public example audio assets
+!examples/original_clone.mp3
+!examples/assets/
+!examples/assets/**/*.mp3

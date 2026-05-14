@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Hangry Labs VoxCPMTTS</title>
+    <title>Hangry Labs VoxCPMTTS Examples</title>
     <link rel="icon" type="image/png" href="../hangrylabs/favicon_small.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -38,7 +38,7 @@
           url("../hangrylabs/hero_background_small.png") center top / cover no-repeat;
         content: "";
         inset: 0;
-        opacity: 0.22;
+        opacity: 0.2;
         pointer-events: none;
         position: fixed;
         z-index: -1;
@@ -47,8 +47,47 @@
       .brand-card {
         background: rgba(20, 20, 20, 0.94);
         border: 2px solid rgba(255, 107, 0, 0.3);
-        border-radius: 8px;
+        border-radius: 12px;
         box-shadow: 0 0 28px rgba(255, 107, 0, 0.12);
+        cursor: pointer;
+        transition:
+          border-color 0.25s ease,
+          box-shadow 0.25s ease,
+          transform 0.25s ease;
+      }
+
+      .brand-card:hover {
+        border-color: #ff6b00;
+        box-shadow: 0 0 24px rgba(255, 107, 0, 0.34);
+        transform: translateY(-3px);
+      }
+
+      .brand-card:focus-visible {
+        border-color: #ff8a33;
+        box-shadow:
+          0 0 0 3px rgba(255, 107, 0, 0.28),
+          0 0 28px rgba(255, 107, 0, 0.42);
+        outline: none;
+      }
+
+      .brand-card.is-playing {
+        animation: cardPulse 1.4s ease-in-out infinite;
+        border-color: #ff6b00;
+      }
+
+      @keyframes cardPulse {
+        0%,
+        100% {
+          box-shadow:
+            0 0 18px rgba(255, 107, 0, 0.28),
+            0 0 42px rgba(255, 107, 0, 0.12);
+        }
+
+        50% {
+          box-shadow:
+            0 0 28px rgba(255, 107, 0, 0.5),
+            0 0 68px rgba(255, 107, 0, 0.2);
+        }
       }
 
       .brand-glow {
@@ -65,6 +104,324 @@
         color: #ffb076;
       }
 
+      .language-filter {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-bottom: 1rem;
+      }
+
+      .filter-button,
+      .language-button {
+        appearance: none;
+        align-items: center;
+        border: 1px solid rgba(255, 107, 0, 0.42);
+        background: rgba(20, 20, 20, 0.84);
+        border-radius: 999px;
+        color: #ffb076;
+        cursor: pointer;
+        display: inline-flex;
+        font-size: 0.86rem;
+        font-weight: 700;
+        gap: 0.5rem;
+        line-height: 1;
+        min-height: 2.75rem;
+        padding: 0.42rem 0.85rem 0.42rem 0.45rem;
+        transition:
+          background 0.2s ease,
+          border-color 0.2s ease,
+          color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .filter-button:hover,
+      .filter-button:focus-visible,
+      .filter-button.is-active,
+      .language-button:hover,
+      .language-button:focus-visible,
+      .language-button.is-active {
+        background: rgba(255, 107, 0, 0.22);
+        border-color: #ff6b00;
+        box-shadow: 0 0 16px rgba(255, 107, 0, 0.18);
+        color: #ffc394;
+        outline: none;
+      }
+
+      .language-icon {
+        align-items: center;
+        background: rgba(255, 107, 0, 0.16);
+        border: 1px solid rgba(255, 107, 0, 0.42);
+        border-radius: 999px;
+        color: #ffd0a3;
+        display: inline-flex;
+        flex: 0 0 2rem;
+        font-size: 0.72rem;
+        font-weight: 900;
+        height: 2rem;
+        justify-content: center;
+        line-height: 1;
+      }
+
+      .language-icon.large {
+        flex-basis: 3.5rem;
+        font-size: 1rem;
+        height: 3.5rem;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        background: rgba(10, 10, 10, 0.86);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 107, 0, 0.26);
+        border-radius: 12px;
+        display: flex;
+        gap: 0.85rem;
+        justify-content: space-between;
+        margin-bottom: 1.35rem;
+        padding: 0.85rem;
+      }
+
+      .brand-lockup {
+        align-items: flex-start;
+        color: inherit;
+        display: flex;
+        gap: 0.7rem;
+        min-width: 0;
+        padding: 0.1rem 0 0 0.1rem;
+        text-decoration: none;
+      }
+
+      .brand-logo {
+        border: 1px solid rgba(255, 107, 0, 0.36);
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(255, 107, 0, 0.22);
+        height: 2.65rem;
+        object-fit: cover;
+        width: 2.65rem;
+      }
+
+      .brand-name {
+        color: #ffb076;
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1.1;
+      }
+
+      .brand-subtitle {
+        color: #ff8a33;
+        font-size: 0.76rem;
+        font-weight: 600;
+        margin-top: 0.15rem;
+      }
+
+      .hero {
+        align-items: start;
+        display: grid;
+        gap: 2rem;
+        grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
+      }
+
+      .hero-logo-panel {
+        align-items: flex-start;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+      }
+
+      .hero-logo-link {
+        display: block;
+        margin-left: auto;
+        max-width: min(360px, 100%);
+        text-decoration: none;
+        width: 100%;
+      }
+
+      .hero-logo {
+        aspect-ratio: 1 / 1;
+        border: 2px solid rgba(255, 107, 0, 0.3);
+        border-radius: 18px;
+        box-shadow:
+          0 0 28px rgba(255, 107, 0, 0.22),
+          0 0 80px rgba(255, 60, 0, 0.14);
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .hero-site-link {
+        align-self: flex-end;
+        animation: siteLinkPulse 2.4s ease-in-out infinite;
+        color: #ff9b45;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0;
+        margin-top: 0.24rem;
+        text-align: center;
+        text-decoration: none;
+        text-shadow:
+          0 0 10px rgba(255, 107, 0, 0.5),
+          0 0 22px rgba(255, 107, 0, 0.22);
+        width: min(360px, 100%);
+      }
+
+      @keyframes siteLinkPulse {
+        0%,
+        100% {
+          opacity: 0.74;
+        }
+
+        50% {
+          opacity: 1;
+        }
+      }
+
+      .top-actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        justify-content: flex-end;
+      }
+
+      .volume-control {
+        align-items: center;
+        background: rgba(255, 107, 0, 0.1);
+        border: 1px solid rgba(255, 107, 0, 0.34);
+        border-radius: 999px;
+        display: flex;
+        gap: 0.55rem;
+        padding: 0.45rem 0.65rem;
+      }
+
+      .volume-button {
+        align-items: center;
+        appearance: none;
+        background: transparent;
+        border: 0;
+        color: #ffb076;
+        cursor: pointer;
+        display: inline-flex;
+        height: 2rem;
+        justify-content: center;
+        padding: 0;
+        width: 2rem;
+      }
+
+      .volume-button:hover,
+      .volume-button:focus-visible {
+        color: #ff6b00;
+        outline: none;
+      }
+
+      .volume-button svg {
+        display: block;
+        height: 1.55rem;
+        width: 1.55rem;
+      }
+
+      .volume-button svg path {
+        stroke: currentColor;
+      }
+
+      .volume-button svg[hidden],
+      audio {
+        display: none;
+      }
+
+      .volume-slider {
+        accent-color: #ff6b00;
+        cursor: pointer;
+        width: 4.5rem;
+      }
+
+      .status-strip {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+      }
+
+      .player {
+        align-items: center;
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .progress-button {
+        appearance: none;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        min-width: 0;
+        padding: 0.75rem 0;
+        touch-action: none;
+        user-select: none;
+        width: 100%;
+      }
+
+      .progress-button:focus-visible {
+        outline: 2px solid rgba(255, 107, 0, 0.8);
+        outline-offset: 4px;
+      }
+
+      .progress-track {
+        align-items: center;
+        background: rgba(255, 107, 0, 0.16);
+        border: 1px solid rgba(255, 107, 0, 0.3);
+        border-radius: 999px;
+        box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.5);
+        display: flex;
+        height: 0.56rem;
+        overflow: visible;
+        position: relative;
+        width: 100%;
+      }
+
+      .progress-fill {
+        background: linear-gradient(90deg, #ff6b00, #ff9b45);
+        border-radius: inherit;
+        box-shadow: 0 0 14px rgba(255, 107, 0, 0.55);
+        height: 100%;
+        left: 0;
+        position: absolute;
+        top: 0;
+        transition: width 0.08s linear;
+        width: 0;
+      }
+
+      .progress-knob {
+        background: #ff6b00;
+        border: 2px solid #ffc08a;
+        border-radius: 999px;
+        box-shadow:
+          0 0 8px rgba(255, 107, 0, 0.7),
+          0 0 16px rgba(255, 107, 0, 0.28);
+        height: 1rem;
+        left: 0;
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        transition: left 0.08s linear;
+        width: 1rem;
+        z-index: 2;
+      }
+
+      .duration {
+        color: #ffb076;
+        font-family: "Courier New", monospace;
+        font-size: 0.78rem;
+        min-width: 4.4rem;
+        text-align: right;
+      }
+
+      .clone-card {
+        background:
+          linear-gradient(135deg, rgba(255, 107, 0, 0.24), rgba(20, 20, 20, 0.95) 48%),
+          rgba(20, 20, 20, 0.94);
+        border-color: rgba(255, 176, 118, 0.58);
+      }
+
       a {
         color: #ff6b00;
       }
@@ -73,6 +430,42 @@
         color: #ff8a33;
         text-shadow: 0 0 12px rgba(255, 107, 0, 0.42);
       }
+
+      @media (max-width: 900px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-logo-link,
+        .hero-logo {
+          margin-left: 0;
+          max-width: 220px;
+        }
+
+        .hero-site-link {
+          align-self: flex-start;
+          width: min(220px, 100%);
+        }
+      }
+
+      @media (max-width: 720px) {
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .top-actions {
+          justify-content: flex-start;
+        }
+
+        .player {
+          grid-template-columns: 1fr;
+        }
+
+        .duration {
+          text-align: left;
+        }
+      }
     </style>
   </head>
   <body>
@@ -80,65 +473,61 @@
     <main class="page-shell">
       <section class="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
         <header class="mb-8 pt-0">
-          <div class="flex flex-col gap-8 lg:grid lg:grid-cols-[1fr_320px] lg:items-start">
+          <div class="hero">
             <div>
-              <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-500/25 bg-black/80 p-3">
-                <a class="flex items-center gap-3 no-underline" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">
-                  <img class="h-12 w-12 rounded-lg border border-orange-500/40 object-cover" src="../hangrylabs/favicon_small.png" alt="Hangry Labs logo">
+              <div class="topbar">
+                <a class="brand-lockup" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">
+                  <img class="brand-logo" src="../hangrylabs/favicon_small.png" alt="Hangry Labs logo">
                   <div>
-                    <div class="font-extrabold text-[#ffb076]">Hangry Labs</div>
-                    <div class="text-sm font-semibold text-orange-400">Useful tools, easy to run</div>
+                    <div class="brand-name">Hangry Labs</div>
+                    <div class="brand-subtitle">Useful tools, easy to run</div>
                   </div>
                 </a>
-                <nav class="flex flex-wrap gap-2" aria-label="Project links">
-                  <a class="pill px-4 py-2 text-sm font-semibold no-underline" href="https://hub.docker.com/r/hangrylabs/voxcpmtts/tags">Docker Hub</a>
-                  <a class="pill px-4 py-2 text-sm font-semibold no-underline" href="https://github.com/Hangry-Labs/VoxCPMTTS">GitHub</a>
-                </nav>
+                <div class="top-actions">
+                  <div class="volume-control" aria-label="Volume control">
+                    <button class="volume-button" type="button" aria-label="Mute audio" data-muted="false">
+                      <svg class="volume-icon-on" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.5 15.5H4.75A1.75 1.75 0 013 13.75v-3.5c0-.97.78-1.75 1.75-1.75H6.5l5-4.25v15.5l-5-4.25zM16 8.5a5 5 0 010 7M18.75 6a8.5 8.5 0 010 12"></path>
+                      </svg>
+                      <svg class="volume-icon-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false" hidden>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.5 15.5H4.75A1.75 1.75 0 013 13.75v-3.5c0-.97.78-1.75 1.75-1.75H6.5l5-4.25v15.5l-5-4.25zM17 9.5l4 4M21 9.5l-4 4"></path>
+                      </svg>
+                    </button>
+                    <input class="volume-slider" type="range" min="0" max="1" step="0.01" value="0.85" aria-label="Volume">
+                  </div>
+                </div>
               </div>
               <h1 class="brand-glow max-w-4xl text-4xl font-extrabold leading-none sm:text-6xl">
-                VoxCPMTTS
+                VoxCPMTTS examples
               </h1>
               <p class="mt-5 max-w-3xl text-base leading-7 text-[#ffb076] sm:text-lg">
-                Easy-to-run Docker packaging for VoxCPM2, a realistic multilingual text-to-speech model with voice design, controllable cloning, and transcript-guided cloning. Run the image, open the browser UI, or call the same HTTP API from your own application.
+                Listen to multilingual VoxCPMTTS samples generated with voice design, translated introductions, and cross-language voice cloning.
               </p>
               <div class="mt-5 flex flex-wrap gap-2">
                 <span class="pill px-3 py-1 text-sm font-semibold">30 languages</span>
-                <span class="pill px-3 py-1 text-sm font-semibold">48 kHz output</span>
-                <span class="pill px-3 py-1 text-sm font-semibold">Voice clone</span>
-                <span class="pill px-3 py-1 text-sm font-semibold">Voice design</span>
-                <span class="pill px-3 py-1 text-sm font-semibold">Baked offline image</span>
-                <span class="pill px-3 py-1 text-sm font-semibold">UI + API</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">10 voice-variety samples each</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">translated intro demos</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">cross-language clone demos</span>
               </div>
             </div>
-            <a class="block" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">
-              <img class="w-full rounded-lg border-2 border-orange-500/30 object-cover shadow-[0_0_60px_rgba(255,107,0,0.18)]" src="../hangrylabs/logo_small.png" alt="Hangry Labs">
-            </a>
+            <div class="hero-logo-panel" aria-hidden="true">
+              <a class="hero-logo-link" href="https://hangry-labs.github.io/VoxCPMTTS/examples/" target="_blank" rel="noopener noreferrer" tabindex="-1">
+                <img class="hero-logo" src="../hangrylabs/logo_small.png" alt="">
+              </a>
+              <a class="hero-site-link" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">nuggies.website</a>
+            </div>
           </div>
         </header>
 
-        <section class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <article class="brand-card p-5">
-            <h2 class="mb-3 text-lg font-bold text-orange-400">Run</h2>
-            <pre class="overflow-auto rounded-lg bg-black/60 p-3 text-xs text-orange-100"><code>docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:v0.1</code></pre>
-          </article>
-          <article class="brand-card p-5">
-            <h2 class="mb-3 text-lg font-bold text-orange-400">Open</h2>
-            <a class="text-lg font-bold" href="http://localhost:8808">http://localhost:8808</a>
-          </article>
-          <article class="brand-card p-5">
-            <h2 class="mb-3 text-lg font-bold text-orange-400">API Docs</h2>
-            <a class="text-lg font-bold" href="http://localhost:8808/tts/docs">/tts/docs</a>
-          </article>
+        <section class="mb-4" aria-label="Choose a language">
+          <div class="mb-3 status-strip">
+            <span class="pill px-3 py-2 text-sm font-semibold" data-load-status>Loading examples...</span>
+            <span class="pill px-3 py-2 text-sm font-semibold" data-now-playing>Ready</span>
+          </div>
+          <div class="language-filter" data-language-list></div>
         </section>
 
-        <section class="brand-card mb-8 p-5">
-          <h2 class="mb-3 text-lg font-bold text-orange-400">Runtime Notes</h2>
-          <p class="text-sm leading-6 text-orange-100">
-            The full image includes VoxCPM2, denoiser, and ASR assets for offline-friendly use after the image is pulled. VoxCPM2 is memory-heavy, so run one VoxCPMTTS container per GPU unless separate model copies are intentional.
-          </p>
-        </section>
-
-        <section class="grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="API examples" data-example-grid></section>
+        <section class="pb-12" aria-label="Selected language examples" data-language-detail></section>
       </section>
     </main>
     <script src="voices.js"></script>

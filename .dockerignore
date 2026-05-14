@@ -26,4 +26,5 @@ pretrained_models/
 
 # Development-only fixtures
 tests/
+voxcpm/tests/
 examples/*.wav

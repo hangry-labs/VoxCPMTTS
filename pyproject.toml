@@ -92,3 +92,7 @@ extend-exclude = '''
   | dist
 )/
 '''
+
+[tool.pytest.ini_options]
+testpaths = ["voxcpm/tests"]
+python_files = ["test_*.py"]

@@ -45,12 +45,12 @@ tasks:
   compile:
     desc: Compile Python sources
     cmds:
-      - cmd /c python -m compileall -q voxcpm tests scripts
+      - cmd /c python -m compileall -q voxcpm scripts
 
   test:
     desc: Run checked-in tests only
     cmds:
-      - cmd /c python -m pytest -q tests
+      - cmd /c python -m pytest -q voxcpm/tests
 
   cli-help:
     desc: Show VoxCPM CLI help
