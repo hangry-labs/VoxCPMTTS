@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Modified by Hangry Labs in 2026 for the Docker-first inference fork.
 """
 VoxCPM Command Line Interface
 

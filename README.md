@@ -152,4 +152,12 @@ This fork preserves the upstream license, public package code, citation, and att
 
 ## License
 
-VoxCPM model weights and code are released under the [Apache-2.0](LICENSE) license. Original VoxCPM copyright remains with the upstream authors.
+The VoxCPMTTS source distribution and upstream VoxCPM source are provided under
+the [Apache License 2.0](LICENSE). Original VoxCPM copyright remains with
+OpenBMB and the upstream contributors; see [NOTICE](NOTICE).
+
+The Docker images are aggregate distributions that also contain model assets,
+Python packages, Debian packages such as FFmpeg, and NVIDIA CUDA libraries under
+their respective terms. The image as a whole is not licensed solely under
+Apache-2.0. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the model,
+runtime, source-availability, and redistribution details.

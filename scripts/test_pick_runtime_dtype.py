@@ -1,3 +1,5 @@
+# Modified by Hangry Labs in 2026 for the Docker-first inference fork.
+
 """Unit checks for pick_runtime_dtype / get_dtype consistency.
 
 Loads voxcpm/model/utils.py directly to avoid the heavy voxcpm package

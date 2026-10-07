@@ -141,4 +141,15 @@ This is an independently maintained Hangry Labs packaging and serving fork of th
 
 https://github.com/OpenBMB/VoxCPM
 
-License and attribution are preserved in the repository. Original VoxCPM copyright remains with the upstream authors; Hangry Labs maintains the Docker packaging, Web UI/API integration, documentation, release tooling, and related modifications in this fork.
+The repository source and upstream VoxCPM source are provided under Apache-2.0.
+Original VoxCPM copyright remains with the upstream authors; Hangry Labs
+maintains the Docker packaging, Web UI/API integration, documentation, release
+tooling, and related modifications in this fork.
+
+The image also contains model assets, Python and Debian packages, FFmpeg, and
+NVIDIA CUDA libraries under their respective licenses. The complete image is
+not licensed solely under Apache-2.0. Attribution, third-party terms, source
+availability, and inspection instructions are documented in the repository:
+
+- https://github.com/Hangry-Labs/VoxCPMTTS/blob/main/NOTICE
+- https://github.com/Hangry-Labs/VoxCPMTTS/blob/main/THIRD_PARTY_NOTICES.md

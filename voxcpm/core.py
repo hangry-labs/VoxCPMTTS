@@ -1,3 +1,5 @@
+# Modified by Hangry Labs in 2026 for the Docker-first inference fork.
+
 import os
 import sys
 import re

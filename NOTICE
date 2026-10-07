@@ -1,0 +1,15 @@
+VoxCPMTTS
+
+This product includes software developed by OpenBMB and contributors as part
+of the VoxCPM project:
+
+    https://github.com/OpenBMB/VoxCPM
+
+VoxCPMTTS is an independently maintained distribution containing Hangry Labs
+packaging, serving, user-interface, documentation, and runtime modifications.
+The original VoxCPM copyright remains with OpenBMB and the upstream
+contributors.
+
+This product also includes third-party software and model assets under their
+respective licenses. See THIRD_PARTY_NOTICES.md for details. This NOTICE is
+informational and does not modify any applicable license.

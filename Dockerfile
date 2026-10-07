@@ -16,7 +16,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential ffmpeg git libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md LICENSE VERSION requirements.txt /app/
+COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION requirements.txt /app/
 COPY voxcpm /app/voxcpm
 COPY hangrylabs /app/hangrylabs
 

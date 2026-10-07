@@ -1,3 +1,5 @@
+# Modified by Hangry Labs in 2026 for the Docker-first inference fork.
+
 from __future__ import annotations
 
 import importlib.util
