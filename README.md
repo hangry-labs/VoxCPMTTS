@@ -150,6 +150,8 @@ curl --no-buffer -X POST "http://localhost:8808/tts/stream" \
   -o streamed.mp3
 ```
 
+For repeatable output, set `randomize_seed` to `false` and provide a 32-bit `seed`. Every generated response reports the seed actually used in `X-VoxCPM-Seed`.
+
 Cheap process health check:
 
 ```bash
@@ -161,6 +163,8 @@ Runtime discovery is available from the local API:
 - Status and loaded backend: `GET /tts/status`
 - Current generation stage: `GET /tts/activity`
 - Saved voices: `GET`, `POST`, and `DELETE /tts/voice-profiles`
+- Reference transcription when ASR is enabled: `POST /tts/transcribe-upload`
+- Generated-audio alignment when `/tts/status` reports it available: `POST /tts/timestamps-upload`
 - Supported languages: `GET /tts/languages`
 - Output formats: `GET /tts/formats`
 - Interactive API reference: `GET /tts/docs`
@@ -203,9 +207,10 @@ task image-tiny
 task test
 task image
 task imagerun
+task smoke
 ```
 
-`task image-tiny` prepares the test/runtime base, and `task test` runs the checked-in suite in an ephemeral CPU-only container based on that image. `task image` builds the full baked image. `task imagerun` runs it without an external model-cache mount so the image proves its baked assets. `task imagerun-tiny` covers the online first-use cache workflow. All Docker dependency installs require binary wheels.
+`task image-tiny` prepares the test/runtime base, and `task test` runs the checked-in suite in an ephemeral CPU-only container based on that image. `task image` builds the full baked image. `task imagerun` runs it without an external model-cache mount so the image proves its baked assets. `task imagerun-tiny` covers the online first-use cache workflow. `task smoke` checks natural speech, two designed voices, and reference cloning against the running API; add `-- --asr-url http://qwen3-asr-host:8010` to judge transcript fidelity. All Docker dependency installs require binary wheels.
 
 Hot-swap local package code into the selected image without rebuilding:
 
@@ -230,6 +235,7 @@ VoxCPM2 is developed by OpenBMB and contributors.
 
 - Original repository: [OpenBMB/VoxCPM](https://github.com/OpenBMB/VoxCPM)
 - Model: [openbmb/VoxCPM2](https://huggingface.co/openbmb/VoxCPM2)
+- Technical report: [VoxCPM2 Technical Report (arXiv:2606.06928)](https://arxiv.org/abs/2606.06928)
 - Documentation: [voxcpm.readthedocs.io](https://voxcpm.readthedocs.io/)
 - Nano-vLLM runtime: [a710128/nanovllm-voxcpm](https://github.com/a710128/nanovllm-voxcpm)
 
@@ -256,6 +262,10 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
 - Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
 - Added persistent voice profiles shared by generation and cloning, drag-and-drop reference audio, truthful generation stages, live streaming output, recording waveforms, and persistent playback volume.
+- Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.
+- Added generated timestamp sidecars and API/UI integration behind runtime capability discovery; standard Python 3.13 images keep alignment disabled until its backend publishes binary wheels. Reference transcription remains a separate cloning workflow.
+- Restored saved LoRA adapter configuration automatically, made CLI model/audio imports lazy, and added checkpoint-loading regression guards.
+- Added a lightweight live-API smoke suite for natural speech, contrasting voice designs, reference cloning, deterministic seed headers, WAV validation, and optional Qwen3-ASR transcript judging.
 - Added one-instance model caching, serialized generation, compile-worker limits, and reference-latent allocator cleanup to prevent duplicate weights and repeated-request RAM/VRAM growth.
 - Added 30-language public examples with voice-variety, translated introduction, and cross-language clone samples.
 - Added the controlled native-versus-Nano baseline suite covering generation speed, VRAM, container RAM, and Qwen3-ASR transcript fidelity across 24 common languages.
@@ -279,6 +289,16 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 
 No immutable `v1.0` image has been published yet. After publication and validation, this section must be updated with the exact `v1.0@sha256:...` and `v1.0_tiny@sha256:...` Docker Hub references before the GitHub Release is announced.
 
+#### Remaining before v1.0
+
+Deferred v1.0 work belongs in this list so release scope does not disappear between development sessions.
+
+- Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
+- Restore reference-audio transcription in the standard Nano image with a Python 3.13 binary-wheel-only backend and baked assets; keep it separate from generated-audio alignment.
+- Confirm redistribution rights and consent for `examples/original_clone.mp3` before publication.
+- Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
+- Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.
+
 ## Responsible Use And Privacy
 
 VoxCPM2 supports highly realistic voice cloning. Do not use this project for unauthorized voice cloning, impersonation, fraud, harassment, scams, or any illegal or unethical activity. Only clone voices when you have the rights and consent to do so, and clearly mark generated speech where appropriate.
@@ -290,10 +310,14 @@ Text, reference audio, and generated speech remain on the machine running the lo
 If you use VoxCPM in research, cite the upstream work:
 
 ```bibtex
-@article{voxcpm2_2026,
-  title   = {VoxCPM2: Tokenizer-Free TTS for Multilingual Speech Generation, Creative Voice Design, and True-to-Life Cloning},
-  author  = {VoxCPM Team},
-  journal = {GitHub},
+@article{zhou2026voxcpm2,
+  title   = {VoxCPM2 Technical Report},
+  author  = {Zhou, Yixuan and Zeng, Guoyang and Liu, Xin and Li, Xiang and
+             Yu, Renjie and Gui, Jiancheng and Wu, Jiaheng and Wang, Ziyang and
+             Shen, Xudong and Ye, Runchuan and Zhang, Zhisheng and Zhou, Jiuyang and
+             Bai, Bingsong and Sun, Weiyue and Deng, Mengyuan and Shi, Qundong and
+             Wu, Zhiyong and Liu, Zhiyuan},
+  journal = {arXiv preprint arXiv:2606.06928},
   year    = {2026},
 }
 

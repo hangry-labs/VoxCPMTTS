@@ -41,6 +41,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="reference-text"' in responses["/"].text
     assert 'id="voice-profile"' in responses["/"].text
     assert 'id="generate-progress"' in responses["/"].text
+    assert 'id="randomize-seed"' in responses["/"].text
+    assert 'id="generate-timestamps"' in responses["/"].text
     assert 'id="stream-live-wave"' in responses["/"].text
     assert 'id="reference-record-wave"' in responses["/"].text
     assert 'id="profile-audio-drop"' in responses["/"].text
@@ -113,7 +115,7 @@ def test_stream_upload_applies_stream_format() -> None:
             contents=path.read_bytes(),
             stream_format=payload.stream_format,
         )
-        return "mp3", 24_000, iter([b"model-chunk"])
+        return "mp3", 24_000, iter([b"model-chunk"]), 123
 
     def fake_encoder(chunks, output_format, sample_rate):
         observed.update(output_format=output_format, sample_rate=sample_rate, chunks=list(chunks))
@@ -136,6 +138,7 @@ def test_stream_upload_applies_stream_format() -> None:
     assert response.content == b"first-second"
     assert response.headers["x-voxcpm-streaming"] == "progressive-chunks"
     assert response.headers["x-voxcpm-format"] == "mp3"
+    assert response.headers["x-voxcpm-seed"] == "123"
     assert observed["exists"] is True
     assert observed["contents"] == b"reference-bytes"
     assert observed["stream_format"] == "mp3"
@@ -211,6 +214,7 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
     assert Path(kwargs["reference_wav_path"]).parent == tmp_path
     assert kwargs["prompt_wav_path"] == kwargs["reference_wav_path"]
     assert kwargs["prompt_text"] == "This is the original recording."
+    assert 0 <= kwargs["seed"] <= runtime.MAX_RANDOM_SEED
     assert deleted.json() == {"deleted": "studio-narrator"}
     assert missing.status_code == 404
 
@@ -234,3 +238,24 @@ def test_saved_voice_design_applies_its_control(tmp_path: Path) -> None:
     assert created.json()["profile_type"] == "designed"
     assert kwargs["text"] == "(A calm, warm guide with measured pacing)Welcome."
     assert kwargs["reference_wav_path"] is None
+
+
+def test_fixed_seed_is_forwarded_to_generation_kwargs() -> None:
+    payload = runtime.TTSRequest(text="A repeatable sentence.", seed=1234, randomize_seed=False)
+
+    kwargs = runtime.build_generate_kwargs(payload, object())
+
+    assert kwargs["seed"] == 1234
+
+
+def test_timestamp_upload_reports_unavailable_backend() -> None:
+    with patch.object(runtime, "timestamp_backend_available", return_value=False):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/timestamps-upload",
+                data={"text": "Hello", "level": "word"},
+                files={"audio": ("generated.wav", b"RIFF", "audio/wav")},
+            )
+
+    assert response.status_code == 503
+    assert "stable-ts" in response.json()["detail"]

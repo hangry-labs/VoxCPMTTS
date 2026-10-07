@@ -46,7 +46,9 @@ from ..modules.locdit import CfmConfig, UnifiedCFM, VoxCPMLocDiTV2
 from ..modules.locenc import VoxCPMLocEnc
 from ..modules.minicpm4 import MiniCPM4Config, MiniCPMModel
 from .utils import (
+    apply_generation_seed,
     get_dtype,
+    materialize_generation_seed,
     mask_multichar_chinese_tokens,
     next_and_close,
     pick_runtime_dtype,
@@ -184,6 +186,7 @@ class VoxCPM2Model(nn.Module):
         self.audio_end_token = 102
         self.ref_audio_start_token = 103
         self.ref_audio_end_token = 104
+        self.last_successful_seed: int | None = None
 
         # Residual Acoustic LM
         residual_lm_config = config.lm_config.model_copy(deep=True)
@@ -476,6 +479,7 @@ class VoxCPM2Model(nn.Module):
         trim_silence_vad: bool = False,
         streaming: bool = False,
         streaming_prefix_len: int = 4,
+        seed: Optional[int] = None,
     ) -> Generator[torch.Tensor, None, None]:
         if retry_badcase and streaming:
             warnings.warn("Retry on bad cases is not supported in streaming mode, setting retry_badcase=False.")
@@ -633,7 +637,11 @@ class VoxCPM2Model(nn.Module):
         target_text_length = len(self.text_tokenizer(target_text))
 
         retry_badcase_times = 0
+        current_seed = materialize_generation_seed(seed)
+        last_attempt_seed = current_seed
         while retry_badcase_times < retry_badcase_max_times:
+            last_attempt_seed = current_seed
+            apply_generation_seed(last_attempt_seed)
             inference_result = self._inference(
                 text_token,
                 text_mask,
@@ -651,6 +659,7 @@ class VoxCPM2Model(nn.Module):
                     for latent_pred, _, _ctx in inference_result:
                         decode_audio = vae_dec.decode_chunk(latent_pred.to(torch.float32))
                         decode_audio = decode_audio.squeeze(1).cpu()
+                        self.last_successful_seed = last_attempt_seed
                         yield decode_audio
                 break
             else:
@@ -662,6 +671,7 @@ class VoxCPM2Model(nn.Module):
                             file=sys.stderr,
                         )
                         retry_badcase_times += 1
+                        current_seed = (current_seed + 1) & 0xFFFFFFFF
                         continue
                     else:
                         break
@@ -669,6 +679,7 @@ class VoxCPM2Model(nn.Module):
                     break
 
         if not streaming:
+            self.last_successful_seed = last_attempt_seed
             decode_audio = self.audio_vae.decode(latent_pred.to(torch.float32))
             decode_patch_len = self.patch_size * self._decode_chunk_size
             if context_len > 0:
@@ -793,6 +804,7 @@ class VoxCPM2Model(nn.Module):
         retry_badcase_ratio_threshold: float = 6.0,
         streaming: bool = False,
         streaming_prefix_len: int = 4,
+        seed: Optional[int] = None,
     ) -> Generator[Tuple[torch.Tensor, torch.Tensor, Union[torch.Tensor, List[torch.Tensor]]], None, None]:
         """
         Generate audio using pre-built prompt cache.
@@ -920,7 +932,11 @@ class VoxCPM2Model(nn.Module):
         # run inference
         target_text_length = len(self.text_tokenizer(target_text))
         retry_badcase_times = 0
+        current_seed = materialize_generation_seed(seed)
+        last_attempt_seed = current_seed
         while retry_badcase_times < retry_badcase_max_times:
+            last_attempt_seed = current_seed
+            apply_generation_seed(last_attempt_seed)
             inference_result = self._inference(
                 text_token,
                 text_mask,
@@ -938,6 +954,7 @@ class VoxCPM2Model(nn.Module):
                     for latent_pred, pred_audio_feat, _ctx in inference_result:
                         decode_audio = vae_dec.decode_chunk(latent_pred.to(torch.float32))
                         decode_audio = decode_audio.squeeze(1).cpu()
+                        self.last_successful_seed = last_attempt_seed
                         yield (decode_audio, target_text_token, pred_audio_feat)
                 break
             else:
@@ -949,12 +966,14 @@ class VoxCPM2Model(nn.Module):
                             file=sys.stderr,
                         )
                         retry_badcase_times += 1
+                        current_seed = (current_seed + 1) & 0xFFFFFFFF
                         continue
                     else:
                         break
                 else:
                     break
         if not streaming:
+            self.last_successful_seed = last_attempt_seed
             decode_audio = self.audio_vae.decode(latent_pred.to(torch.float32))
             decode_patch_len = self.patch_size * self._decode_chunk_size
             if context_len > 0:

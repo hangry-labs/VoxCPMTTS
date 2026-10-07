@@ -376,6 +376,10 @@ function updateCloneConditioning() {
   $('#clone-direction-state').textContent = guided ? 'Transcript guided' : 'Optional'
 }
 
+function updateSeedState() {
+  $('#seed').disabled = $('#randomize-seed').checked
+}
+
 function updateWorkflowControls() {
   const cloning = state.activeTab === 'clone'
   const profile = selectedProfile()
@@ -403,6 +407,8 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
     inference_timesteps: Number($('#steps').value),
     normalize: $('#normalize').checked,
     denoise: cloning && $('#denoise').checked,
+    seed: Number($('#seed').value || 42),
+    randomize_seed: $('#randomize-seed').checked,
     device: $('#device').value,
     output_format: outputFormat,
   }
@@ -444,6 +450,54 @@ async function requestAudio(options = {}) {
   return {
     blob: await response.blob(),
     extension: response.headers.get('X-VoxCPM-Format') || payload.output_format,
+    seed: response.headers.get('X-VoxCPM-Seed'),
+    payload,
+  }
+}
+
+function renderTimestamps(workflow, result) {
+  const panel = $(`#${workflow}-timestamp-results`)
+  const header = document.createElement('header')
+  const title = document.createElement('strong')
+  title.textContent = `${result.level[0].toUpperCase()}${result.level.slice(1)} timestamps`
+  const count = document.createElement('span')
+  count.textContent = `${result.items.length} aligned`
+  header.append(title, count)
+  const list = document.createElement('ol')
+  list.className = 'timestamp-list'
+  result.items.forEach((item) => {
+    const row = document.createElement('li')
+    const start = document.createElement('span')
+    const end = document.createElement('span')
+    const text = document.createElement('span')
+    start.textContent = `${Number(item.start).toFixed(2)}s`
+    end.textContent = `${Number(item.end).toFixed(2)}s`
+    text.textContent = item.text
+    row.append(start, end, text)
+    list.append(row)
+  })
+  panel.replaceChildren(header, list)
+  panel.hidden = false
+}
+
+async function alignGeneratedAudio(workflow, blob, extension, payload) {
+  const panel = $(`#${workflow}-timestamp-results`)
+  if (!$('#generate-timestamps').checked) {
+    panel.hidden = true
+    return
+  }
+  setStatus('Aligning generated speech')
+  const form = new FormData()
+  form.append('audio', blob, `voxcpmtts.${extension}`)
+  form.append('text', payload.text)
+  form.append('level', $('#timestamp-level').value)
+  form.append('language', payload.language || '')
+  try {
+    const result = await fetchJson('/tts/timestamps-upload', { method: 'POST', body: form })
+    renderTimestamps(workflow, result)
+  } catch (error) {
+    panel.hidden = true
+    showToast(`Audio is ready, but timestamp alignment failed: ${errorMessage(error)}`)
   }
 }
 
@@ -511,8 +565,13 @@ async function generateAudio(workflow = 'generate') {
   startActivityPolling(workflow)
   setStatus('Generating audio')
   try {
-    const { blob, extension } = await requestAudio({ workflow })
+    const { blob, extension, seed, payload } = await requestAudio({ workflow })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
+    if (seed !== null) {
+      $('#last-generated-seed').value = seed
+      $('#seed').value = seed
+    }
+    await alignGeneratedAudio(workflow, blob, extension, payload)
     setStatus('Generation complete', 'success')
     finishActivityPolling(workflow, 'complete', 'Audio is ready')
   } catch (error) {
@@ -703,6 +762,11 @@ async function streamAudio() {
     playback = await IncrementalAudioPlayback.create(streamWaveform)
     state.streamPlayback = playback
     const { response } = await requestAudioResponse({ workflow: 'stream', streaming: true, signal: controller.signal })
+    const seed = response.headers.get('X-VoxCPM-Seed')
+    if (seed !== null) {
+      $('#last-generated-seed').value = seed
+      $('#seed').value = seed
+    }
     if (!response.body) throw new Error('Streaming response body is unavailable in this browser.')
     const reader = response.body.getReader()
     let totalBytes = 0
@@ -1157,6 +1221,9 @@ function resetControls() {
   $('#steps-slider').value = state.defaults.inference_timesteps || 10
   $('#normalize').checked = false
   $('#denoise').checked = false
+  $('#seed').value = state.defaults.seed ?? 42
+  $('#randomize-seed').checked = state.defaults.randomize_seed ?? true
+  updateSeedState()
 }
 
 async function initialize() {
@@ -1182,6 +1249,11 @@ async function initialize() {
   resetControls()
   $('#denoise').disabled = !status.load_denoiser
   $('#transcribe-reference').disabled = !status.load_asr
+  const timestampsAvailable = Boolean(status.timestamps?.available)
+  $('#generate-timestamps').disabled = !timestampsAvailable
+  $('#timestamp-level').disabled = !timestampsAvailable
+  $('#timestamp-state').textContent = timestampsAvailable ? 'Available' : 'Not installed'
+  $('#timestamp-state').dataset.state = timestampsAvailable ? 'available' : 'unavailable'
   $('#runtime-badge').dataset.state = 'ready'
   $('#runtime-state').textContent = `${status.backend === 'nano' ? 'Nano' : 'Native'} backend ready`
   $('#runtime-model').textContent = `${status.model_id} · ${status.runtime}`
@@ -1198,6 +1270,7 @@ $('#text-input').addEventListener('input', updateMetrics)
 $('#control-input').addEventListener('input', updateVoiceDesignState)
 $('#reference-text').addEventListener('input', updateCloneConditioning)
 $('#voice-profile').addEventListener('change', updateVoiceProfileState)
+$('#randomize-seed').addEventListener('change', updateSeedState)
 $('#sample-button').addEventListener('click', () => {
   state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
   $('#text-input').value = SAMPLE_TEXTS[state.sampleIndex]

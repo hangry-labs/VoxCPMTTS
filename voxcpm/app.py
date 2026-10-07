@@ -4,6 +4,7 @@ import asyncio
 import io
 import json
 import os
+import secrets
 import subprocess
 import tempfile
 import threading
@@ -24,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from voxcpm.standalone_ui.gpu import GPU_MONITOR
 from voxcpm.standalone_ui.server import attach_ui
+from voxcpm.timestamps import align_audio_file, timestamp_backend_available
 from voxcpm.voice_profiles import (
     delete_voice_profile,
     load_voice_profiles,
@@ -60,6 +62,9 @@ VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
 MAX_REFERENCE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_REFERENCE_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 REFERENCE_AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".webm"}
 VOICE_PROFILE_DIR = Path(os.getenv("VOXCPM_VOICE_PROFILE_DIR", "/app/persistent/voices"))
+MAX_RANDOM_SEED = 2**32 - 1
+TIMESTAMP_MODEL = os.getenv("VOXCPM_TIMESTAMP_MODEL", "base")
+TIMESTAMP_DEVICE = os.getenv("VOXCPM_TIMESTAMP_DEVICE", "cpu")
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -487,7 +492,13 @@ def build_final_text(text: str, control: str | None, prompt_text: str | None) ->
     return stripped
 
 
-def build_generate_kwargs(payload: "TTSRequest", model: Any) -> dict:
+def resolve_generation_seed(payload: "TTSRequest") -> int:
+    if payload.randomize_seed:
+        return secrets.randbelow(MAX_RANDOM_SEED + 1)
+    return 42 if payload.seed is None else payload.seed
+
+
+def build_generate_kwargs(payload: "TTSRequest", model: Any, *, seed: int | None = None) -> dict:
     ref_audio = payload.ref_audio or payload.reference_audio
     prompt_audio = payload.prompt_audio
     prompt_text = payload.prompt_text
@@ -515,6 +526,7 @@ def build_generate_kwargs(payload: "TTSRequest", model: Any) -> dict:
         "inference_timesteps": payload.inference_timesteps,
         "normalize": payload.normalize_text,
         "denoise": payload.denoise,
+        "seed": resolve_generation_seed(payload) if seed is None else seed,
     }
     if not prompt_audio:
         kwargs["prompt_text"] = None
@@ -547,6 +559,8 @@ class TTSRequest(BaseModel):
     normalize_text: bool = Field(False, alias="normalize", description="Normalize text before synthesis.")
     denoise: bool = Field(False, description="Apply ZipEnhancer to prompt/reference audio when denoiser is enabled.")
     speed: float = Field(1.0, ge=0.25, le=4.0, description="Compatibility field; VoxCPM2 has no direct speed scalar.")
+    seed: Optional[int] = Field(42, ge=0, le=MAX_RANDOM_SEED, description="32-bit generation seed.")
+    randomize_seed: bool = Field(True, description="Choose a fresh generation seed for this request.")
     device: str = Field("auto", description="auto, cpu, mps, cuda, or cuda:N.")
     use_gpu: Optional[bool] = Field(None, description="Legacy compatibility switch. Prefer device.")
     output_format: str = Field(
@@ -573,7 +587,7 @@ class TranscriptionRequest(BaseModel):
     language: str = Field("auto", description="ASR language hint. Use auto for detection.")
 
 
-def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray]:
+def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int]:
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Text must not be empty")
     try:
@@ -593,7 +607,8 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray]:
             set_generation_activity("loading_model", "Loading VoxCPM2 weights", active=True)
         model = get_model(requested_device, load_denoiser=payload.denoise)
         set_generation_activity("generating", "Generating speech", active=True)
-        wav = model.generate(**build_generate_kwargs(payload, model))
+        seed = resolve_generation_seed(payload)
+        wav = model.generate(**build_generate_kwargs(payload, model, seed=seed))
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -601,10 +616,15 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray]:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"VoxCPM generation failed: {exc}") from exc
 
-    return output_format, int(model.tts_model.sample_rate), to_float32_audio(wav)
+    successful_seed = getattr(model, "last_successful_seed", None)
+    if successful_seed is None:
+        successful_seed = getattr(model.tts_model, "last_successful_seed", None)
+    if successful_seed is None:
+        successful_seed = seed
+    return output_format, int(model.tts_model.sample_rate), to_float32_audio(wav), int(successful_seed)
 
 
-def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, Iterator[np.ndarray]]:
+def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, Iterator[np.ndarray], int]:
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Text must not be empty")
     try:
@@ -624,7 +644,8 @@ def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, I
             set_generation_activity("loading_model", "Loading VoxCPM2 weights", active=True)
         model = get_model(requested_device, load_denoiser=payload.denoise)
         set_generation_activity("streaming", "Generating the live audio stream", active=True)
-        chunks = model.generate_streaming(**build_generate_kwargs(payload, model))
+        seed = resolve_generation_seed(payload)
+        chunks = model.generate_streaming(**build_generate_kwargs(payload, model, seed=seed))
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -632,11 +653,11 @@ def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, I
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"VoxCPM streaming failed: {exc}") from exc
 
-    return output_format, int(model.tts_model.sample_rate), chunks
+    return output_format, int(model.tts_model.sample_rate), chunks, seed
 
 
 def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResponse:
-    output_format, sample_rate, waveform = synthesize_payload(payload)
+    output_format, sample_rate, waveform, seed = synthesize_payload(payload)
     try:
         set_generation_activity("encoding", f"Encoding {output_format.upper()} audio", active=True)
         audio_bytes = encode_audio_bytes(waveform, output_format, sample_rate)
@@ -655,6 +676,7 @@ def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResp
         "X-VoxCPM-Duration": f"{duration:.3f}",
         "X-VoxCPM-Route": route_name,
         "X-VoxCPM-Format": output_format,
+        "X-VoxCPM-Seed": str(seed),
     }
     return StreamingResponse(io.BytesIO(audio_bytes), media_type=media_type, headers=headers)
 
@@ -666,7 +688,7 @@ def progressive_audio_response(
     cleanup_paths: tuple[str, ...] = (),
 ) -> StreamingResponse:
     try:
-        output_format, sample_rate, chunks = synthesize_payload_chunks(payload)
+        output_format, sample_rate, chunks, seed = synthesize_payload_chunks(payload)
     except Exception:
         for path in cleanup_paths:
             Path(path).unlink(missing_ok=True)
@@ -696,6 +718,7 @@ def progressive_audio_response(
         "X-VoxCPM-Route": route_name,
         "X-VoxCPM-Format": output_format,
         "X-VoxCPM-Streaming": "progressive-chunks",
+        "X-VoxCPM-Seed": str(seed),
     }
     return StreamingResponse(body(), media_type=media_type, headers=headers)
 
@@ -732,6 +755,13 @@ def get_status_payload() -> dict:
         "loaded_model_devices": loaded_devices,
         "output_formats": get_supported_output_formats(),
         "stream_formats": STREAM_FORMATS,
+        "timestamps": {
+            "available": timestamp_backend_available(),
+            "backend": "stable-ts",
+            "levels": ["segment", "word", "char"],
+            "model": TIMESTAMP_MODEL,
+            "device": TIMESTAMP_DEVICE,
+        },
         "hardware": [
             {"label": label, "value": value}
             for label, value in get_hardware_choices()
@@ -864,6 +894,8 @@ def defaults() -> dict:
         "device": "auto",
         "cfg_value": 2.0,
         "inference_timesteps": DEFAULT_INFERENCE_TIMESTEPS,
+        "seed": 42,
+        "randomize_seed": True,
         "output_formats": {"default": "wav", "available": get_supported_output_formats()},
         "stream_formats": {"default": "mp3", "available": STREAM_FORMATS},
     }
@@ -999,6 +1031,43 @@ async def transcribe_upload(
     finally:
         Path(reference_path).unlink(missing_ok=True)
     return {"text": text, "language": language, "model_id": ASR_MODEL_ID}
+
+
+@api.post("/tts/timestamps-upload")
+async def timestamps_upload(
+    audio: UploadFile = File(...),
+    text: str = Form(...),
+    level: str = Form("word"),
+    language: str = Form(""),
+) -> dict:
+    if level not in {"segment", "word", "char"}:
+        raise HTTPException(status_code=400, detail="Timestamp level must be segment, word, or char")
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Timestamp text must not be empty")
+    if not timestamp_backend_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Timestamp alignment is unavailable because the stable-ts backend is not installed.",
+        )
+
+    audio_path = await save_reference_upload(audio)
+    try:
+        return await asyncio.to_thread(
+            align_audio_file,
+            audio_path=audio_path,
+            text=text.strip(),
+            backend="stable-ts",
+            level=level,
+            model_name=TIMESTAMP_MODEL,
+            device=TIMESTAMP_DEVICE,
+            language=language.strip() or None,
+        )
+    except (ImportError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Timestamp alignment failed: {exc}") from exc
+    finally:
+        Path(audio_path).unlink(missing_ok=True)
 
 
 @api.post("/tts/generate")

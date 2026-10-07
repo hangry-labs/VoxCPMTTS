@@ -49,3 +49,13 @@ def test_resolve_runtime_device_rejects_unavailable_explicit_cuda(monkeypatch):
 
     with pytest.raises(ValueError, match="CUDA is not available"):
         utils.resolve_runtime_device("cuda:0", "cuda")
+
+
+def test_materialize_generation_seed_preserves_valid_seed():
+    assert utils.materialize_generation_seed(0) == 0
+    assert utils.materialize_generation_seed(2**32 - 1) == 2**32 - 1
+
+
+def test_materialize_generation_seed_rejects_out_of_range_values():
+    with pytest.raises(ValueError, match="seed must be between"):
+        utils.materialize_generation_seed(2**32)

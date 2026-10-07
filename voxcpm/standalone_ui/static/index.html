@@ -69,6 +69,17 @@
           <label class="range-control"><span class="range-heading"><span>Guidance</span></span><span class="range-input-row"><input id="guidance-slider" type="range" min="0.1" max="10" step="0.1" value="2" data-value-input="guidance"><input id="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" data-range-input="guidance-slider"></span></label>
           <label class="range-control"><span class="range-heading"><span>Inference steps</span></span><span class="range-input-row"><input id="steps-slider" type="range" min="1" max="100" step="1" value="10" data-value-input="steps"><input id="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" data-range-input="steps-slider"></span></label>
         </div>
+        <div class="seed-panel">
+          <label class="field seed-field"><span>Seed</span><input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></label>
+          <label class="toggle-field seed-randomize"><span>Randomize</span><input id="randomize-seed" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
+          <div class="seed-result"><span>Last generated seed</span><output id="last-generated-seed">--</output></div>
+        </div>
+        <div class="timestamp-options">
+          <span>Timing</span>
+          <label><input id="generate-timestamps" type="checkbox">Align output</label>
+          <select id="timestamp-level" aria-label="Timestamp level"><option value="word">Words</option><option value="segment">Segments</option><option value="char">Characters</option></select>
+          <small id="timestamp-state" data-state="unavailable">Checking</small>
+        </div>
       </div>
       <label class="toggle-field"><span>Normalize text</span><input id="normalize" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
       <label class="toggle-field"><span>Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
@@ -92,7 +103,7 @@
       <div class="tab-panel" data-panel="generate">
         <div class="generate-action-row"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span>Generate audio</span></button></div>
         <div class="inference-progress" id="generate-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong>Preparing request</strong><span>VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Generated audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="generate-output" aria-live="polite"></section></section>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Generated audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></section>
       </div>
 
       <div class="tab-panel" data-panel="clone" hidden>
@@ -111,7 +122,7 @@
         </section>
         <div class="generate-action-row"><button class="primary-button" id="clone-button" type="button"><i class="icon-audio-lines"></i><span>Generate cloned audio</span></button></div>
         <div class="inference-progress" id="clone-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong>Preparing request</strong><span>VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Cloned audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="clone-output" aria-live="polite"></section></section>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Cloned audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="clone-output" aria-live="polite"></section><section class="timestamp-results" id="clone-timestamp-results" hidden aria-live="polite"></section></section>
       </div>
 
       <div class="tab-panel" data-panel="stream" hidden>

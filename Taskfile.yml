@@ -254,6 +254,15 @@ tasks:
       - 'cmd /c python -c "from pathlib import Path; p=Path(r''{{.TEMP_AUDIO}}.{{.API_FORMAT}}''); assert p.exists() and p.stat().st_size > 0, p"'
       - 'cmd /c del /f /q {{.TEMP_AUDIO}}.{{.API_FORMAT}}'
 
+  smoke:
+    desc: Smoke-test natural, designed, and cloned voices against the running API
+    cmds:
+      - >-
+        python scripts/smoke-api.py
+        --base-url http://127.0.0.1:{{.PORT}}
+        --reference examples/original_clone.mp3
+        {{.CLI_ARGS}}
+
   imagestop:
     desc: Stop running VoxCPMTTS containers
     cmds:

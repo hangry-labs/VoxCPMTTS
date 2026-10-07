@@ -74,6 +74,7 @@ class NanoVoxCPM:
         )
         model_info = self._server.get_model_info()
         self.tts_model = SimpleNamespace(sample_rate=int(model_info["sample_rate"]))
+        self.last_successful_seed: int | None = None
         self.text_normalizer = None
         self.denoiser = None
         if enable_denoiser and zipenhancer_model_path:
@@ -130,6 +131,7 @@ class NanoVoxCPM:
         max_len: int = 2000,
         normalize: bool = False,
         denoise: bool = False,
+        seed: int | None = None,
         **_: object,
     ) -> Generator[np.ndarray, None, None]:
         if not isinstance(text, str) or not text.strip():
@@ -141,7 +143,6 @@ class NanoVoxCPM:
                 "Nano-vLLM fixes inference_timesteps when the engine starts; "
                 f"this instance uses {self.inference_timesteps}"
             )
-
         text = re.sub(r"\s+", " ", text.replace("\n", " ")).strip()
         if normalize:
             if self.text_normalizer is None:
@@ -176,7 +177,9 @@ class NanoVoxCPM:
                     ref_audio_latents=reference_latents,
                     max_generate_length=max_len,
                     cfg_value=cfg_value,
+                    seed=seed,
                 ):
+                    self.last_successful_seed = seed
                     yield np.asarray(chunk, dtype=np.float32).reshape(-1)
         finally:
             for temporary_path in temporary_paths:

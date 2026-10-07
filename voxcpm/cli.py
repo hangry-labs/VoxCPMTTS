@@ -12,10 +12,30 @@ import os
 import sys
 from pathlib import Path
 
-import soundfile as sf
-from voxcpm.core import VoxCPM
-
 DEFAULT_HF_MODEL_ID = "openbmb/VoxCPM2"
+MAX_RANDOM_SEED = 2**32 - 1
+
+# Kept as patchable hooks for tests while the real dependencies stay lazy.
+VoxCPM = None
+sf = None
+
+
+def _get_voxcpm_class():
+    global VoxCPM
+    if VoxCPM is None:
+        from voxcpm.core import VoxCPM as runtime_class
+
+        VoxCPM = runtime_class
+    return VoxCPM
+
+
+def _get_soundfile():
+    global sf
+    if sf is None:
+        import soundfile as soundfile
+
+        sf = soundfile
+    return sf
 
 # -----------------------------
 # Validators
@@ -50,14 +70,17 @@ def validate_ranges(args, parser):
     if not (1 <= args.inference_timesteps <= 100):
         parser.error("--inference-timesteps must be between 1 and 100 (recommended: 4–30)")
 
-    if args.lora_r <= 0:
+    if args.lora_r is not None and args.lora_r <= 0:
         parser.error("--lora-r must be a positive integer")
 
-    if args.lora_alpha <= 0:
+    if args.lora_alpha is not None and args.lora_alpha <= 0:
         parser.error("--lora-alpha must be a positive integer")
 
-    if not (0.0 <= args.lora_dropout <= 1.0):
+    if args.lora_dropout is not None and not (0.0 <= args.lora_dropout <= 1.0):
         parser.error("--lora-dropout must be between 0.0 and 1.0")
+
+    if args.seed is not None and not (0 <= args.seed <= MAX_RANDOM_SEED):
+        parser.error(f"--seed must be between 0 and {MAX_RANDOM_SEED}")
 
 
 def warn_legacy_mode():
@@ -173,6 +196,7 @@ def validate_batch_args(args, parser):
 
 
 def load_model(args):
+    runtime_class = _get_voxcpm_class()
     print("Loading VoxCPM model...", file=sys.stderr)
 
     zipenhancer_path = getattr(args, "zipenhancer_path", None) or os.environ.get(
@@ -182,17 +206,25 @@ def load_model(args):
     # Build LoRA config if provided
     lora_config = None
     lora_weights_path = getattr(args, "lora_path", None)
-    if lora_weights_path:
+    has_lora_overrides = any(
+        value is not None
+        for value in (args.lora_r, args.lora_alpha, args.lora_dropout)
+    ) or args.lora_disable_lm or args.lora_disable_dit or args.lora_enable_proj
+    if lora_weights_path and has_lora_overrides:
         from voxcpm.model.voxcpm import LoRAConfig
 
-        lora_config = LoRAConfig(
-            enable_lm=not args.lora_disable_lm,
-            enable_dit=not args.lora_disable_dit,
-            enable_proj=args.lora_enable_proj,
-            r=args.lora_r,
-            alpha=args.lora_alpha,
-            dropout=args.lora_dropout,
-        )
+        config_values = {
+            "enable_lm": not args.lora_disable_lm,
+            "enable_dit": not args.lora_disable_dit,
+            "enable_proj": args.lora_enable_proj,
+        }
+        if args.lora_r is not None:
+            config_values["r"] = args.lora_r
+        if args.lora_alpha is not None:
+            config_values["alpha"] = args.lora_alpha
+        if args.lora_dropout is not None:
+            config_values["dropout"] = args.lora_dropout
+        lora_config = LoRAConfig(**config_values)
 
         print(
             f"LoRA config: r={lora_config.r}, alpha={lora_config.alpha}, "
@@ -203,7 +235,7 @@ def load_model(args):
     # Load local model if specified
     if args.model_path:
         try:
-            model = VoxCPM(
+            model = runtime_class(
                 voxcpm_model_path=args.model_path,
                 zipenhancer_model_path=zipenhancer_path,
                 enable_denoiser=not args.no_denoiser,
@@ -220,7 +252,7 @@ def load_model(args):
 
     # Load from Hugging Face Hub
     try:
-        model = VoxCPM.from_pretrained(
+        model = runtime_class.from_pretrained(
             hf_model_id=args.hf_model_id,
             load_denoiser=not args.no_denoiser,
             zipenhancer_model_id=zipenhancer_path,
@@ -263,12 +295,19 @@ def _run_single(args, parser, *, text: str, output: str, prompt_text: str | None
         normalize=args.normalize,
         denoise=args.denoise
         and (args.prompt_audio is not None or args.reference_audio is not None),
+        seed=args.seed,
     )
 
-    sf.write(str(output_path), audio_array, model.tts_model.sample_rate)
+    _get_soundfile().write(str(output_path), audio_array, model.tts_model.sample_rate)
 
     duration = len(audio_array) / model.tts_model.sample_rate
     print(f"Saved audio to: {output_path} ({duration:.2f}s)", file=sys.stderr)
+    maybe_write_timestamps(
+        args,
+        text=text,
+        audio_path=output_path,
+        sample_rate=model.tts_model.sample_rate,
+    )
 
 
 def cmd_design(args, parser):
@@ -328,19 +367,60 @@ def cmd_batch(args, parser):
                 normalize=args.normalize,
                 denoise=args.denoise
                 and (prompt_audio_path is not None or reference_audio_path is not None),
+                seed=args.seed,
             )
 
             output_file = output_dir / f"output_{i:03d}.wav"
-            sf.write(str(output_file), audio_array, model.tts_model.sample_rate)
+            _get_soundfile().write(str(output_file), audio_array, model.tts_model.sample_rate)
 
             duration = len(audio_array) / model.tts_model.sample_rate
             print(f"Saved: {output_file} ({duration:.2f}s)", file=sys.stderr)
+            maybe_write_timestamps(
+                args,
+                text=final_text,
+                audio_path=output_file,
+                sample_rate=model.tts_model.sample_rate,
+            )
             success_count += 1
 
         except Exception as e:
             print(f"Failed on line {i}: {e}", file=sys.stderr)
 
     print(f"\nBatch finished: {success_count}/{len(texts)} succeeded", file=sys.stderr)
+
+
+def default_timestamp_path(audio_path: Path) -> Path:
+    return audio_path.with_suffix(".timestamps.json")
+
+
+def maybe_write_timestamps(args, *, text: str, audio_path: Path, sample_rate: int) -> None:
+    if not getattr(args, "timestamps", False):
+        return
+
+    from voxcpm.timestamps import align_audio_file
+
+    requested_output = getattr(args, "timestamp_output", None)
+    output_path = Path(requested_output) if requested_output else default_timestamp_path(audio_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        result = align_audio_file(
+            audio_path=str(audio_path),
+            text=text,
+            sample_rate=sample_rate,
+            backend="stable-ts",
+            level=args.timestamp_level,
+            model_name=args.timestamp_model,
+            device=args.timestamp_device,
+            language=args.timestamp_language,
+        )
+    except Exception as exc:
+        if args.timestamp_strict:
+            raise SystemExit(f"Timestamp alignment failed: {exc}") from exc
+        print(f"Warning: Timestamp alignment failed: {exc}", file=sys.stderr)
+        return
+
+    output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"Saved timestamps to: {output_path}", file=sys.stderr)
 
 
 # -----------------------------
@@ -369,6 +449,12 @@ def _add_common_generation_args(parser):
     )
     parser.add_argument(
         "--normalize", action="store_true", help="Enable text normalization"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="32-bit generation seed (default: random)",
     )
 
 
@@ -434,19 +520,19 @@ def _add_model_args(parser):
 def _add_lora_args(parser):
     parser.add_argument("--lora-path", type=str, help="Path to LoRA weights")
     parser.add_argument(
-        "--lora-r", type=int, default=32, help="LoRA rank (positive int, default: 32)"
+        "--lora-r", type=int, default=None, help="Override saved LoRA rank"
     )
     parser.add_argument(
         "--lora-alpha",
         type=int,
-        default=16,
-        help="LoRA alpha (positive int, default: 16)",
+        default=None,
+        help="Override saved LoRA alpha",
     )
     parser.add_argument(
         "--lora-dropout",
         type=float,
-        default=0.0,
-        help="LoRA dropout rate (0.0–1.0, default: 0.0)",
+        default=None,
+        help="Override saved LoRA dropout rate (0.0–1.0)",
     )
     parser.add_argument(
         "--lora-disable-lm", action="store_true", help="Disable LoRA on LM layers"
@@ -458,6 +544,34 @@ def _add_lora_args(parser):
         "--lora-enable-proj",
         action="store_true",
         help="Enable LoRA on projection layers",
+    )
+
+
+def _add_timestamp_args(parser, *, include_output: bool = True):
+    parser.add_argument(
+        "--timestamps",
+        action="store_true",
+        help="Write post-generation timestamps to a JSON sidecar",
+    )
+    if include_output:
+        parser.add_argument(
+            "--timestamp-output",
+            type=str,
+            help="Timestamp JSON path (default: output path with .timestamps.json)",
+        )
+    parser.add_argument(
+        "--timestamp-level",
+        choices=["segment", "word", "char"],
+        default="word",
+        help="Timestamp granularity (char timing is best-effort)",
+    )
+    parser.add_argument("--timestamp-model", default="base", help="stable-ts Whisper model name")
+    parser.add_argument("--timestamp-language", default=None, help="Alignment language hint")
+    parser.add_argument("--timestamp-device", default="cpu", help="Alignment device (default: cpu)")
+    parser.add_argument(
+        "--timestamp-strict",
+        action="store_true",
+        help="Fail when timestamp alignment is unavailable or unsuccessful",
     )
 
 
@@ -483,6 +597,7 @@ Examples:
     _add_prompt_reference_args(design_parser)
     _add_model_args(design_parser)
     _add_lora_args(design_parser)
+    _add_timestamp_args(design_parser)
     design_parser.add_argument(
         "--output", "-o", required=True, help="Output audio file path"
     )
@@ -494,6 +609,7 @@ Examples:
     _add_prompt_reference_args(clone_parser)
     _add_model_args(clone_parser)
     _add_lora_args(clone_parser)
+    _add_timestamp_args(clone_parser)
     clone_parser.add_argument(
         "--output", "-o", required=True, help="Output audio file path"
     )
@@ -528,8 +644,15 @@ Examples:
     batch_parser.add_argument(
         "--normalize", action="store_true", help="Enable text normalization"
     )
+    batch_parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="32-bit generation seed (default: random)",
+    )
     _add_model_args(batch_parser)
     _add_lora_args(batch_parser)
+    _add_timestamp_args(batch_parser, include_output=False)
 
     # Legacy root arguments
     parser.add_argument("--input", "-i", help="Input text file (batch mode only)")
@@ -543,6 +666,7 @@ Examples:
     _add_prompt_reference_args(parser)
     _add_model_args(parser)
     _add_lora_args(parser)
+    _add_timestamp_args(parser)
 
     return parser
 

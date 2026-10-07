@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import types
 from pathlib import Path
@@ -19,16 +20,6 @@ V2_MODEL_PATH = ROOT / "models" / "VoxCPM2-1B-newaudiovae-6hz-nope-sft"
 pkg = types.ModuleType("voxcpm")
 pkg.__path__ = [str(ROOT / "voxcpm")]
 sys.modules.setdefault("voxcpm", pkg)
-
-core_stub = types.ModuleType("voxcpm.core")
-
-
-class StubVoxCPM:
-    pass
-
-
-core_stub.VoxCPM = StubVoxCPM
-sys.modules["voxcpm.core"] = core_stub
 
 spec = importlib.util.spec_from_file_location("voxcpm.cli", CLI_PATH)
 cli = importlib.util.module_from_spec(spec)
@@ -56,12 +47,21 @@ def run_main(monkeypatch, argv):
     cli.main()
 
 
+def patch_soundfile_write(monkeypatch):
+    monkeypatch.setattr(cli, "sf", types.SimpleNamespace(write=lambda *args, **kwargs: None))
+
+
 def test_parser_defaults_to_voxcpm2():
     parser = cli._build_parser()
     args = parser.parse_args(["design", "--text", "hello", "--output", "out.wav"])
     assert args.hf_model_id == "openbmb/VoxCPM2"
     assert args.device == "auto"
     assert args.no_optimize is False
+
+
+def test_cli_heavy_dependencies_are_lazy():
+    assert cli.VoxCPM is None
+    assert cli.sf is None
 
 
 def test_load_model_respects_no_optimize_for_local_model(monkeypatch):
@@ -175,7 +175,7 @@ def test_load_model_passes_explicit_device_to_hf(monkeypatch):
 def test_design_subcommand_applies_control(monkeypatch, tmp_path):
     dummy_model = DummyModel()
     monkeypatch.setattr(cli, "load_model", lambda args: dummy_model)
-    monkeypatch.setattr(cli.sf, "write", lambda *args, **kwargs: None)
+    patch_soundfile_write(monkeypatch)
 
     run_main(
         monkeypatch,
@@ -203,7 +203,7 @@ def test_clone_subcommand_reads_prompt_file(monkeypatch, tmp_path):
     prompt_file.write_text("prompt transcript\n", encoding="utf-8")
 
     monkeypatch.setattr(cli, "load_model", lambda args: dummy_model)
-    monkeypatch.setattr(cli.sf, "write", lambda *args, **kwargs: None)
+    patch_soundfile_write(monkeypatch)
 
     run_main(
         monkeypatch,
@@ -275,7 +275,7 @@ def test_clone_rejects_reference_audio_for_v1_hf_model_id(monkeypatch, tmp_path)
 def test_legacy_root_args_still_work_and_warn(monkeypatch, tmp_path, capsys):
     dummy_model = DummyModel()
     monkeypatch.setattr(cli, "load_model", lambda args: dummy_model)
-    monkeypatch.setattr(cli.sf, "write", lambda *args, **kwargs: None)
+    patch_soundfile_write(monkeypatch)
 
     run_main(
         monkeypatch,
@@ -298,7 +298,7 @@ def test_batch_subcommand_applies_control(monkeypatch, tmp_path):
     input_file.write_text("hello\nworld\n", encoding="utf-8")
 
     monkeypatch.setattr(cli, "load_model", lambda args: dummy_model)
-    monkeypatch.setattr(cli.sf, "write", lambda *args, **kwargs: None)
+    patch_soundfile_write(monkeypatch)
 
     run_main(
         monkeypatch,
@@ -327,7 +327,7 @@ def test_legacy_clone_with_prompt_file_still_works(monkeypatch, tmp_path, capsys
     prompt_file.write_text("legacy transcript", encoding="utf-8")
 
     monkeypatch.setattr(cli, "load_model", lambda args: dummy_model)
-    monkeypatch.setattr(cli.sf, "write", lambda *args, **kwargs: None)
+    patch_soundfile_write(monkeypatch)
 
     run_main(
         monkeypatch,
@@ -543,3 +543,63 @@ def test_detect_model_architecture_uses_local_configs():
 
     assert cli.detect_model_architecture(v1_args) == "voxcpm"
     assert cli.detect_model_architecture(v2_args) == "voxcpm2"
+
+
+def test_parser_accepts_generation_seed():
+    args = cli._build_parser().parse_args(
+        ["design", "--text", "hello", "--output", "out.wav", "--seed", "42"]
+    )
+
+    assert args.seed == 42
+
+
+def test_design_subcommand_passes_seed(monkeypatch, tmp_path):
+    dummy_model = DummyModel()
+    monkeypatch.setattr(cli, "load_model", lambda args: dummy_model)
+    patch_soundfile_write(monkeypatch)
+
+    run_main(
+        monkeypatch,
+        [
+            "design",
+            "--text",
+            "hello",
+            "--seed",
+            "123",
+            "--output",
+            str(tmp_path / "out.wav"),
+        ],
+    )
+
+    assert dummy_model.calls[0]["seed"] == 123
+
+
+def test_design_writes_timestamp_sidecar_when_requested(monkeypatch, tmp_path):
+    import voxcpm.timestamps as timestamps
+
+    dummy_model = DummyModel()
+    output = tmp_path / "out.wav"
+    monkeypatch.setattr(cli, "load_model", lambda args: dummy_model)
+    patch_soundfile_write(monkeypatch)
+    monkeypatch.setattr(
+        timestamps,
+        "align_audio_file",
+        lambda **kwargs: {
+            "audio_path": kwargs["audio_path"],
+            "sample_rate": kwargs["sample_rate"],
+            "backend": kwargs["backend"],
+            "level": kwargs["level"],
+            "text": kwargs["text"],
+            "items": [{"text": "hello", "start": 0.0, "end": 0.5, "level": "word"}],
+            "warning": None,
+        },
+    )
+
+    run_main(
+        monkeypatch,
+        ["design", "--text", "hello", "--output", str(output), "--timestamps"],
+    )
+
+    sidecar = json.loads((tmp_path / "out.timestamps.json").read_text(encoding="utf-8"))
+    assert sidecar["level"] == "word"
+    assert sidecar["items"][0]["text"] == "hello"

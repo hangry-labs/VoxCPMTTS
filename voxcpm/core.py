@@ -65,14 +65,25 @@ class VoxCPM:
             file=sys.stderr,
         )
 
-        # If lora_weights_path is provided but no lora_config, create a default one
+        # Restore the adapter shape saved beside the weights when available.
         if lora_weights_path is not None and lora_config is None:
-            lora_config = LoRAConfig(
-                enable_lm=True,
-                enable_dit=True,
-                enable_proj=False,
-            )
-            print(f"Auto-created default LoRAConfig for loading weights from: {lora_weights_path}", file=sys.stderr)
+            lora_directory = Path(lora_weights_path)
+            if lora_directory.is_file():
+                lora_directory = lora_directory.parent
+            lora_config_path = lora_directory / "lora_config.json"
+            if lora_config_path.is_file():
+                saved_config = json.loads(lora_config_path.read_text(encoding="utf-8"))
+                config_values = saved_config.get("lora_config")
+                if not isinstance(config_values, dict):
+                    raise ValueError(f"Invalid LoRA config in {lora_config_path}: missing lora_config object")
+                lora_config = LoRAConfig(**config_values)
+                print(f"Loaded LoRAConfig from: {lora_config_path}", file=sys.stderr)
+            else:
+                lora_config = LoRAConfig(enable_lm=True, enable_dit=True, enable_proj=False)
+                print(
+                    f"Auto-created default LoRAConfig for loading weights from: {lora_weights_path}",
+                    file=sys.stderr,
+                )
 
         # Determine model type from config.json architecture field
         config_path = os.path.join(voxcpm_model_path, "config.json")
@@ -221,6 +232,7 @@ class VoxCPM:
         retry_badcase_max_times: int = 3,
         retry_badcase_ratio_threshold: float = 6.0,
         streaming: bool = False,
+        seed: Optional[int] = None,
     ) -> Generator[np.ndarray, None, None]:
         """Synthesize speech for the given text and return a single waveform.
 
@@ -243,6 +255,7 @@ class VoxCPM:
             retry_badcase_max_times: Maximum number of times to retry badcase.
             retry_badcase_ratio_threshold: Threshold for audio-to-text ratio.
             streaming: Whether to return a generator of audio chunks.
+            seed: Optional 32-bit random seed for reproducible generation.
         Returns:
             Generator of numpy.ndarray: 1D waveform array (float32) on CPU.
             Yields audio chunks for each generation step if ``streaming=True``,
@@ -319,6 +332,7 @@ class VoxCPM:
                 retry_badcase_max_times=retry_badcase_max_times,
                 retry_badcase_ratio_threshold=retry_badcase_ratio_threshold,
                 streaming=streaming,
+                seed=seed,
             )
 
             if streaming:
