@@ -8,6 +8,10 @@ desktop.ini
 .vscode/
 *.code-workspace
 
+# Local agent context and instructions
+.ai/
+AGENTS.md
+
 # Python bytecode and caches
 __pycache__/
 *.py[cod]
