@@ -814,20 +814,25 @@ async function transcribeReference() {
   const file = referenceAudio.currentFile()
   if (!file) return showToast('Choose or record reference audio first.')
   const button = $('#transcribe-reference')
+  const label = button.querySelector('span')
   button.disabled = true
-  setStatus('Transcribing reference')
+  const firstLoad = !state.status.asr_loaded
+  label.textContent = firstLoad ? 'Loading transcription model' : 'Transcribing reference'
+  setStatus(firstLoad ? 'Loading transcription model' : 'Transcribing reference')
   try {
     const form = new FormData()
     form.append('reference_audio', file, file.name)
     form.append('language', 'auto')
     const result = await fetchJson('/tts/transcribe-upload', { method: 'POST', body: form })
     $('#reference-text').value = result.text || ''
+    state.status.asr_loaded = true
     updateCloneConditioning()
     setStatus('Reference transcript ready', 'success')
   } catch (error) {
     setStatus(errorMessage(error), 'error')
     showToast(errorMessage(error))
   } finally {
+    label.textContent = 'Transcribe reference'
     button.disabled = !state.status.load_asr
   }
 }

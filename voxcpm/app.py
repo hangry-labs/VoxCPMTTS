@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import io
 import json
 import os
@@ -144,13 +145,25 @@ STREAM_FORMAT_ALIASES = {
     ".mp3": "mp3",
     "mpeg": "mp3",
 }
-ASR_MODEL_ID = os.getenv("VOXCPM_ASR_MODEL_ID", "iic/SenseVoiceSmall")
+ASR_MODEL_ID = os.getenv("VOXCPM_ASR_MODEL_ID", "openai/whisper-base")
+ASR_MODEL_REVISION = os.getenv(
+    "VOXCPM_ASR_MODEL_REVISION",
+    "e37978b90ca9030d5170a5c07aadb050351a65bb",
+)
+ASR_DEVICE = os.getenv("VOXCPM_ASR_DEVICE", "cpu")
 DEFAULT_LOAD_ASR = os.getenv("VOXCPM_LOAD_ASR", "1").lower() in {"1", "true", "yes"}
+ASR_ALLOW_PATTERNS = (
+    "*.json",
+    "*.safetensors",
+    "*.txt",
+    "LICENSE*",
+    "README.md",
+)
 
 MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
 MODEL_LOCK = threading.Lock()
 ASR_MODEL = None
-ASR_LOCK = threading.Lock()
+ASR_LOCK = threading.RLock()
 ACTIVITY_LOCK = threading.Lock()
 GENERATION_ACTIVITY: dict[str, Any] = {
     "active": False,
@@ -186,6 +199,18 @@ def _close_all_models() -> None:
         for model in MODEL_CACHE.values():
             _close_model(model)
         MODEL_CACHE.clear()
+
+
+def _close_asr_model() -> bool:
+    global ASR_MODEL
+    with ASR_LOCK:
+        if ASR_MODEL is None:
+            return False
+        ASR_MODEL = None
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return True
 
 
 def get_cuda_devices() -> list[str]:
@@ -274,21 +299,32 @@ def get_model(device: str = DEFAULT_DEVICE, load_denoiser: bool = False) -> Any:
         return MODEL_CACHE[cache_key]
 
 
+def _create_asr_pipeline(model_path: str, device: str):
+    from transformers import pipeline
+
+    return pipeline(
+        "automatic-speech-recognition",
+        model=model_path,
+        device=device,
+        dtype=torch.float16 if device.startswith("cuda") else torch.float32,
+    )
+
+
 def get_asr_model():
     global ASR_MODEL
     if not DEFAULT_LOAD_ASR:
         raise RuntimeError("ASR is disabled. Set VOXCPM_LOAD_ASR=1 to enable reference transcription.")
     with ASR_LOCK:
         if ASR_MODEL is None:
-            from funasr import AutoModel
-
-            device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            ASR_MODEL = AutoModel(
-                model=ASR_MODEL_ID,
-                disable_update=True,
-                log_level="ERROR",
-                device=device,
+            from huggingface_hub import snapshot_download
+            device = canonical_model_device(ASR_DEVICE)
+            model_path = snapshot_download(
+                repo_id=ASR_MODEL_ID,
+                revision=ASR_MODEL_REVISION,
+                allow_patterns=list(ASR_ALLOW_PATTERNS),
+                local_files_only=DEFAULT_LOCAL_ONLY,
             )
+            ASR_MODEL = _create_asr_pipeline(model_path, device)
         return ASR_MODEL
 
 
@@ -298,12 +334,14 @@ def transcribe_reference_audio(audio_path: str, language: str = "auto") -> str:
     if not Path(audio_path).exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    model = get_asr_model()
-    result = model.generate(input=audio_path, language=language or "auto", use_itn=True)
-    if not result:
-        return ""
-    text = result[0].get("text", "")
-    return text.split("|>")[-1].strip()
+    generate_kwargs = {"task": "transcribe"}
+    normalized_language = (language or "auto").strip().lower()
+    if normalized_language != "auto":
+        generate_kwargs["language"] = normalized_language
+
+    with ASR_LOCK:
+        result = get_asr_model()(audio_path, generate_kwargs=generate_kwargs)
+    return str(result.get("text", "")).strip()
 
 
 def normalize_output_format(output_format: str | None) -> str:
@@ -750,6 +788,9 @@ def get_status_payload() -> dict:
         "load_denoiser": DEFAULT_LOAD_DENOISER,
         "load_asr": DEFAULT_LOAD_ASR,
         "asr_model_id": ASR_MODEL_ID,
+        "asr_model_revision": ASR_MODEL_REVISION,
+        "asr_device": ASR_DEVICE,
+        "asr_loaded": ASR_MODEL is not None,
         "optimize": DEFAULT_OPTIMIZE,
         "languages": SUPPORTED_LANGUAGES,
         "loaded_model_devices": loaded_devices,
@@ -849,6 +890,7 @@ async def app_lifespan(_: FastAPI):
     yield
     GPU_MONITOR.close()
     await asyncio.to_thread(_close_all_models)
+    await asyncio.to_thread(_close_asr_model)
 
 
 api = FastAPI(
@@ -1013,7 +1055,12 @@ def transcribe(payload: TranscriptionRequest = Body(...)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Reference transcription failed: {exc}") from exc
-    return {"text": text, "language": payload.language, "model_id": ASR_MODEL_ID}
+    return {
+        "text": text,
+        "language": payload.language,
+        "model_id": ASR_MODEL_ID,
+        "model_revision": ASR_MODEL_REVISION,
+    }
 
 
 @api.post("/tts/transcribe-upload")
@@ -1030,7 +1077,12 @@ async def transcribe_upload(
         raise HTTPException(status_code=500, detail=f"Reference transcription failed: {exc}") from exc
     finally:
         Path(reference_path).unlink(missing_ok=True)
-    return {"text": text, "language": language, "model_id": ASR_MODEL_ID}
+    return {
+        "text": text,
+        "language": language,
+        "model_id": ASR_MODEL_ID,
+        "model_revision": ASR_MODEL_REVISION,
+    }
 
 
 @api.post("/tts/timestamps-upload")
@@ -1119,6 +1171,8 @@ def purge_models(payload: PurgeRequest | None = Body(None)) -> dict:
         for model in MODEL_CACHE.values():
             _close_model(model)
         MODEL_CACHE.clear()
+        if _close_asr_model():
+            purged.append("asr")
         return {"purged": purged, "remaining_model_devices": []}
 
 

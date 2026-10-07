@@ -12,7 +12,7 @@ This Hangry Labs fork is made for local use without the usual Python environment
 
 ## What This Project Provides
 
-- A browser UI for voice design, voice cloning, and transcript-guided cloning
+- A browser UI for voice design, voice cloning, transcript-guided cloning, and local reference transcription
 - Persistent saved voices that can be reused across Generate, Clone, and Stream
 - An HTTP API for applications and local integrations
 - Multilingual generation across 30 VoxCPM2 languages
@@ -90,6 +90,8 @@ CUDA graphs are enabled by default. Set `VOXCPM_NANO_ENFORCE_EAGER=1` only for t
 
 Nano-vLLM fixes the diffusion step count when the engine starts. The image default is 10; set `VOXCPM_NANO_INFERENCE_TIMESTEPS` before startup when another value is required, then send the same `inference_timesteps` value in API requests.
 
+Reference transcription lazy-loads the pinned multilingual `openai/whisper-base` model on CPU, preserving GPU memory for VoxCPM2. The full image bakes the 282 MiB ASR snapshot for offline use; the tiny image stores it in the mounted Hugging Face cache after the first transcription. Set `VOXCPM_LOAD_ASR=0` to disable transcription, or override `VOXCPM_ASR_DEVICE` and the pinned model settings when maintaining a custom image.
+
 ## API Usage
 
 Default generation returns WAV:
@@ -141,6 +143,14 @@ curl -X POST "http://localhost:8808/tts/generate" \
   -o guided.mp3
 ```
 
+Transcribe an uploaded or browser-recorded reference locally before cloning:
+
+```bash
+curl -X POST "http://localhost:8808/tts/transcribe-upload" \
+  -F "reference_audio=@reference.mp3" \
+  -F "language=auto"
+```
+
 Progressive MP3 streaming begins returning encoded model chunks before synthesis finishes:
 
 ```bash
@@ -163,7 +173,7 @@ Runtime discovery is available from the local API:
 - Status and loaded backend: `GET /tts/status`
 - Current generation stage: `GET /tts/activity`
 - Saved voices: `GET`, `POST`, and `DELETE /tts/voice-profiles`
-- Reference transcription when ASR is enabled: `POST /tts/transcribe-upload`
+- Lazy local reference transcription with the baked multilingual Whisper Base model: `POST /tts/transcribe-upload`
 - Generated-audio alignment when `/tts/status` reports it available: `POST /tts/timestamps-upload`
 - Supported languages: `GET /tts/languages`
 - Output formats: `GET /tts/formats`
@@ -264,6 +274,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Added persistent voice profiles shared by generation and cloning, drag-and-drop reference audio, truthful generation stages, live streaming output, recording waveforms, and persistent playback volume.
 - Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.
 - Added generated timestamp sidecars and API/UI integration behind runtime capability discovery; standard Python 3.13 images keep alignment disabled until its backend publishes binary wheels. Reference transcription remains a separate cloning workflow.
+- Added lazy multilingual reference transcription with a pinned Whisper Base model. The baked image works offline; the tiny image downloads the same pinned assets on first use.
 - Restored saved LoRA adapter configuration automatically, made CLI model/audio imports lazy, and added checkpoint-loading regression guards.
 - Added a lightweight live-API smoke suite for natural speech, contrasting voice designs, reference cloning, deterministic seed headers, WAV validation, and optional Qwen3-ASR transcript judging.
 - Added one-instance model caching, serialized generation, compile-worker limits, and reference-latent allocator cleanup to prevent duplicate weights and repeated-request RAM/VRAM growth.
@@ -294,7 +305,6 @@ No immutable `v1.0` image has been published yet. After publication and validati
 Deferred v1.0 work belongs in this list so release scope does not disappear between development sessions.
 
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
-- Restore reference-audio transcription in the standard Nano image with a Python 3.13 binary-wheel-only backend and baked assets; keep it separate from generated-audio alignment.
 - Confirm redistribution rights and consent for `examples/original_clone.mp3` before publication.
 - Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
 - Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.

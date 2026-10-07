@@ -40,7 +40,7 @@ Then open:
 
 http://localhost:8808
 
-The standard full image (`latest` or a fixed `vX.Y` release) includes the VoxCPM2 model assets for offline use after the image is pulled.
+The standard full image (`latest` or a fixed `vX.Y` release) includes the VoxCPM2 and multilingual Whisper Base model assets for offline use after the image is pulled.
 
 The `voxcpmtts_data` volume stores saved voice profiles and reference samples across container replacement.
 
@@ -50,6 +50,8 @@ The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.49` gives the engine a budget 
 
 Nano-vLLM fixes the diffusion step count at engine startup. The image default is 10; set `VOXCPM_NANO_INFERENCE_TIMESTEPS` before startup to change it, and use the same value in API requests.
 
+The UI can transcribe uploaded or freshly recorded reference samples before transcript-guided cloning. The pinned `openai/whisper-base` model loads only when requested and uses CPU by default so VoxCPM2 retains the GPU budget. Set `VOXCPM_LOAD_ASR=0` to disable this feature. The full image contains the ASR assets; the tiny image downloads them into its Hugging Face cache on first use.
+
 The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face cache is warmed on first online use:
 
 ```bash
@@ -58,7 +60,7 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 
 ## What You Get
 
-- Offline browser workspace for voice design, controllable cloning, transcript-guided cloning, recording, upload, waveform trimming, and reusable saved voices
+- Offline browser workspace for voice design, controllable cloning, transcript-guided cloning, local reference transcription, recording, upload, waveform trimming, and reusable saved voices
 - HTTP API for applications and automation
 - VoxCPM2 multilingual generation across 30 officially supported languages
 - 48 kHz output when using the VoxCPM2 AudioVAE V2 model

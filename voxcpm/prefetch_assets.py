@@ -5,6 +5,15 @@ import os
 from huggingface_hub import snapshot_download
 
 
+ASR_ALLOW_PATTERNS = [
+    "*.json",
+    "*.safetensors",
+    "*.txt",
+    "LICENSE*",
+    "README.md",
+]
+
+
 def _enabled(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
@@ -28,9 +37,17 @@ def main() -> None:
         _prefetch_modelscope(denoiser_id)
 
     if _enabled(os.getenv("VOXCPM_PREFETCH_ASR"), default=True):
-        asr_id = os.getenv("VOXCPM_ASR_MODEL_ID", "iic/SenseVoiceSmall")
-        print(f"Prefetching ModelScope ASR: {asr_id}")
-        _prefetch_modelscope(asr_id)
+        asr_id = os.getenv("VOXCPM_ASR_MODEL_ID", "openai/whisper-base")
+        asr_revision = os.getenv(
+            "VOXCPM_ASR_MODEL_REVISION",
+            "e37978b90ca9030d5170a5c07aadb050351a65bb",
+        )
+        print(f"Prefetching Hugging Face ASR: {asr_id}@{asr_revision}")
+        snapshot_download(
+            repo_id=asr_id,
+            revision=asr_revision,
+            allow_patterns=ASR_ALLOW_PATTERNS,
+        )
 
 
 if __name__ == "__main__":

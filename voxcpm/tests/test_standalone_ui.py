@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 from fastapi.responses import StreamingResponse
@@ -169,6 +169,38 @@ def test_transcribe_upload_uses_and_removes_temporary_audio() -> None:
     assert observed["exists"] is True
     assert observed["language"] == "auto"
     assert not observed["path"].exists()
+
+
+def test_reference_asr_loads_pinned_whisper_lazily_and_reuses_it(tmp_path: Path) -> None:
+    audio_path = tmp_path / "reference.wav"
+    audio_path.write_bytes(b"audio")
+    asr_pipeline = Mock(return_value={"text": "  Reference transcript  "})
+
+    with (
+        patch.object(runtime, "ASR_MODEL", None),
+        patch.object(runtime, "DEFAULT_LOAD_ASR", True),
+        patch.object(runtime, "DEFAULT_LOCAL_ONLY", True),
+        patch.object(runtime, "ASR_DEVICE", "cpu"),
+        patch("huggingface_hub.snapshot_download", return_value="/models/whisper-base") as download,
+        patch.object(runtime, "_create_asr_pipeline", return_value=asr_pipeline) as create_pipeline,
+    ):
+        first = runtime.transcribe_reference_audio(str(audio_path), "auto")
+        second = runtime.transcribe_reference_audio(str(audio_path), "English")
+
+    assert first == "Reference transcript"
+    assert second == "Reference transcript"
+    download.assert_called_once_with(
+        repo_id=runtime.ASR_MODEL_ID,
+        revision=runtime.ASR_MODEL_REVISION,
+        allow_patterns=list(runtime.ASR_ALLOW_PATTERNS),
+        local_files_only=True,
+    )
+    create_pipeline.assert_called_once_with("/models/whisper-base", "cpu")
+    assert asr_pipeline.call_args_list[0].kwargs["generate_kwargs"] == {"task": "transcribe"}
+    assert asr_pipeline.call_args_list[1].kwargs["generate_kwargs"] == {
+        "task": "transcribe",
+        "language": "english",
+    }
 
 
 def test_upload_rejects_unsupported_file_type() -> None:

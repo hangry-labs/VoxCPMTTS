@@ -28,7 +28,7 @@ offline operation:
 | Model | Purpose | Declared license |
 | --- | --- | --- |
 | [openbmb/VoxCPM2](https://huggingface.co/openbmb/VoxCPM2) | Speech generation | Apache-2.0 |
-| [iic/SenseVoiceSmall](https://www.modelscope.cn/models/iic/SenseVoiceSmall) | Reference-audio transcription | Apache-2.0 |
+| [openai/whisper-base](https://huggingface.co/openai/whisper-base) | Reference-audio transcription | Apache-2.0 |
 | [iic/speech_zipenhancer_ans_multiloss_16k_base](https://www.modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base) | Audio denoising | Apache-2.0 |
 
 Model cards and accompanying files are retained in the image's Hugging Face
@@ -45,7 +45,7 @@ Major direct runtime dependencies include:
 | CPython | Python Software Foundation License |
 | PyTorch and TorchAudio | BSD-style licenses |
 | Transformers, Hugging Face Hub, Python Multipart, ModelScope, Datasets, WeText, Spaces, Safetensors | Apache-2.0 |
-| FastAPI, Pydantic, Einops, Inflect, Addict, FunASR | MIT-style licenses |
+| FastAPI, Pydantic, Einops, Inflect, Addict | MIT-style licenses |
 | Uvicorn, SoundFile, NumPy | BSD and other permissive licenses |
 | Librosa | ISC |
 | tqdm | MPL-2.0 and MIT |

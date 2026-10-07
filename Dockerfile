@@ -7,7 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HF_HOME=/app/.cache/huggingface \
     MODELSCOPE_CACHE=/app/.cache/modelscope \
     VOXCPM_PREFETCH_DENOISER=1 \
-    VOXCPM_PREFETCH_ASR=1
+    VOXCPM_PREFETCH_ASR=1 \
+    VOXCPM_ASR_MODEL_ID=openai/whisper-base \
+    VOXCPM_ASR_MODEL_REVISION=e37978b90ca9030d5170a5c07aadb050351a65bb
 
 WORKDIR /app
 
@@ -43,7 +45,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HF_HOME=/app/.cache/huggingface \
     MODELSCOPE_CACHE=/app/.cache/modelscope \
     VOXCPM_PREFETCH_DENOISER=1 \
-    VOXCPM_PREFETCH_ASR=1
+    VOXCPM_PREFETCH_ASR=1 \
+    VOXCPM_ASR_MODEL_ID=openai/whisper-base \
+    VOXCPM_ASR_MODEL_REVISION=e37978b90ca9030d5170a5c07aadb050351a65bb
 
 WORKDIR /app
 
@@ -79,10 +83,25 @@ COPY assets /app/assets
 
 RUN python -m pip install -e . --no-deps
 
-FROM nano-dependencies AS nano-asset-builder
+FROM python:3.13-slim AS nano-asset-dependencies
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    HF_HOME=/app/.cache/huggingface
+
+WORKDIR /app
+
+RUN python -m pip install --upgrade --only-binary=:all: pip setuptools wheel \
+    && python -m pip install --only-binary=:all: huggingface-hub==1.7.1
+
+FROM nano-asset-dependencies AS nano-asset-builder
 
 ENV VOXCPM_PREFETCH_DENOISER=0 \
-    VOXCPM_PREFETCH_ASR=0
+    VOXCPM_PREFETCH_ASR=1 \
+    VOXCPM_ASR_MODEL_ID=openai/whisper-base \
+    VOXCPM_ASR_MODEL_REVISION=e37978b90ca9030d5170a5c07aadb050351a65bb
 
 COPY voxcpm/prefetch_assets.py /tmp/prefetch_assets.py
 
@@ -102,6 +121,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TRANSFORMERS_OFFLINE=1 \
     VOXCPM_DEVICE=auto \
     VOXCPM_MODEL_ID=openbmb/VoxCPM2 \
+    VOXCPM_LOAD_ASR=1 \
+    VOXCPM_ASR_MODEL_ID=openai/whisper-base \
+    VOXCPM_ASR_MODEL_REVISION=e37978b90ca9030d5170a5c07aadb050351a65bb \
+    VOXCPM_ASR_DEVICE=cpu \
     VOXCPM_LOAD_DENOISER=1 \
     VOXCPM_OPTIMIZE=0 \
     PORT=8808 \
@@ -147,7 +170,6 @@ FROM runtime-base AS nano-runtime-app
 
 ENV VOXCPM_BACKEND=nano \
     VOXCPM_LOAD_DENOISER=0 \
-    VOXCPM_LOAD_ASR=0 \
     VOXCPM_NANO_INFERENCE_TIMESTEPS=10 \
     VOXCPM_NANO_MAX_NUM_BATCHED_TOKENS=4096 \
     VOXCPM_NANO_MAX_NUM_SEQS=1 \
