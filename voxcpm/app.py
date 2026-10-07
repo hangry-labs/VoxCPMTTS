@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import os
 import subprocess
 import tempfile
@@ -11,13 +12,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
-import gradio as gr
 import numpy as np
 import torch
 import uvicorn
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
+
+from voxcpm.standalone_ui.gpu import GPU_MONITOR
+from voxcpm.standalone_ui.server import attach_ui
 
 def _read_version() -> str:
     version_path = Path(__file__).resolve().parents[1] / "VERSION"
@@ -42,6 +45,8 @@ APP_VERSION = os.getenv("APP_VERSION", _read_version())
 BUILD_ID = os.getenv("BUILD_ID", "stable")
 BUILD_DATE = os.getenv("VOXCPMTTS_BUILD_DATE", "unknown")
 VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
+MAX_REFERENCE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_REFERENCE_UPLOAD_BYTES", str(100 * 1024 * 1024)))
+REFERENCE_AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".webm"}
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -340,15 +345,6 @@ def encode_audio_bytes(audio: np.ndarray, output_format: str, sample_rate: int) 
     return result.stdout
 
 
-def encoded_audio_to_temp_file(audio: np.ndarray, output_format: str, sample_rate: int) -> str:
-    normalized_format = normalize_output_format(output_format)
-    extension = OUTPUT_FORMATS[normalized_format]["extension"]
-    audio_bytes = encode_audio_bytes(audio, normalized_format, sample_rate)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}") as file:
-        file.write(audio_bytes)
-        return file.name
-
-
 def clean_control(control: str | None) -> str:
     control = (control or "").strip()
     return control.replace("(", "").replace(")", "").replace("（", "").replace("）", "").strip()
@@ -511,173 +507,72 @@ def get_status_payload() -> dict:
         "loaded_model_devices": loaded_devices,
         "output_formats": get_supported_output_formats(),
         "stream_formats": STREAM_FORMATS,
+        "hardware": [
+            {"label": label, "value": value}
+            for label, value in get_hardware_choices()
+        ],
     }
 
 
-def create_ui() -> gr.Blocks:
-    hardware_choices = get_hardware_choices()
-    hardware_values = {value for _, value in hardware_choices}
-    default_hardware = DEFAULT_DEVICE if DEFAULT_DEVICE in hardware_values else "auto"
+async def save_reference_upload(upload: UploadFile) -> str:
+    suffix = Path(upload.filename or "reference.wav").suffix.lower()
+    if suffix not in REFERENCE_AUDIO_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Unsupported reference audio file type")
 
-    def generate_file(
-        text: str,
-        control: str,
-        reference_audio: Optional[str],
-        use_ref_text: bool,
-        ref_text: str,
-        cfg_value: float,
-        inference_timesteps: int,
-        normalize_text: bool,
-        denoise: bool,
-        output_format: str,
-        hardware: str,
-    ):
-        payload = TTSRequest(
-            text=text,
-            control=None if use_ref_text else (control or None),
-            ref_audio=reference_audio,
-            ref_text=(ref_text or None) if use_ref_text else None,
-            cfg_value=cfg_value,
-            inference_timesteps=int(inference_timesteps),
-            normalize=normalize_text,
-            denoise=denoise,
-            output_format=output_format,
-            device=hardware,
-        )
-        output_format, sample_rate, waveform = synthesize_payload(payload)
-        return encoded_audio_to_temp_file(waveform, output_format, sample_rate)
+    total = 0
+    path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as output:
+            path = output.name
+            while chunk := await upload.read(1024 * 1024):
+                total += len(chunk)
+                if total > MAX_REFERENCE_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Reference audio exceeds the upload limit")
+                output.write(chunk)
+    except Exception:
+        if path:
+            Path(path).unlink(missing_ok=True)
+        raise
+    finally:
+        await upload.close()
+    return path
 
-    def toggle_ultimate_mode(enabled: bool):
-        if enabled:
-            return (
-                gr.update(visible=True),
-                gr.update(interactive=False, value=""),
-                gr.update(interactive=DEFAULT_LOAD_ASR),
-            )
-        return (
-            gr.update(visible=False, value=""),
-            gr.update(interactive=True),
-            gr.update(interactive=False),
-        )
 
-    def transcribe_for_ui(reference_audio: Optional[str]) -> str:
-        if not reference_audio:
-            raise gr.Error("Upload or record reference audio before transcription.")
-        try:
-            return transcribe_reference_audio(reference_audio)
-        except Exception as exc:
-            raise gr.Error(f"Reference transcription failed: {exc}") from exc
+def parse_uploaded_payload(payload: str, *, streaming: bool = False) -> TTSRequest:
+    try:
+        parsed = json.loads(payload)
+        request_type = StreamingTTSRequest if streaming else TTSRequest
+        return request_type.model_validate(parsed)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid generation payload: {exc}") from exc
 
-    with gr.Blocks(title="VoxCPMTTS") as ui:
-        gr.HTML(
-            "<div style='position:fixed;right:12px;top:12px;z-index:9999;"
-            "background:rgba(0,0,0,.55);color:#fff;border-radius:8px;padding:6px 10px;"
-            "font-size:12px'>"
-            f"Version: {APP_VERSION} | Build: {BUILD_ID}<br>{get_runtime_label()}"
-            "</div>"
-        )
-        gr.Markdown(
-            "# VoxCPMTTS\n"
-            "VoxCPM2 text to speech with voice design, controllable cloning, "
-            "and transcript-guided cloning."
-        )
-        with gr.Row():
-            with gr.Column():
-                text = gr.Textbox(
-                    label="Target Text",
-                    value="VoxCPM2 generates realistic multilingual speech with voice design and cloning.",
-                    lines=4,
-                )
-                control = gr.Textbox(
-                    label="Control Instruction",
-                    placeholder="A calm warm narrator / young female, gentle and bright / faster and cheerful",
-                    lines=2,
-                )
-                reference_audio = gr.Audio(
-                    label="Reference Audio",
-                    sources=["upload", "microphone"],
-                    type="filepath",
-                )
-                use_ref_text = gr.Checkbox(
-                    value=False,
-                    label="Ultimate Cloning Mode",
-                    info="Use a transcript with the reference audio. Control Instruction is disabled in this mode.",
-                )
-                ref_text = gr.Textbox(
-                    label="Reference Transcript",
-                    placeholder="Use the transcribe button or enter the reference transcript manually.",
-                    lines=2,
-                    visible=False,
-                )
-                transcribe_btn = gr.Button("Transcribe Reference", interactive=False)
-                with gr.Row():
-                    hardware = gr.Dropdown(hardware_choices, value=default_hardware, label="Hardware")
-                    output_format = gr.Dropdown(
-                        choices=[(config["label"], key) for key, config in OUTPUT_FORMATS.items()],
-                        value="mp3",
-                        label="Output Format",
-                    )
-                with gr.Accordion("Advanced", open=False):
-                    cfg_value = gr.Slider(0.1, 10.0, value=2.0, step=0.1, label="CFG")
-                    inference_timesteps = gr.Slider(
-                        1,
-                        100,
-                        value=DEFAULT_INFERENCE_TIMESTEPS,
-                        step=1,
-                        label="Inference Timesteps",
-                    )
-                    normalize_text = gr.Checkbox(value=False, label="Normalize Text")
-                    denoise = gr.Checkbox(
-                        value=False,
-                        label="Denoise Reference Audio",
-                        interactive=DEFAULT_LOAD_DENOISER,
-                    )
-                generate_btn = gr.Button("Generate", variant="primary")
-            with gr.Column():
-                audio_output = gr.Audio(label="Generated Audio", interactive=False, autoplay=True)
-                gr.Markdown(
-                    "API docs: `/tts/docs`\n\n"
-                    "Use `ref_audio` alone for controllable cloning, or enable Ultimate "
-                    "Cloning Mode to pair reference audio with `ref_text`. VoxCPM2 "
-                    "auto-detects its supported languages from the input text."
-                )
 
-        use_ref_text.change(
-            fn=toggle_ultimate_mode,
-            inputs=[use_ref_text],
-            outputs=[ref_text, control, transcribe_btn],
-        )
-        transcribe_btn.click(
-            fn=transcribe_for_ui,
-            inputs=[reference_audio],
-            outputs=[ref_text],
-            show_progress=True,
-        )
-        generate_btn.click(
-            fn=generate_file,
-            inputs=[
-                text,
-                control,
-                reference_audio,
-                use_ref_text,
-                ref_text,
-                cfg_value,
-                inference_timesteps,
-                normalize_text,
-                denoise,
-                output_format,
-                hardware,
-            ],
-            outputs=[audio_output],
-            show_progress=True,
-        )
-
-    return ui
+async def uploaded_audio_response(
+    payload: str,
+    reference_audio: UploadFile,
+    *,
+    streaming: bool,
+) -> StreamingResponse:
+    request = parse_uploaded_payload(payload, streaming=streaming)
+    reference_path = await save_reference_upload(reference_audio)
+    request.ref_audio = reference_path
+    request.reference_audio = None
+    route_name = "/tts/stream-upload" if streaming else "/tts/generate-upload"
+    try:
+        if streaming:
+            try:
+                request.output_format = normalize_stream_format(request.stream_format)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return await asyncio.to_thread(stream_audio_response, request, route_name)
+    finally:
+        Path(reference_path).unlink(missing_ok=True)
 
 
 @asynccontextmanager
 async def app_lifespan(_: FastAPI):
     yield
+    GPU_MONITOR.close()
     await asyncio.to_thread(_close_all_models)
 
 
@@ -777,9 +672,34 @@ def transcribe(payload: TranscriptionRequest = Body(...)) -> dict:
     return {"text": text, "language": payload.language, "model_id": ASR_MODEL_ID}
 
 
+@api.post("/tts/transcribe-upload")
+async def transcribe_upload(
+    reference_audio: UploadFile = File(...),
+    language: str = Form("auto"),
+) -> dict:
+    reference_path = await save_reference_upload(reference_audio)
+    try:
+        text = await asyncio.to_thread(transcribe_reference_audio, reference_path, language)
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Reference transcription failed: {exc}") from exc
+    finally:
+        Path(reference_path).unlink(missing_ok=True)
+    return {"text": text, "language": language, "model_id": ASR_MODEL_ID}
+
+
 @api.post("/tts/generate")
 def generate_tts(payload: TTSRequest = Body(...)) -> StreamingResponse:
     return stream_audio_response(payload, "/tts/generate")
+
+
+@api.post("/tts/generate-upload")
+async def generate_tts_upload(
+    payload: str = Form(...),
+    reference_audio: UploadFile = File(...),
+) -> StreamingResponse:
+    return await uploaded_audio_response(payload, reference_audio, streaming=False)
 
 
 @api.post("/tts/convert")
@@ -794,6 +714,14 @@ def stream_tts(payload: StreamingTTSRequest = Body(...)) -> StreamingResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return stream_audio_response(payload, "/tts/stream")
+
+
+@api.post("/tts/stream-upload")
+async def stream_tts_upload(
+    payload: str = Form(...),
+    reference_audio: UploadFile = File(...),
+) -> StreamingResponse:
+    return await uploaded_audio_response(payload, reference_audio, streaming=True)
 
 
 @api.post("/tts/purge")
@@ -817,7 +745,7 @@ def purge_models(payload: PurgeRequest | None = Body(None)) -> dict:
         return {"purged": purged, "remaining_model_devices": []}
 
 
-app = gr.mount_gradio_app(api, create_ui(), path="/")
+app = attach_ui(api_app=api)
 
 
 def main() -> None:

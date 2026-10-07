@@ -56,7 +56,7 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 
 ## What You Get
 
-- Browser UI for voice design, controllable cloning, and transcript-guided cloning
+- Offline browser workspace for voice design, controllable cloning, transcript-guided cloning, recording, upload, and waveform trimming
 - HTTP API for applications and automation
 - VoxCPM2 multilingual generation across 30 officially supported languages
 - 48 kHz output when using the VoxCPM2 AudioVAE V2 model

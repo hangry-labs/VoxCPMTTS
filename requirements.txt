@@ -4,8 +4,8 @@ torch==2.10.0
 torchaudio==2.10.0
 transformers==5.3.0
 huggingface-hub==1.7.1
-gradio==6.9.0
 fastapi==0.135.1
+python-multipart==0.0.32
 uvicorn[standard]==0.42.0
 numpy==2.4.3
 modelscope==1.35.0

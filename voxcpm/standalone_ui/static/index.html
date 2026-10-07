@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>VoxCPMTTS</title>
+  <link rel="icon" type="image/webp" sizes="128x128" href="/assets/voxcpmtts_badge.webp">
+  <script>
+    try {
+      const state = JSON.parse(sessionStorage.getItem('voxcpmtts-ui-state-v1') || 'null')
+      if (state?.headerCollapsed) document.documentElement.dataset.headerCollapsed = 'true'
+    } catch {
+      // Browser storage may be unavailable in privacy-restricted sessions.
+    }
+  </script>
+  <link rel="stylesheet" href="/static/vendor/lucide/lucide.css">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <header class="brand-hero" id="brand-hero" data-collapsed="false">
+    <a class="labs-signature" href="https://hangrylabs.app/" target="_blank" rel="noreferrer" aria-label="Hangry Labs home" title="Hangry Labs home">
+      <span class="powered-label">Powered by</span>
+      <img class="labs-logo" src="/assets/hangrylabs_logo.webp" alt="Hangry Labs">
+    </a>
+    <img class="collapsed-mascot" src="/assets/voxcpmtts_badge.webp" alt="VoxCPMTTS mascot">
+    <nav class="brand-nav" aria-label="Application links">
+      <div class="brand-links">
+        <a class="primary-link" href="https://hangry-labs.github.io/VoxCPMTTS/examples/" target="_blank" rel="noreferrer"><i class="icon-sparkles"></i><span>Examples</span></a>
+        <a href="/tts/docs"><i class="icon-book-open"></i><span>API docs</span></a>
+        <a href="/tts/voices"><i class="icon-audio-lines"></i><span>Voices</span></a>
+        <a href="https://github.com/Hangry-Labs/VoxCPMTTS" target="_blank" rel="noreferrer"><i class="icon-git-branch"></i><span>GitHub</span></a>
+      </div>
+    </nav>
+    <div class="brand-copy">
+      <h1><img class="product-logo" src="/assets/voxcpmtts_logo_horizontal.webp" alt="VoxCPMTTS"></h1>
+    </div>
+    <div class="runtime-badge" id="runtime-badge" data-state="starting">
+      <i class="icon-activity"></i>
+      <div class="runtime-copy"><strong id="runtime-state">Inference starting</strong><span id="runtime-model">Waiting for inference service</span></div>
+      <a class="runtime-version" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" title="Open VoxCPMTTS releases">UI v{{UI_VERSION}}</a>
+    </div>
+    <button class="hero-toggle" id="hero-toggle" type="button" aria-controls="brand-hero" aria-expanded="true" aria-label="Collapse header" title="Collapse header"><i class="icon-chevron-up"></i></button>
+  </header>
+
+  <div class="app-tabs" role="tablist" aria-label="Workspace views">
+    <button class="tab-button active" type="button" role="tab" aria-selected="true" data-tab="generate">Generate</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="stream">Stream</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="api">API</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="system">System</button>
+  </div>
+
+  <main class="workspace" data-view="generate">
+    <aside class="settings-panel workflow-only" id="inference-settings">
+      <div class="section-title"><i class="icon-sliders-horizontal"></i><span>Voice setup</span></div>
+      <label class="field"><span>Voice mode</span>
+        <select id="voice-mode">
+          <option value="natural">Natural voice</option>
+          <option value="design">Voice design</option>
+          <option value="clone">Reference clone</option>
+          <option value="guided">Transcript-guided clone</option>
+        </select>
+      </label>
+      <label class="field"><span>Language</span><select id="language"><option value="English">English</option></select></label>
+      <div class="field-grid">
+        <label class="field"><span>Hardware</span><select id="device"><option value="auto">Auto</option><option value="cpu">CPU</option></select></label>
+        <label class="field"><span>Output format</span><select id="output-format"><option value="mp3">MP3</option></select></label>
+      </div>
+
+      <div class="settings-section compact-settings">
+        <div class="section-heading-row"><div class="section-title"><i class="icon-audio-lines"></i><span>Generation controls</span></div><button class="icon-button reset-controls" id="reset-controls" type="button" title="Reset controls" aria-label="Reset controls"><i class="icon-rotate-ccw"></i></button></div>
+        <div class="range-stack">
+          <label class="range-control"><span class="range-heading"><span>Guidance</span></span><span class="range-input-row"><input id="guidance-slider" type="range" min="0.1" max="10" step="0.1" value="2" data-value-input="guidance"><input id="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" data-range-input="guidance-slider"></span></label>
+          <label class="range-control"><span class="range-heading"><span>Inference steps</span></span><span class="range-input-row"><input id="steps-slider" type="range" min="1" max="100" step="1" value="10" data-value-input="steps"><input id="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" data-range-input="steps-slider"></span></label>
+        </div>
+      </div>
+      <label class="toggle-field"><span>Normalize text</span><input id="normalize" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+      <label class="toggle-field"><span>Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+      <div class="status-line" id="global-status" data-tone="neutral">Connecting to inference</div>
+    </aside>
+
+    <section class="content-panel">
+      <section class="composer workflow-only" id="composer">
+        <div class="composer-heading">
+          <div class="section-title"><i class="icon-message-square-text"></i><span>Input text</span></div>
+          <div class="composer-actions"><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span>New sample</span></button></div>
+        </div>
+        <textarea id="text-input" rows="7" spellcheck="true" aria-label="Text to synthesize">VoxCPM2 generates natural multilingual speech with voice design and cloning.</textarea>
+      </section>
+
+      <section class="conditioning-panel workflow-only" id="design-panel" hidden>
+        <div class="section-title"><i class="icon-sparkles"></i><span>Voice design</span></div>
+        <label class="field"><span>Voice description</span><textarea id="control-input" rows="3" placeholder="A calm, warm narrator with clear pacing"></textarea></label>
+      </section>
+
+      <section class="conditioning-panel workflow-only" id="clone-panel" hidden>
+        <div class="section-title"><i class="icon-mic"></i><span>Reference voice</span></div>
+        <div class="reference-source-grid">
+          <label class="file-drop" id="reference-audio-drop"><input id="reference-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"><i class="icon-upload"></i><span>Choose or drop reference audio</span><small id="reference-audio-name">WAV, MP3, FLAC, OGG, or M4A</small></label>
+          <div class="microphone-capture"><div><i class="icon-mic"></i><strong>Microphone</strong><small>Record a reference sample</small></div><span class="record-state" id="reference-record-state" aria-live="polite">Ready to record</span><button class="record-button" id="reference-record-toggle" type="button" aria-pressed="false"><i class="icon-mic"></i><span>Record</span></button></div>
+        </div>
+        <section class="reference-audio-preview" id="reference-audio-preview" aria-live="polite"></section>
+        <div id="guided-fields" hidden>
+          <label class="field"><span>Reference transcript</span><textarea id="reference-text" rows="4" placeholder="Enter exactly what is spoken in the reference audio"></textarea></label>
+          <button class="secondary-button" id="transcribe-reference" type="button"><i class="icon-message-square-text"></i><span>Transcribe reference</span></button>
+        </div>
+      </section>
+
+      <div class="tab-panel" data-panel="generate">
+        <div class="generate-action-row"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span>Generate audio</span></button></div>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Generated audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="generate-output" aria-live="polite"></section></section>
+      </div>
+
+      <div class="tab-panel" data-panel="stream" hidden>
+        <div class="generate-action-row"><button class="primary-button" id="stream-start" type="button"><i class="icon-radio"></i><span>Start stream</span></button><button class="secondary-button stop-button" id="stream-stop" type="button" disabled>Stop</button></div>
+        <div class="stream-progress" id="stream-progress" hidden><span></span></div>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-radio"></i><span>Stream output</span></div></div><section id="stream-output" aria-live="polite"></section></section>
+      </div>
+
+      <div class="tab-panel" data-panel="api" hidden>
+        <div class="view-heading"><div><h2>API</h2><p>Native VoxCPMTTS endpoint status</p></div><button class="secondary-button" id="api-refresh" type="button"><i class="icon-refresh-cw"></i><span>Refresh</span></button></div>
+        <div class="api-grid"><section><div class="section-title"><i class="icon-activity"></i><span>Runtime details</span></div><pre class="data-output json-output" id="api-output"></pre></section><section><div class="section-title"><i class="icon-book-open"></i><span>Service capabilities</span></div><pre class="data-output json-output" id="capabilities-output"></pre></section></div>
+      </div>
+
+      <div class="tab-panel" data-panel="system" hidden>
+        <div class="view-heading"><div><h2>System</h2><p>Model memory and GPU telemetry</p></div><button class="secondary-button" id="system-refresh" type="button"><i class="icon-refresh-cw"></i><span>Refresh</span></button></div>
+        <div class="system-grid">
+          <div class="system-controls"><section class="runtime-settings-card"><div class="runtime-settings-heading"><div><i class="icon-activity"></i><strong>Memory controls</strong></div></div><div class="system-action-row"><button class="danger-button" id="purge-models" type="button">Purge models</button></div></section><pre class="data-output" id="readiness-output">Runtime status unavailable.</pre></div>
+          <section class="gpu-system-panel" id="gpu-output" aria-live="polite"></section>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="alert" hidden></div>
+</body>
+</html>

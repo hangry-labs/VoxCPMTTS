@@ -238,7 +238,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 
 - Promoted the VoxCPM2 Nano-vLLM backend to the standard runtime with CUDA graph acceleration and ten-step generation.
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
-- Added the browser UI and HTTP API for multilingual generation, voice design, cloning, transcript-guided cloning, format conversion, streaming compatibility, model status, and model purge.
+- Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, streaming compatibility, GPU telemetry, model status, and model purge.
 - Added one-instance model caching, serialized generation, compile-worker limits, and reference-latent allocator cleanup to prevent duplicate weights and repeated-request RAM/VRAM growth.
 - Added 30-language public examples with voice-variety, translated introduction, and cross-language clone samples.
 - Added the controlled native-versus-Nano baseline suite covering generation speed, VRAM, container RAM, and Qwen3-ASR transcript fidelity across 24 common languages.

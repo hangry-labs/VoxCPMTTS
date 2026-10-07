@@ -28,8 +28,8 @@ dependencies = [
     "torchaudio>=2.5.0",
     "transformers>=4.36.2",
     "einops",
-    "gradio>=6,<7",
     "fastapi",
+    "python-multipart>=0.0.18",
     "uvicorn[standard]",
     "inflect",
     "addict",
@@ -72,6 +72,17 @@ Documentation = "https://github.com/hangry-labs/VoxCPMTTS#readme"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["voxcpm*"]
+
+[tool.setuptools.package-data]
+"voxcpm.standalone_ui" = [
+    "static/*.css",
+    "static/*.html",
+    "static/*.js",
+    "static/vendor/lucide/*",
+    "static/vendor/wavesurfer/*.js",
+    "static/vendor/wavesurfer/LICENSE",
+    "static/vendor/wavesurfer/plugins/*.js",
+]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"

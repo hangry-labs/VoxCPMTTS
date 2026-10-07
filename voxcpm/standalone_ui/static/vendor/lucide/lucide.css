@@ -1,0 +1,42 @@
+/* Subset of Lucide Icons used by this UI. See LICENSE. */
+@font-face {
+  font-family: "lucide";
+  src: url("lucide.woff2") format("woff2");
+  font-display: block;
+}
+
+[class^="icon-"], [class*=" icon-"] {
+  font-family: "lucide" !important;
+  font-size: inherit;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-activity::before { content: "\e038"; }
+.icon-audio-lines::before { content: "\e55a"; }
+.icon-book-open::before { content: "\e05f"; }
+.icon-boxes::before { content: "\e2d0"; }
+.icon-check::before { content: "\e06c"; }
+.icon-chevron-down::before { content: "\e06d"; }
+.icon-chevron-up::before { content: "\e070"; }
+.icon-download::before { content: "\e0b2"; }
+.icon-fast-forward::before { content: "\e0bd"; }
+.icon-file-audio::before { content: "\e31a"; }
+.icon-git-branch::before { content: "\e0e2"; }
+.icon-message-square-text::before { content: "\e575"; }
+.icon-mic::before { content: "\e118"; }
+.icon-pause::before { content: "\e12e"; }
+.icon-play::before { content: "\e13c"; }
+.icon-radio::before { content: "\e142"; }
+.icon-refresh-cw::before { content: "\e145"; }
+.icon-rewind::before { content: "\e147"; }
+.icon-rotate-ccw::before { content: "\e148"; }
+.icon-scissors::before { content: "\e14e"; }
+.icon-share-2::before { content: "\e156"; }
+.icon-sliders-horizontal::before { content: "\e29a"; }
+.icon-sparkles::before { content: "\e412"; }
+.icon-square::before { content: "\e167"; }
+.icon-upload::before { content: "\e19e"; }
+.icon-volume-2::before { content: "\e1ab"; }
+.icon-x::before { content: "\e1b2"; }
