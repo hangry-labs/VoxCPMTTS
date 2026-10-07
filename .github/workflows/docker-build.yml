@@ -1,4 +1,4 @@
-name: Build and Push Docker Image (FULL)
+name: Build and Push Container Images
 
 on:
   push:
@@ -18,17 +18,21 @@ on:
         required: false
         type: string
       push_latest:
-        description: "Also publish latest"
+        description: "Also publish latest and latest_tiny"
         required: false
         default: true
         type: boolean
 
 env:
-  IMAGE_NAME: hangrylabs/voxcpmtts
+  DOCKER_IMAGE_NAME: hangrylabs/voxcpmtts
+  GHCR_IMAGE_NAME: ghcr.io/hangry-labs/voxcpmtts
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
@@ -51,29 +55,92 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Prepare image build identity
+        shell: bash
+        run: |
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+          echo "VCS_REF=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_ENV"
+
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Extract version if tag
+        id: get_version
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "VERSION=${GITHUB_REF##refs/tags/}" >> $GITHUB_ENV
+            echo "VERSION=${GITHUB_REF##refs/tags/}" >> "$GITHUB_ENV"
           elif [[ -n "${{ inputs.image_tag }}" ]]; then
-            echo "VERSION=${{ inputs.image_tag }}" >> $GITHUB_ENV
+            echo "VERSION=${{ inputs.image_tag }}" >> "$GITHUB_ENV"
           fi
 
-      - name: Build baked Docker image
+      - name: Prepare image tags
+        id: image_tags
+        shell: bash
         run: |
-          docker build --target baked -t $IMAGE_NAME:latest .
-          if [[ -n "$VERSION" ]]; then
-            docker tag $IMAGE_NAME:latest $IMAGE_NAME:$VERSION
+          set -euo pipefail
+          VERSION="${VERSION:-}"
+          baked_tags=()
+          tiny_tags=()
+          if [[ "${{ github.event_name }}" == "push" && "$GITHUB_REF" == "refs/heads/main" ]] || \
+             [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.push_latest }}" == "true" ]]; then
+            baked_tags+=("$DOCKER_IMAGE_NAME:latest" "$GHCR_IMAGE_NAME:latest")
+            tiny_tags+=("$DOCKER_IMAGE_NAME:latest_tiny" "$GHCR_IMAGE_NAME:latest_tiny")
           fi
+          if [[ -n "$VERSION" ]]; then
+            baked_tags+=("$DOCKER_IMAGE_NAME:$VERSION" "$GHCR_IMAGE_NAME:$VERSION")
+            tiny_tags+=("$DOCKER_IMAGE_NAME:${VERSION}_tiny" "$GHCR_IMAGE_NAME:${VERSION}_tiny")
+          fi
+          if (( ${#baked_tags[@]} == 0 || ${#tiny_tags[@]} == 0 )); then
+            echo "No container tags selected for publishing." >&2
+            exit 1
+          fi
+          {
+            echo "baked_tags<<EOF"
+            printf '%s\n' "${baked_tags[@]}"
+            echo "EOF"
+            echo "tiny_tags<<EOF"
+            printf '%s\n' "${tiny_tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Push baked Docker image
+      - name: Build and push baked Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: baked
+          push: true
+          tags: ${{ steps.image_tags.outputs.baked_tags }}
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            VCS_REF=${{ env.VCS_REF }}
+
+      - name: Report disk usage after baked image
+        shell: bash
         run: |
-          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "${{ inputs.push_latest }}" == "true" ]]; then
-            docker push $IMAGE_NAME:latest
-          fi
-          if [[ -n "$VERSION" ]]; then
-            docker push $IMAGE_NAME:$VERSION
-          fi
+          df -h
+          docker buildx du || true
+
+      - name: Build and push tiny Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: tiny
+          push: true
+          tags: ${{ steps.image_tags.outputs.tiny_tags }}
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            VCS_REF=${{ env.VCS_REF }}
+
+      - name: Report final disk usage
+        if: always()
+        shell: bash
+        run: |
+          df -h
+          docker buildx du || true

@@ -27,38 +27,38 @@ VoxCPM2 supports highly realistic voice cloning. Do not use this image for unaut
 Run with NVIDIA GPU support:
 
 ```bash
-docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:v0.1
+docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:latest
 ```
 
 Run on CPU:
 
 ```bash
-docker run -p 8808:8808 -e VOXCPM_DEVICE=cpu hangrylabs/voxcpmtts:v0.1
+docker run -p 8808:8808 -e VOXCPM_DEVICE=cpu hangrylabs/voxcpmtts:latest
 ```
 
 Run on a specific GPU:
 
 ```bash
-docker run -p 8808:8808 --gpus "device=1" -e CUDA_VISIBLE_DEVICES=1 hangrylabs/voxcpmtts:v0.1
+docker run -p 8808:8808 --gpus "device=1" -e CUDA_VISIBLE_DEVICES=1 hangrylabs/voxcpmtts:latest
 ```
 
 Then open:
 
 http://localhost:8808
 
-The standard `vX.Y` image is the full baked image with VoxCPM2 model assets plus the denoiser and ASR support assets included for offline-friendly use after the image is pulled.
+The standard full image (`latest` or a fixed `vX.Y` release) includes VoxCPM2 model assets plus the denoiser and ASR support assets for offline-friendly use after the image is pulled.
 
 The runtime defaults to `VOXCPM_OPTIMIZE=0` so the slim image does not need a C compiler for first-run Triton compilation. Set `VOXCPM_OPTIMIZE=1` only when you want to test compiled inference.
 
 VoxCPM2 is memory-heavy. Run one VoxCPMTTS container per GPU unless you intentionally want duplicate model copies in RAM and VRAM. The service reuses one cached model for `auto` and `cuda:0`, and only attaches the denoiser to that existing model when `denoise=true`.
 
-Tiny tags use the `vX.Y_tiny` pattern. They keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face and ModelScope caches are warmed on first online use:
+The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face and ModelScope caches are warmed on first online use:
 
 ```bash
 docker run -p 8808:8808 --gpus all \
   -v voxcpmtts_hf_cache:/app/.cache/huggingface \
   -v voxcpmtts_modelscope_cache:/app/.cache/modelscope \
-  hangrylabs/voxcpmtts:v0.1_tiny
+  hangrylabs/voxcpmtts:latest_tiny
 ```
 
 ## What You Get
@@ -131,9 +131,9 @@ http://localhost:8808/tts/docs
 
 ## Image Tags
 
-- Current release tag: `v0.1`
-- Future release tags use the same pattern: `vX.Y`
-- Tiny tags use the pattern `vX.Y_tiny`
+- `latest` and `latest_tiny` follow the current development snapshot on `main`.
+- Fixed releases use `vX.Y` and `vX.Y_tiny` tags.
+- Every published tag is mirrored to `ghcr.io/hangry-labs/voxcpmtts`.
 
 ## Attribution
 

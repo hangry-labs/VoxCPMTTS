@@ -4,7 +4,7 @@ vars:
   IMAGE: voxcpmtts:test
   TINY_IMAGE: voxcpmtts:tiny
   PORT: '8808'
-  GPU_DEVICE: '1'
+  GPU_DEVICE: '0'
   APP_DEVICE: 'auto'
   APP_OPTIMIZE: '0'
   HF_TOKEN: ''
@@ -65,12 +65,12 @@ tasks:
   image:
     desc: Build local baked VoxCPMTTS Docker image
     cmds:
-      - cmd /c docker build --target baked -t {{.IMAGE}} .
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-image.ps1 -Target baked -Image "{{.IMAGE}}"
 
   image-tiny:
     desc: Build local tiny VoxCPMTTS Docker image without baked model cache
     cmds:
-      - cmd /c docker build --target tiny -t {{.TINY_IMAGE}} .
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-image.ps1 -Target tiny -Image "{{.TINY_IMAGE}}"
 
   cache-init:
     desc: Seed persistent Hugging Face and ModelScope cache volumes from the baked image

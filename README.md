@@ -15,19 +15,19 @@ This fork keeps the upstream OpenBMB VoxCPM code, license, and attribution intac
 Run with NVIDIA GPU support:
 
 ```bash
-docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:v0.1
+docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:latest
 ```
 
 Run on CPU:
 
 ```bash
-docker run -p 8808:8808 -e VOXCPM_DEVICE=cpu hangrylabs/voxcpmtts:v0.1
+docker run -p 8808:8808 -e VOXCPM_DEVICE=cpu hangrylabs/voxcpmtts:latest
 ```
 
 Run on a specific GPU:
 
 ```bash
-docker run -p 8808:8808 --gpus "device=1" -e CUDA_VISIBLE_DEVICES=1 hangrylabs/voxcpmtts:v0.1
+docker run -p 8808:8808 --gpus "device=1" -e CUDA_VISIBLE_DEVICES=1 hangrylabs/voxcpmtts:latest
 ```
 
 Open:
@@ -38,7 +38,9 @@ API docs:
 
 http://localhost:8808/tts/docs
 
-The full image bakes VoxCPM2 model assets plus denoiser and ASR support assets for offline-friendly use after the image is pulled. Tiny images use the `vX.Y_tiny` tag pattern and warm Hugging Face and ModelScope caches on first online use.
+All published tags are mirrored on Docker Hub as `hangrylabs/voxcpmtts` and GHCR as `ghcr.io/hangry-labs/voxcpmtts`. The moving `latest` and `latest_tiny` tags follow `main`; fixed releases use `vX.Y` and `vX.Y_tiny`.
+
+The full image bakes VoxCPM2 model assets plus denoiser and ASR support assets for offline-friendly use after the image is pulled. Tiny images warm Hugging Face and ModelScope caches on first online use.
 
 Docker defaults to `VOXCPM_OPTIMIZE=0` to avoid first-run Triton/C compiler requirements in the slim runtime. Advanced users can opt into optimization later by setting `VOXCPM_OPTIMIZE=1`.
 

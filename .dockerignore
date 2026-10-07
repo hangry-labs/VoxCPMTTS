@@ -3,6 +3,9 @@
 .gitignore
 .github
 .idea
+.ai
+AGENTS.md
+todo
 
 # Python cache/artifacts
 __pycache__/

@@ -36,6 +36,8 @@ DEFAULT_LOCAL_ONLY = os.getenv("VOXCPM_LOCAL_FILES_ONLY", "0").lower() in {"1", 
 ZIPENHANCER_MODEL_ID = os.getenv("ZIPENHANCER_MODEL_ID", "iic/speech_zipenhancer_ans_multiloss_16k_base")
 APP_VERSION = os.getenv("APP_VERSION", _read_version())
 BUILD_ID = os.getenv("BUILD_ID", "stable")
+BUILD_DATE = os.getenv("VOXCPMTTS_BUILD_DATE", "unknown")
+VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -447,6 +449,8 @@ def get_status_payload() -> dict:
         "type": "VoxCPMTTS",
         "version": APP_VERSION,
         "build_id": BUILD_ID,
+        "build_date": BUILD_DATE,
+        "revision": VCS_REF,
         "runtime": get_runtime_label(),
         "device": DEFAULT_DEVICE,
         "model_id": DEFAULT_MODEL_ID,
@@ -624,7 +628,14 @@ api = FastAPI(
 
 @api.get("/tts/ping")
 def ping() -> dict:
-    return {"msg": "pong", "type": "VoxCPMTTS", "version": APP_VERSION, "build_id": BUILD_ID}
+    return {
+        "msg": "pong",
+        "type": "VoxCPMTTS",
+        "version": APP_VERSION,
+        "build_id": BUILD_ID,
+        "build_date": BUILD_DATE,
+        "revision": VCS_REF,
+    }
 
 
 @api.get("/tts/status")
