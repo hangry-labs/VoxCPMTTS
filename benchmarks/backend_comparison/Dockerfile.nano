@@ -1,0 +1,11 @@
+ARG BASE_IMAGE=voxcpmtts:tiny
+FROM ${BASE_IMAGE}
+
+COPY voxcpm /app/voxcpm
+COPY scripts/patch-nanovllm-voxcpm.py /tmp/patch-nanovllm-voxcpm.py
+
+RUN python /tmp/patch-nanovllm-voxcpm.py
+
+ENV VOXCPM_BACKEND=nano \
+    VOXCPM_NANO_ENFORCE_EAGER=0 \
+    TORCHINDUCTOR_COMPILE_THREADS=1

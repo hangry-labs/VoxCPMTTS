@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Hangry Labs VoxCPMTTS Examples</title>
-    <link rel="icon" type="image/png" href="../hangrylabs/favicon_small.png">
+    <link rel="icon" type="image/webp" href="../assets/voxcpmtts_logo.webp">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       html,
@@ -33,9 +33,7 @@
       }
 
       .page-shell::before {
-        background:
-          linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.82)),
-          url("../hangrylabs/hero_background_small.png") center top / cover no-repeat;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.82));
         content: "";
         inset: 0;
         opacity: 0.2;
@@ -197,7 +195,7 @@
         border-radius: 8px;
         box-shadow: 0 0 20px rgba(255, 107, 0, 0.22);
         height: 2.65rem;
-        object-fit: cover;
+        object-fit: contain;
         width: 2.65rem;
       }
 
@@ -238,13 +236,8 @@
       }
 
       .hero-logo {
-        aspect-ratio: 1 / 1;
-        border: 2px solid rgba(255, 107, 0, 0.3);
-        border-radius: 18px;
-        box-shadow:
-          0 0 28px rgba(255, 107, 0, 0.22),
-          0 0 80px rgba(255, 60, 0, 0.14);
-        object-fit: cover;
+        aspect-ratio: 4 / 3;
+        object-fit: contain;
         width: 100%;
       }
 
@@ -476,8 +469,8 @@
           <div class="hero">
             <div>
               <div class="topbar">
-                <a class="brand-lockup" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">
-                  <img class="brand-logo" src="../hangrylabs/favicon_small.png" alt="Hangry Labs logo">
+                <a class="brand-lockup" href="https://hangrylabs.app/" target="_blank" rel="noopener noreferrer">
+                  <img class="brand-logo" src="../assets/hangrylabs_logo.webp" alt="Hangry Labs logo">
                   <div>
                     <div class="brand-name">Hangry Labs</div>
                     <div class="brand-subtitle">Useful tools, easy to run</div>
@@ -512,9 +505,9 @@
             </div>
             <div class="hero-logo-panel" aria-hidden="true">
               <a class="hero-logo-link" href="https://hangry-labs.github.io/VoxCPMTTS/examples/" target="_blank" rel="noopener noreferrer" tabindex="-1">
-                <img class="hero-logo" src="../hangrylabs/logo_small.png" alt="">
+                <img class="hero-logo" src="../assets/voxcpmtts_logo.webp" alt="">
               </a>
-              <a class="hero-site-link" href="https://nuggies.website/" target="_blank" rel="noopener noreferrer">nuggies.website</a>
+              <a class="hero-site-link" href="https://hangrylabs.app/" target="_blank" rel="noopener noreferrer">hangrylabs.app</a>
             </div>
           </div>
         </header>

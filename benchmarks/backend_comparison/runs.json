@@ -1,0 +1,4929 @@
+{
+  "schema": 1,
+  "runs": [
+    {
+      "schema": 1,
+      "started_at": "2026-10-07T16:23:32+00:00",
+      "finished_at": "2026-10-07T16:33:28+00:00",
+      "comment": "Historical native image 68787abb versus current Nano backend; same GPU, checkpoint cache, API payloads, 10 steps, concurrency 1",
+      "git": {
+        "revision": "d9e163bcccc3bbcaf6927b411e3b7854937bb8a4",
+        "dirty": true,
+        "status": [
+          " M Taskfile.yml",
+          "?? benchmarks/"
+        ],
+        "diff_sha256": "4d2ec160b07ba1242b5e8a6185e91107707b3ab618086f3210a70bca0f561855"
+      },
+      "hardware": {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 5070 Ti",
+        "driver": "610.88",
+        "total_mib": 16303,
+        "used_mib": 1889,
+        "utilization_percent": 1
+      },
+      "settings": {
+        "model_id": "openbmb/VoxCPM2",
+        "gpu_index": 0,
+        "calls": 10,
+        "warmup_calls": 2,
+        "sample_interval_seconds": 0.1,
+        "inference_timesteps": 10,
+        "cfg_value": 2.0,
+        "output_format": "wav",
+        "concurrency": 1,
+        "nano_gpu_memory_utilization": 0.49,
+        "nano_enforce_eager": false
+      },
+      "scenarios": [
+        {
+          "code": "PS",
+          "label": "plain_short_english",
+          "description": "Short English generation without voice control or reference audio."
+        },
+        {
+          "code": "DM",
+          "label": "designed_medium_english",
+          "description": "Medium English generation with a fixed voice-design instruction."
+        },
+        {
+          "code": "MN",
+          "label": "designed_norwegian",
+          "description": "Norwegian generation with the same fixed voice-design instruction."
+        },
+        {
+          "code": "CR",
+          "label": "reference_clone",
+          "description": "English zero-shot clone with the same reference audio mounted into both containers."
+        }
+      ],
+      "backends": [
+        {
+          "backend": "native",
+          "image": {
+            "tag": "voxcpmtts:benchmark-native",
+            "id": "sha256:68787abb3ecca6fa04d579e43f93d0ce30d3e74d89497450896e1d04fe7d1413",
+            "created": "2026-10-07T10:06:02.193219714Z",
+            "size_bytes": 4832268446,
+            "repo_digests": [
+              "voxcpmtts@sha256:68787abb3ecca6fa04d579e43f93d0ce30d3e74d89497450896e1d04fe7d1413"
+            ],
+            "labels": {}
+          },
+          "runtime_versions": {
+            "python": "3.13.16",
+            "torch": "2.10.0+cu128",
+            "transformers": "5.3.0",
+            "huggingface-hub": null,
+            "nano-vllm-voxcpm": null,
+            "flash-attn": null,
+            "triton": "3.6.0"
+          },
+          "api_ready_seconds": 6.056,
+          "status_before_load": {
+            "msg": "pong",
+            "type": "VoxCPMTTS",
+            "version": "0.1-snapshot",
+            "build_id": "stable",
+            "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+            "device": "auto",
+            "model_id": "openbmb/VoxCPM2",
+            "load_denoiser": false,
+            "load_asr": false,
+            "asr_model_id": "iic/SenseVoiceSmall",
+            "optimize": false,
+            "languages": [
+              "Arabic",
+              "Burmese",
+              "Chinese",
+              "Danish",
+              "Dutch",
+              "English",
+              "Finnish",
+              "French",
+              "German",
+              "Greek",
+              "Hebrew",
+              "Hindi",
+              "Indonesian",
+              "Italian",
+              "Japanese",
+              "Khmer",
+              "Korean",
+              "Lao",
+              "Malay",
+              "Norwegian",
+              "Polish",
+              "Portuguese",
+              "Russian",
+              "Spanish",
+              "Swahili",
+              "Swedish",
+              "Tagalog",
+              "Thai",
+              "Turkish",
+              "Vietnamese"
+            ],
+            "loaded_model_devices": [],
+            "output_formats": {
+              "wav": {
+                "label": "WAV",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "MP3",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              },
+              "flac": {
+                "label": "FLAC",
+                "extension": "flac",
+                "media_type": "audio/flac"
+              },
+              "ogg": {
+                "label": "OGG Vorbis",
+                "extension": "ogg",
+                "media_type": "audio/ogg"
+              }
+            },
+            "stream_formats": {
+              "wav": {
+                "label": "Full WAV response",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "Full MP3 response",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              }
+            }
+          },
+          "status_after": {
+            "msg": "pong",
+            "type": "VoxCPMTTS",
+            "version": "0.1-snapshot",
+            "build_id": "stable",
+            "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+            "device": "auto",
+            "model_id": "openbmb/VoxCPM2",
+            "load_denoiser": false,
+            "load_asr": false,
+            "asr_model_id": "iic/SenseVoiceSmall",
+            "optimize": false,
+            "languages": [
+              "Arabic",
+              "Burmese",
+              "Chinese",
+              "Danish",
+              "Dutch",
+              "English",
+              "Finnish",
+              "French",
+              "German",
+              "Greek",
+              "Hebrew",
+              "Hindi",
+              "Indonesian",
+              "Italian",
+              "Japanese",
+              "Khmer",
+              "Korean",
+              "Lao",
+              "Malay",
+              "Norwegian",
+              "Polish",
+              "Portuguese",
+              "Russian",
+              "Spanish",
+              "Swahili",
+              "Swedish",
+              "Tagalog",
+              "Thai",
+              "Turkish",
+              "Vietnamese"
+            ],
+            "loaded_model_devices": [
+              "cuda:0"
+            ],
+            "output_formats": {
+              "wav": {
+                "label": "WAV",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "MP3",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              },
+              "flac": {
+                "label": "FLAC",
+                "extension": "flac",
+                "media_type": "audio/flac"
+              },
+              "ogg": {
+                "label": "OGG Vorbis",
+                "extension": "ogg",
+                "media_type": "audio/ogg"
+              }
+            },
+            "stream_formats": {
+              "wav": {
+                "label": "Full WAV response",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "Full MP3 response",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              }
+            }
+          },
+          "gpu_baseline": {
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "driver": "610.88",
+            "total_mib": 16303,
+            "used_mib": 1890,
+            "utilization_percent": 2
+          },
+          "cold_request": {
+            "wall_seconds": 19.3369,
+            "audio_seconds": 3.84,
+            "rtf": 5.0356,
+            "bytes": 368684,
+            "sample_rate": 48000,
+            "channels": 1,
+            "response_duration": "3.840",
+            "response_model": "openbmb/VoxCPM2",
+            "gpu": {
+              "samples": 80,
+              "peak_mib": 7661,
+              "peak_delta_mib": 5771,
+              "mean_utilization_percent": 11.6,
+              "peak_utilization_percent": 46
+            }
+          },
+          "gpu_final": {
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "driver": "610.88",
+            "total_mib": 16303,
+            "used_mib": 8349,
+            "utilization_percent": 1
+          },
+          "gpu_final_delta_mib": 6459,
+          "container_memory_before_load": {
+            "current_mib": 475.6,
+            "peak_mib": 478.2
+          },
+          "container_memory_after_load": {
+            "current_mib": 3506.5,
+            "peak_mib": 10866.8
+          },
+          "container_memory_final": {
+            "current_mib": 3590.1,
+            "peak_mib": 10866.8
+          },
+          "scenarios": [
+            {
+              "code": "PS",
+              "label": "plain_short_english",
+              "description": "Short English generation without voice control or reference audio.",
+              "payload": {
+                "language": "English",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "The morning coffee negotiated hard, but eventually agreed to help."
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 4.6025,
+                  "audio_seconds": 3.68,
+                  "rtf": 1.2507,
+                  "bytes": 353324,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.680",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 18,
+                    "peak_mib": 7854,
+                    "peak_delta_mib": 5964,
+                    "mean_utilization_percent": 22.2,
+                    "peak_utilization_percent": 37
+                  }
+                },
+                {
+                  "wall_seconds": 4.539,
+                  "audio_seconds": 4.0,
+                  "rtf": 1.1348,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 19,
+                    "peak_mib": 7863,
+                    "peak_delta_mib": 5973,
+                    "mean_utilization_percent": 26.4,
+                    "peak_utilization_percent": 41
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 4.167,
+                  "audio_seconds": 3.52,
+                  "rtf": 1.1838,
+                  "bytes": 337964,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.520",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 17,
+                    "peak_mib": 7863,
+                    "peak_delta_mib": 5973,
+                    "mean_utilization_percent": 37.3,
+                    "peak_utilization_percent": 47
+                  }
+                },
+                {
+                  "wall_seconds": 4.0584,
+                  "audio_seconds": 3.52,
+                  "rtf": 1.1529,
+                  "bytes": 337964,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.520",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 17,
+                    "peak_mib": 7855,
+                    "peak_delta_mib": 5965,
+                    "mean_utilization_percent": 26.8,
+                    "peak_utilization_percent": 44
+                  }
+                },
+                {
+                  "wall_seconds": 4.6097,
+                  "audio_seconds": 4.0,
+                  "rtf": 1.1524,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 19,
+                    "peak_mib": 7862,
+                    "peak_delta_mib": 5972,
+                    "mean_utilization_percent": 34.0,
+                    "peak_utilization_percent": 47
+                  }
+                },
+                {
+                  "wall_seconds": 3.9071,
+                  "audio_seconds": 3.36,
+                  "rtf": 1.1628,
+                  "bytes": 322604,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.360",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 16,
+                    "peak_mib": 7855,
+                    "peak_delta_mib": 5965,
+                    "mean_utilization_percent": 29.1,
+                    "peak_utilization_percent": 41
+                  }
+                },
+                {
+                  "wall_seconds": 4.4934,
+                  "audio_seconds": 4.0,
+                  "rtf": 1.1234,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 18,
+                    "peak_mib": 7861,
+                    "peak_delta_mib": 5971,
+                    "mean_utilization_percent": 34.0,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 3.6599,
+                  "audio_seconds": 3.36,
+                  "rtf": 1.0893,
+                  "bytes": 322604,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.360",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 15,
+                    "peak_mib": 7862,
+                    "peak_delta_mib": 5972,
+                    "mean_utilization_percent": 28.2,
+                    "peak_utilization_percent": 47
+                  }
+                },
+                {
+                  "wall_seconds": 4.5232,
+                  "audio_seconds": 4.0,
+                  "rtf": 1.1308,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 18,
+                    "peak_mib": 7855,
+                    "peak_delta_mib": 5965,
+                    "mean_utilization_percent": 36.3,
+                    "peak_utilization_percent": 52
+                  }
+                },
+                {
+                  "wall_seconds": 5.7037,
+                  "audio_seconds": 4.8,
+                  "rtf": 1.1883,
+                  "bytes": 460844,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.800",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 23,
+                    "peak_mib": 7862,
+                    "peak_delta_mib": 5972,
+                    "mean_utilization_percent": 27.4,
+                    "peak_utilization_percent": 43
+                  }
+                },
+                {
+                  "wall_seconds": 4.2667,
+                  "audio_seconds": 3.52,
+                  "rtf": 1.2121,
+                  "bytes": 337964,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.520",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 17,
+                    "peak_mib": 7856,
+                    "peak_delta_mib": 5966,
+                    "mean_utilization_percent": 25.7,
+                    "peak_utilization_percent": 37
+                  }
+                },
+                {
+                  "wall_seconds": 4.981,
+                  "audio_seconds": 4.32,
+                  "rtf": 1.153,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 19,
+                    "peak_mib": 7863,
+                    "peak_delta_mib": 5973,
+                    "mean_utilization_percent": 31.8,
+                    "peak_utilization_percent": 48
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 4.3801,
+                "wall_p95_seconds": 5.3785,
+                "wall_mean_seconds": 4.437,
+                "rtf_median": 1.153,
+                "rtf_p95": 1.2014,
+                "rtf_mean": 1.1549,
+                "audio_mean_seconds": 3.84,
+                "gpu_peak_mib": 7863,
+                "gpu_peak_delta_mib": 5973,
+                "gpu_mean_utilization_percent": 31.1
+              },
+              "container_memory_after": {
+                "current_mib": 3506.3,
+                "peak_mib": 10866.8
+              }
+            },
+            {
+              "code": "DM",
+              "label": "designed_medium_english",
+              "description": "Medium English generation with a fixed voice-design instruction.",
+              "payload": {
+                "language": "English",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "Local speech generation keeps private text on your own machine while producing clear, natural audio for applications, accessibility tools, and creative work.",
+                "control": "warm adult female narrator, clear and friendly"
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 10.1395,
+                  "audio_seconds": 8.8,
+                  "rtf": 1.1522,
+                  "bytes": 844844,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.800",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 38,
+                    "peak_mib": 7864,
+                    "peak_delta_mib": 5974,
+                    "mean_utilization_percent": 32.7,
+                    "peak_utilization_percent": 46
+                  }
+                },
+                {
+                  "wall_seconds": 9.8613,
+                  "audio_seconds": 8.64,
+                  "rtf": 1.1414,
+                  "bytes": 829484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 37,
+                    "peak_mib": 7864,
+                    "peak_delta_mib": 5974,
+                    "mean_utilization_percent": 32.5,
+                    "peak_utilization_percent": 45
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 11.2412,
+                  "audio_seconds": 9.44,
+                  "rtf": 1.1908,
+                  "bytes": 906284,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.440",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 43,
+                    "peak_mib": 7866,
+                    "peak_delta_mib": 5976,
+                    "mean_utilization_percent": 28.8,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 11.8399,
+                  "audio_seconds": 9.92,
+                  "rtf": 1.1935,
+                  "bytes": 952364,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.920",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 46,
+                    "peak_mib": 7865,
+                    "peak_delta_mib": 5975,
+                    "mean_utilization_percent": 31.7,
+                    "peak_utilization_percent": 56
+                  }
+                },
+                {
+                  "wall_seconds": 9.8484,
+                  "audio_seconds": 8.48,
+                  "rtf": 1.1614,
+                  "bytes": 814124,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.480",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 37,
+                    "peak_mib": 8002,
+                    "peak_delta_mib": 6112,
+                    "mean_utilization_percent": 29.5,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 11.6134,
+                  "audio_seconds": 10.4,
+                  "rtf": 1.1167,
+                  "bytes": 998444,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "10.400",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 44,
+                    "peak_mib": 8061,
+                    "peak_delta_mib": 6171,
+                    "mean_utilization_percent": 32.3,
+                    "peak_utilization_percent": 47
+                  }
+                },
+                {
+                  "wall_seconds": 11.4614,
+                  "audio_seconds": 9.28,
+                  "rtf": 1.2351,
+                  "bytes": 890924,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.280",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 43,
+                    "peak_mib": 8170,
+                    "peak_delta_mib": 6280,
+                    "mean_utilization_percent": 29.9,
+                    "peak_utilization_percent": 48
+                  }
+                },
+                {
+                  "wall_seconds": 10.2654,
+                  "audio_seconds": 9.12,
+                  "rtf": 1.1256,
+                  "bytes": 875564,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.120",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 40,
+                    "peak_mib": 8095,
+                    "peak_delta_mib": 6205,
+                    "mean_utilization_percent": 31.5,
+                    "peak_utilization_percent": 47
+                  }
+                },
+                {
+                  "wall_seconds": 10.9945,
+                  "audio_seconds": 8.64,
+                  "rtf": 1.2725,
+                  "bytes": 829484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 43,
+                    "peak_mib": 8093,
+                    "peak_delta_mib": 6203,
+                    "mean_utilization_percent": 29.0,
+                    "peak_utilization_percent": 47
+                  }
+                },
+                {
+                  "wall_seconds": 10.1818,
+                  "audio_seconds": 8.64,
+                  "rtf": 1.1784,
+                  "bytes": 829484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 38,
+                    "peak_mib": 8086,
+                    "peak_delta_mib": 6196,
+                    "mean_utilization_percent": 30.4,
+                    "peak_utilization_percent": 44
+                  }
+                },
+                {
+                  "wall_seconds": 12.4848,
+                  "audio_seconds": 9.76,
+                  "rtf": 1.2792,
+                  "bytes": 937004,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.760",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 44,
+                    "peak_mib": 8370,
+                    "peak_delta_mib": 6480,
+                    "mean_utilization_percent": 26.7,
+                    "peak_utilization_percent": 43
+                  }
+                },
+                {
+                  "wall_seconds": 10.7598,
+                  "audio_seconds": 8.64,
+                  "rtf": 1.2453,
+                  "bytes": 829484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 39,
+                    "peak_mib": 8410,
+                    "peak_delta_mib": 6520,
+                    "mean_utilization_percent": 28.8,
+                    "peak_utilization_percent": 42
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 11.1179,
+                "wall_p95_seconds": 12.1946,
+                "wall_mean_seconds": 11.0691,
+                "rtf_median": 1.1922,
+                "rtf_p95": 1.2762,
+                "rtf_mean": 1.1999,
+                "audio_mean_seconds": 9.232,
+                "gpu_peak_mib": 8410,
+                "gpu_peak_delta_mib": 6520,
+                "gpu_mean_utilization_percent": 29.9
+              },
+              "container_memory_after": {
+                "current_mib": 3506.9,
+                "peak_mib": 10866.8
+              }
+            },
+            {
+              "code": "MN",
+              "label": "designed_norwegian",
+              "description": "Norwegian generation with the same fixed voice-design instruction.",
+              "payload": {
+                "language": "Norwegian",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "Denne testen måler hvor raskt modellen lager tydelig norsk tale med de samme innstillingene.",
+                "control": "warm adult female narrator, clear and friendly"
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 7.3226,
+                  "audio_seconds": 5.44,
+                  "rtf": 1.3461,
+                  "bytes": 522284,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.440",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 26,
+                    "peak_mib": 8274,
+                    "peak_delta_mib": 6384,
+                    "mean_utilization_percent": 27.6,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 7.3394,
+                  "audio_seconds": 5.6,
+                  "rtf": 1.3106,
+                  "bytes": 537644,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.600",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 29,
+                    "peak_mib": 8149,
+                    "peak_delta_mib": 6259,
+                    "mean_utilization_percent": 28.7,
+                    "peak_utilization_percent": 44
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 5.6976,
+                  "audio_seconds": 5.12,
+                  "rtf": 1.1128,
+                  "bytes": 491564,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.120",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 21,
+                    "peak_mib": 8149,
+                    "peak_delta_mib": 6259,
+                    "mean_utilization_percent": 29.2,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 4.3653,
+                  "audio_seconds": 4.0,
+                  "rtf": 1.0913,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 18,
+                    "peak_mib": 8368,
+                    "peak_delta_mib": 6478,
+                    "mean_utilization_percent": 32.3,
+                    "peak_utilization_percent": 46
+                  }
+                },
+                {
+                  "wall_seconds": 7.2195,
+                  "audio_seconds": 6.08,
+                  "rtf": 1.1874,
+                  "bytes": 583724,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "6.080",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 28,
+                    "peak_mib": 8417,
+                    "peak_delta_mib": 6527,
+                    "mean_utilization_percent": 31.6,
+                    "peak_utilization_percent": 46
+                  }
+                },
+                {
+                  "wall_seconds": 7.2642,
+                  "audio_seconds": 6.56,
+                  "rtf": 1.1073,
+                  "bytes": 629804,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "6.560",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 28,
+                    "peak_mib": 8420,
+                    "peak_delta_mib": 6530,
+                    "mean_utilization_percent": 29.2,
+                    "peak_utilization_percent": 48
+                  }
+                },
+                {
+                  "wall_seconds": 5.7981,
+                  "audio_seconds": 4.96,
+                  "rtf": 1.169,
+                  "bytes": 476204,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.960",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 23,
+                    "peak_mib": 8362,
+                    "peak_delta_mib": 6472,
+                    "mean_utilization_percent": 29.3,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 5.7691,
+                  "audio_seconds": 4.64,
+                  "rtf": 1.2433,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 23,
+                    "peak_mib": 8168,
+                    "peak_delta_mib": 6278,
+                    "mean_utilization_percent": 28.5,
+                    "peak_utilization_percent": 46
+                  }
+                },
+                {
+                  "wall_seconds": 7.3345,
+                  "audio_seconds": 6.24,
+                  "rtf": 1.1754,
+                  "bytes": 599084,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "6.240",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 29,
+                    "peak_mib": 8168,
+                    "peak_delta_mib": 6278,
+                    "mean_utilization_percent": 32.7,
+                    "peak_utilization_percent": 46
+                  }
+                },
+                {
+                  "wall_seconds": 7.7826,
+                  "audio_seconds": 6.24,
+                  "rtf": 1.2472,
+                  "bytes": 599084,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "6.240",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 30,
+                    "peak_mib": 8168,
+                    "peak_delta_mib": 6278,
+                    "mean_utilization_percent": 26.7,
+                    "peak_utilization_percent": 46
+                  }
+                },
+                {
+                  "wall_seconds": 5.3838,
+                  "audio_seconds": 4.64,
+                  "rtf": 1.1603,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 22,
+                    "peak_mib": 8160,
+                    "peak_delta_mib": 6270,
+                    "mean_utilization_percent": 29.6,
+                    "peak_utilization_percent": 44
+                  }
+                },
+                {
+                  "wall_seconds": 5.549,
+                  "audio_seconds": 5.12,
+                  "rtf": 1.0838,
+                  "bytes": 491564,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.120",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 22,
+                    "peak_mib": 8309,
+                    "peak_delta_mib": 6419,
+                    "mean_utilization_percent": 27.4,
+                    "peak_utilization_percent": 45
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 5.7836,
+                "wall_p95_seconds": 7.581,
+                "wall_mean_seconds": 6.2164,
+                "rtf_median": 1.1646,
+                "rtf_p95": 1.2454,
+                "rtf_mean": 1.1578,
+                "audio_mean_seconds": 5.36,
+                "gpu_peak_mib": 8420,
+                "gpu_peak_delta_mib": 6530,
+                "gpu_mean_utilization_percent": 29.6
+              },
+              "container_memory_after": {
+                "current_mib": 3508.3,
+                "peak_mib": 10866.8
+              }
+            },
+            {
+              "code": "CR",
+              "label": "reference_clone",
+              "description": "English zero-shot clone with the same reference audio mounted into both containers.",
+              "payload": {
+                "language": "English",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "This sample checks how quickly the model can carry a reference voice into a new sentence.",
+                "ref_audio": "/benchmark/original_clone.mp3"
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 17.6292,
+                  "audio_seconds": 5.6,
+                  "rtf": 3.1481,
+                  "bytes": 537644,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.600",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 73,
+                    "peak_mib": 8293,
+                    "peak_delta_mib": 6403,
+                    "mean_utilization_percent": 11.1,
+                    "peak_utilization_percent": 44
+                  }
+                },
+                {
+                  "wall_seconds": 5.811,
+                  "audio_seconds": 4.96,
+                  "rtf": 1.1716,
+                  "bytes": 476204,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.960",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 23,
+                    "peak_mib": 8425,
+                    "peak_delta_mib": 6535,
+                    "mean_utilization_percent": 31.4,
+                    "peak_utilization_percent": 44
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 5.6347,
+                  "audio_seconds": 4.8,
+                  "rtf": 1.1739,
+                  "bytes": 460844,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.800",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 22,
+                    "peak_mib": 8347,
+                    "peak_delta_mib": 6457,
+                    "mean_utilization_percent": 30.9,
+                    "peak_utilization_percent": 44
+                  }
+                },
+                {
+                  "wall_seconds": 5.2156,
+                  "audio_seconds": 4.64,
+                  "rtf": 1.1241,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 21,
+                    "peak_mib": 8340,
+                    "peak_delta_mib": 6450,
+                    "mean_utilization_percent": 30.0,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 4.4747,
+                  "audio_seconds": 4.0,
+                  "rtf": 1.1187,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 18,
+                    "peak_mib": 8347,
+                    "peak_delta_mib": 6457,
+                    "mean_utilization_percent": 32.1,
+                    "peak_utilization_percent": 47
+                  }
+                },
+                {
+                  "wall_seconds": 4.7618,
+                  "audio_seconds": 4.32,
+                  "rtf": 1.1023,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 19,
+                    "peak_mib": 8349,
+                    "peak_delta_mib": 6459,
+                    "mean_utilization_percent": 28.3,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 6.0473,
+                  "audio_seconds": 4.96,
+                  "rtf": 1.2192,
+                  "bytes": 476204,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.960",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 23,
+                    "peak_mib": 8348,
+                    "peak_delta_mib": 6458,
+                    "mean_utilization_percent": 26.4,
+                    "peak_utilization_percent": 44
+                  }
+                },
+                {
+                  "wall_seconds": 5.5075,
+                  "audio_seconds": 4.64,
+                  "rtf": 1.187,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 22,
+                    "peak_mib": 8354,
+                    "peak_delta_mib": 6464,
+                    "mean_utilization_percent": 32.0,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 5.3604,
+                  "audio_seconds": 4.48,
+                  "rtf": 1.1965,
+                  "bytes": 430124,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.480",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 22,
+                    "peak_mib": 8362,
+                    "peak_delta_mib": 6472,
+                    "mean_utilization_percent": 31.4,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 5.2353,
+                  "audio_seconds": 4.48,
+                  "rtf": 1.1686,
+                  "bytes": 430124,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.480",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 20,
+                    "peak_mib": 8355,
+                    "peak_delta_mib": 6465,
+                    "mean_utilization_percent": 32.6,
+                    "peak_utilization_percent": 45
+                  }
+                },
+                {
+                  "wall_seconds": 5.7813,
+                  "audio_seconds": 4.8,
+                  "rtf": 1.2044,
+                  "bytes": 460844,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.800",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 22,
+                    "peak_mib": 8363,
+                    "peak_delta_mib": 6473,
+                    "mean_utilization_percent": 30.5,
+                    "peak_utilization_percent": 44
+                  }
+                },
+                {
+                  "wall_seconds": 5.4564,
+                  "audio_seconds": 4.8,
+                  "rtf": 1.1367,
+                  "bytes": 460844,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.800",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 22,
+                    "peak_mib": 8349,
+                    "peak_delta_mib": 6459,
+                    "mean_utilization_percent": 29.6,
+                    "peak_utilization_percent": 45
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 5.4084,
+                "wall_p95_seconds": 5.9276,
+                "wall_mean_seconds": 5.3475,
+                "rtf_median": 1.1713,
+                "rtf_p95": 1.2125,
+                "rtf_mean": 1.1631,
+                "audio_mean_seconds": 4.592,
+                "gpu_peak_mib": 8363,
+                "gpu_peak_delta_mib": 6473,
+                "gpu_mean_utilization_percent": 30.4
+              },
+              "container_memory_after": {
+                "current_mib": 3589.2,
+                "peak_mib": 10866.8
+              }
+            }
+          ]
+        },
+        {
+          "backend": "nano",
+          "image": {
+            "tag": "voxcpmtts:benchmark-nano",
+            "id": "sha256:3a4e1ccda4af76e389521374637905c6462974480dac20c476da9414255923f1",
+            "created": "2026-10-07T16:21:51.274308704Z",
+            "size_bytes": 4847177171,
+            "repo_digests": [
+              "voxcpmtts@sha256:3a4e1ccda4af76e389521374637905c6462974480dac20c476da9414255923f1"
+            ],
+            "labels": {
+              "org.opencontainers.image.created": "2026-10-07T14:52:34Z",
+              "org.opencontainers.image.revision": "ac1d0b3b2bcb",
+              "org.opencontainers.image.source": "https://github.com/hangry-labs/VoxCPMTTS"
+            }
+          },
+          "runtime_versions": {
+            "python": "3.13.16",
+            "torch": "2.8.0+cu128",
+            "transformers": "5.3.0",
+            "huggingface-hub": null,
+            "nano-vllm-voxcpm": "2.0.4",
+            "flash-attn": null,
+            "triton": "3.4.0"
+          },
+          "api_ready_seconds": 4.037,
+          "status_before_load": {
+            "msg": "pong",
+            "type": "VoxCPMTTS",
+            "version": "0.1-snapshot",
+            "build_id": "2026-10-07T14:52:34Z@ac1d0b3b2bcb",
+            "build_date": "2026-10-07T14:52:34Z",
+            "revision": "ac1d0b3b2bcb",
+            "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+            "device": "auto",
+            "backend": "nano",
+            "model_id": "openbmb/VoxCPM2",
+            "load_denoiser": false,
+            "load_asr": false,
+            "asr_model_id": "iic/SenseVoiceSmall",
+            "optimize": false,
+            "languages": [
+              "Arabic",
+              "Burmese",
+              "Chinese",
+              "Danish",
+              "Dutch",
+              "English",
+              "Finnish",
+              "French",
+              "German",
+              "Greek",
+              "Hebrew",
+              "Hindi",
+              "Indonesian",
+              "Italian",
+              "Japanese",
+              "Khmer",
+              "Korean",
+              "Lao",
+              "Malay",
+              "Norwegian",
+              "Polish",
+              "Portuguese",
+              "Russian",
+              "Spanish",
+              "Swahili",
+              "Swedish",
+              "Tagalog",
+              "Thai",
+              "Turkish",
+              "Vietnamese"
+            ],
+            "loaded_model_devices": [],
+            "output_formats": {
+              "wav": {
+                "label": "WAV",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "MP3",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              },
+              "flac": {
+                "label": "FLAC",
+                "extension": "flac",
+                "media_type": "audio/flac"
+              },
+              "ogg": {
+                "label": "OGG Vorbis",
+                "extension": "ogg",
+                "media_type": "audio/ogg"
+              }
+            },
+            "stream_formats": {
+              "wav": {
+                "label": "Full WAV response",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "Full MP3 response",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              }
+            }
+          },
+          "status_after": {
+            "msg": "pong",
+            "type": "VoxCPMTTS",
+            "version": "0.1-snapshot",
+            "build_id": "2026-10-07T14:52:34Z@ac1d0b3b2bcb",
+            "build_date": "2026-10-07T14:52:34Z",
+            "revision": "ac1d0b3b2bcb",
+            "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+            "device": "auto",
+            "backend": "nano",
+            "model_id": "openbmb/VoxCPM2",
+            "load_denoiser": false,
+            "load_asr": false,
+            "asr_model_id": "iic/SenseVoiceSmall",
+            "optimize": false,
+            "languages": [
+              "Arabic",
+              "Burmese",
+              "Chinese",
+              "Danish",
+              "Dutch",
+              "English",
+              "Finnish",
+              "French",
+              "German",
+              "Greek",
+              "Hebrew",
+              "Hindi",
+              "Indonesian",
+              "Italian",
+              "Japanese",
+              "Khmer",
+              "Korean",
+              "Lao",
+              "Malay",
+              "Norwegian",
+              "Polish",
+              "Portuguese",
+              "Russian",
+              "Spanish",
+              "Swahili",
+              "Swedish",
+              "Tagalog",
+              "Thai",
+              "Turkish",
+              "Vietnamese"
+            ],
+            "loaded_model_devices": [
+              "cuda:0"
+            ],
+            "output_formats": {
+              "wav": {
+                "label": "WAV",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "MP3",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              },
+              "flac": {
+                "label": "FLAC",
+                "extension": "flac",
+                "media_type": "audio/flac"
+              },
+              "ogg": {
+                "label": "OGG Vorbis",
+                "extension": "ogg",
+                "media_type": "audio/ogg"
+              }
+            },
+            "stream_formats": {
+              "wav": {
+                "label": "Full WAV response",
+                "extension": "wav",
+                "media_type": "audio/wav"
+              },
+              "mp3": {
+                "label": "Full MP3 response",
+                "extension": "mp3",
+                "media_type": "audio/mpeg"
+              }
+            }
+          },
+          "gpu_baseline": {
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "driver": "610.88",
+            "total_mib": 16303,
+            "used_mib": 2063,
+            "utilization_percent": 8
+          },
+          "cold_request": {
+            "wall_seconds": 22.4175,
+            "audio_seconds": 4.16,
+            "rtf": 5.3888,
+            "bytes": 399404,
+            "sample_rate": 48000,
+            "channels": 1,
+            "response_duration": "4.160",
+            "response_model": "openbmb/VoxCPM2",
+            "gpu": {
+              "samples": 95,
+              "peak_mib": 10414,
+              "peak_delta_mib": 8351,
+              "mean_utilization_percent": 9.2,
+              "peak_utilization_percent": 100
+            }
+          },
+          "gpu_final": {
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "driver": "610.88",
+            "total_mib": 16303,
+            "used_mib": 9564,
+            "utilization_percent": 2
+          },
+          "gpu_final_delta_mib": 7501,
+          "container_memory_before_load": {
+            "current_mib": 369.8,
+            "peak_mib": 372.7
+          },
+          "container_memory_after_load": {
+            "current_mib": 2672.4,
+            "peak_mib": 2701.8
+          },
+          "container_memory_final": {
+            "current_mib": 3067.5,
+            "peak_mib": 3324.3
+          },
+          "scenarios": [
+            {
+              "code": "PS",
+              "label": "plain_short_english",
+              "description": "Short English generation without voice control or reference audio.",
+              "payload": {
+                "language": "English",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "The morning coffee negotiated hard, but eventually agreed to help."
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 1.0834,
+                  "audio_seconds": 3.84,
+                  "rtf": 0.2821,
+                  "bytes": 368684,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.840",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9502,
+                    "peak_delta_mib": 7439,
+                    "mean_utilization_percent": 25.7,
+                    "peak_utilization_percent": 77
+                  }
+                },
+                {
+                  "wall_seconds": 1.0014,
+                  "audio_seconds": 4.0,
+                  "rtf": 0.2504,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9502,
+                    "peak_delta_mib": 7439,
+                    "mean_utilization_percent": 65.3,
+                    "peak_utilization_percent": 82
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 1.1387,
+                  "audio_seconds": 4.0,
+                  "rtf": 0.2847,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 33.7,
+                    "peak_utilization_percent": 81
+                  }
+                },
+                {
+                  "wall_seconds": 1.2282,
+                  "audio_seconds": 4.8,
+                  "rtf": 0.2559,
+                  "bytes": 460844,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.800",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 32.5,
+                    "peak_utilization_percent": 85
+                  }
+                },
+                {
+                  "wall_seconds": 1.0627,
+                  "audio_seconds": 3.84,
+                  "rtf": 0.2767,
+                  "bytes": 368684,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.840",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 63.8,
+                    "peak_utilization_percent": 81
+                  }
+                },
+                {
+                  "wall_seconds": 1.344,
+                  "audio_seconds": 4.8,
+                  "rtf": 0.28,
+                  "bytes": 460844,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.800",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 40.0,
+                    "peak_utilization_percent": 78
+                  }
+                },
+                {
+                  "wall_seconds": 1.1481,
+                  "audio_seconds": 4.16,
+                  "rtf": 0.276,
+                  "bytes": 399404,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.160",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 49.7,
+                    "peak_utilization_percent": 84
+                  }
+                },
+                {
+                  "wall_seconds": 1.3264,
+                  "audio_seconds": 4.64,
+                  "rtf": 0.2859,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 50.0,
+                    "peak_utilization_percent": 84
+                  }
+                },
+                {
+                  "wall_seconds": 0.944,
+                  "audio_seconds": 3.68,
+                  "rtf": 0.2565,
+                  "bytes": 353324,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.680",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 5,
+                    "peak_mib": 9502,
+                    "peak_delta_mib": 7439,
+                    "mean_utilization_percent": 30.0,
+                    "peak_utilization_percent": 75
+                  }
+                },
+                {
+                  "wall_seconds": 1.0478,
+                  "audio_seconds": 3.52,
+                  "rtf": 0.2977,
+                  "bytes": 337964,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "3.520",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9502,
+                    "peak_delta_mib": 7439,
+                    "mean_utilization_percent": 28.0,
+                    "peak_utilization_percent": 84
+                  }
+                },
+                {
+                  "wall_seconds": 1.0808,
+                  "audio_seconds": 4.16,
+                  "rtf": 0.2598,
+                  "bytes": 399404,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.160",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9502,
+                    "peak_delta_mib": 7439,
+                    "mean_utilization_percent": 32.8,
+                    "peak_utilization_percent": 82
+                  }
+                },
+                {
+                  "wall_seconds": 1.0694,
+                  "audio_seconds": 4.0,
+                  "rtf": 0.2674,
+                  "bytes": 384044,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.000",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 40.0,
+                    "peak_utilization_percent": 78
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 1.1098,
+                "wall_p95_seconds": 1.3361,
+                "wall_mean_seconds": 1.139,
+                "rtf_median": 0.2763,
+                "rtf_p95": 0.2924,
+                "rtf_mean": 0.2741,
+                "audio_mean_seconds": 4.16,
+                "gpu_peak_mib": 9502,
+                "gpu_peak_delta_mib": 7439,
+                "gpu_mean_utilization_percent": 40.0
+              },
+              "container_memory_after": {
+                "current_mib": 2676.1,
+                "peak_mib": 2701.8
+              }
+            },
+            {
+              "code": "DM",
+              "label": "designed_medium_english",
+              "description": "Medium English generation with a fixed voice-design instruction.",
+              "payload": {
+                "language": "English",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "Local speech generation keeps private text on your own machine while producing clear, natural audio for applications, accessibility tools, and creative work.",
+                "control": "warm adult female narrator, clear and friendly"
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 2.6789,
+                  "audio_seconds": 9.92,
+                  "rtf": 0.27,
+                  "bytes": 952364,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.920",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 12,
+                    "peak_mib": 9494,
+                    "peak_delta_mib": 7431,
+                    "mean_utilization_percent": 48.8,
+                    "peak_utilization_percent": 84
+                  }
+                },
+                {
+                  "wall_seconds": 2.8458,
+                  "audio_seconds": 8.96,
+                  "rtf": 0.3176,
+                  "bytes": 860204,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.960",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 10,
+                    "peak_mib": 9502,
+                    "peak_delta_mib": 7439,
+                    "mean_utilization_percent": 55.0,
+                    "peak_utilization_percent": 86
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 2.9523,
+                  "audio_seconds": 9.28,
+                  "rtf": 0.3181,
+                  "bytes": 890924,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.280",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 12,
+                    "peak_mib": 9502,
+                    "peak_delta_mib": 7439,
+                    "mean_utilization_percent": 48.5,
+                    "peak_utilization_percent": 83
+                  }
+                },
+                {
+                  "wall_seconds": 2.7632,
+                  "audio_seconds": 9.6,
+                  "rtf": 0.2878,
+                  "bytes": 921644,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.600",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 12,
+                    "peak_mib": 9474,
+                    "peak_delta_mib": 7411,
+                    "mean_utilization_percent": 51.8,
+                    "peak_utilization_percent": 82
+                  }
+                },
+                {
+                  "wall_seconds": 2.5298,
+                  "audio_seconds": 8.96,
+                  "rtf": 0.2823,
+                  "bytes": 860204,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.960",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 12,
+                    "peak_mib": 9474,
+                    "peak_delta_mib": 7411,
+                    "mean_utilization_percent": 41.2,
+                    "peak_utilization_percent": 81
+                  }
+                },
+                {
+                  "wall_seconds": 2.5078,
+                  "audio_seconds": 9.28,
+                  "rtf": 0.2702,
+                  "bytes": 890924,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.280",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 11,
+                    "peak_mib": 9474,
+                    "peak_delta_mib": 7411,
+                    "mean_utilization_percent": 58.7,
+                    "peak_utilization_percent": 83
+                  }
+                },
+                {
+                  "wall_seconds": 2.7617,
+                  "audio_seconds": 9.76,
+                  "rtf": 0.283,
+                  "bytes": 937004,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.760",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 12,
+                    "peak_mib": 9482,
+                    "peak_delta_mib": 7419,
+                    "mean_utilization_percent": 34.9,
+                    "peak_utilization_percent": 78
+                  }
+                },
+                {
+                  "wall_seconds": 3.106,
+                  "audio_seconds": 10.88,
+                  "rtf": 0.2855,
+                  "bytes": 1044524,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "10.880",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 13,
+                    "peak_mib": 9475,
+                    "peak_delta_mib": 7412,
+                    "mean_utilization_percent": 48.0,
+                    "peak_utilization_percent": 80
+                  }
+                },
+                {
+                  "wall_seconds": 2.8919,
+                  "audio_seconds": 10.72,
+                  "rtf": 0.2698,
+                  "bytes": 1029164,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "10.720",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 12,
+                    "peak_mib": 9702,
+                    "peak_delta_mib": 7639,
+                    "mean_utilization_percent": 49.9,
+                    "peak_utilization_percent": 82
+                  }
+                },
+                {
+                  "wall_seconds": 2.7315,
+                  "audio_seconds": 9.92,
+                  "rtf": 0.2753,
+                  "bytes": 952364,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.920",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 12,
+                    "peak_mib": 9705,
+                    "peak_delta_mib": 7642,
+                    "mean_utilization_percent": 37.6,
+                    "peak_utilization_percent": 84
+                  }
+                },
+                {
+                  "wall_seconds": 2.4368,
+                  "audio_seconds": 8.96,
+                  "rtf": 0.272,
+                  "bytes": 860204,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "8.960",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 11,
+                    "peak_mib": 9705,
+                    "peak_delta_mib": 7642,
+                    "mean_utilization_percent": 58.3,
+                    "peak_utilization_percent": 85
+                  }
+                },
+                {
+                  "wall_seconds": 2.2976,
+                  "audio_seconds": 9.12,
+                  "rtf": 0.2519,
+                  "bytes": 875564,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "9.120",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 11,
+                    "peak_mib": 9668,
+                    "peak_delta_mib": 7605,
+                    "mean_utilization_percent": 52.0,
+                    "peak_utilization_percent": 84
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 2.7466,
+                "wall_p95_seconds": 3.0368,
+                "wall_mean_seconds": 2.6979,
+                "rtf_median": 0.2788,
+                "rtf_p95": 0.3045,
+                "rtf_mean": 0.2796,
+                "audio_mean_seconds": 9.648,
+                "gpu_peak_mib": 9705,
+                "gpu_peak_delta_mib": 7642,
+                "gpu_mean_utilization_percent": 48.1
+              },
+              "container_memory_after": {
+                "current_mib": 2692.4,
+                "peak_mib": 2701.8
+              }
+            },
+            {
+              "code": "MN",
+              "label": "designed_norwegian",
+              "description": "Norwegian generation with the same fixed voice-design instruction.",
+              "payload": {
+                "language": "Norwegian",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "Denne testen måler hvor raskt modellen lager tydelig norsk tale med de samme innstillingene.",
+                "control": "warm adult female narrator, clear and friendly"
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 1.4953,
+                  "audio_seconds": 5.44,
+                  "rtf": 0.2749,
+                  "bytes": 522284,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.440",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 9548,
+                    "peak_delta_mib": 7485,
+                    "mean_utilization_percent": 44.3,
+                    "peak_utilization_percent": 78
+                  }
+                },
+                {
+                  "wall_seconds": 1.4264,
+                  "audio_seconds": 4.64,
+                  "rtf": 0.3074,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 9548,
+                    "peak_delta_mib": 7485,
+                    "mean_utilization_percent": 46.6,
+                    "peak_utilization_percent": 81
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 1.5716,
+                  "audio_seconds": 5.92,
+                  "rtf": 0.2655,
+                  "bytes": 568364,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.920",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 8,
+                    "peak_mib": 9515,
+                    "peak_delta_mib": 7452,
+                    "mean_utilization_percent": 30.6,
+                    "peak_utilization_percent": 85
+                  }
+                },
+                {
+                  "wall_seconds": 1.5992,
+                  "audio_seconds": 5.92,
+                  "rtf": 0.2701,
+                  "bytes": 568364,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.920",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 8,
+                    "peak_mib": 9523,
+                    "peak_delta_mib": 7460,
+                    "mean_utilization_percent": 51.0,
+                    "peak_utilization_percent": 82
+                  }
+                },
+                {
+                  "wall_seconds": 2.0514,
+                  "audio_seconds": 7.36,
+                  "rtf": 0.2787,
+                  "bytes": 706604,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "7.360",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 10,
+                    "peak_mib": 9516,
+                    "peak_delta_mib": 7453,
+                    "mean_utilization_percent": 44.4,
+                    "peak_utilization_percent": 77
+                  }
+                },
+                {
+                  "wall_seconds": 2.163,
+                  "audio_seconds": 5.6,
+                  "rtf": 0.3862,
+                  "bytes": 537644,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.600",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 8,
+                    "peak_mib": 9516,
+                    "peak_delta_mib": 7453,
+                    "mean_utilization_percent": 28.1,
+                    "peak_utilization_percent": 73
+                  }
+                },
+                {
+                  "wall_seconds": 1.4104,
+                  "audio_seconds": 5.12,
+                  "rtf": 0.2755,
+                  "bytes": 491564,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.120",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 9516,
+                    "peak_delta_mib": 7453,
+                    "mean_utilization_percent": 47.6,
+                    "peak_utilization_percent": 84
+                  }
+                },
+                {
+                  "wall_seconds": 1.3455,
+                  "audio_seconds": 4.64,
+                  "rtf": 0.29,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 9516,
+                    "peak_delta_mib": 7453,
+                    "mean_utilization_percent": 44.3,
+                    "peak_utilization_percent": 79
+                  }
+                },
+                {
+                  "wall_seconds": 1.2764,
+                  "audio_seconds": 5.12,
+                  "rtf": 0.2493,
+                  "bytes": 491564,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.120",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9626,
+                    "peak_delta_mib": 7563,
+                    "mean_utilization_percent": 51.3,
+                    "peak_utilization_percent": 79
+                  }
+                },
+                {
+                  "wall_seconds": 1.3508,
+                  "audio_seconds": 4.48,
+                  "rtf": 0.3015,
+                  "bytes": 430124,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.480",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9954,
+                    "peak_delta_mib": 7891,
+                    "mean_utilization_percent": 57.0,
+                    "peak_utilization_percent": 83
+                  }
+                },
+                {
+                  "wall_seconds": 1.4682,
+                  "audio_seconds": 5.12,
+                  "rtf": 0.2868,
+                  "bytes": 491564,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.120",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 9966,
+                    "peak_delta_mib": 7903,
+                    "mean_utilization_percent": 44.9,
+                    "peak_utilization_percent": 76
+                  }
+                },
+                {
+                  "wall_seconds": 1.5586,
+                  "audio_seconds": 5.92,
+                  "rtf": 0.2633,
+                  "bytes": 568364,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "5.920",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 9939,
+                    "peak_delta_mib": 7876,
+                    "mean_utilization_percent": 37.1,
+                    "peak_utilization_percent": 84
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 1.5134,
+                "wall_p95_seconds": 2.1128,
+                "wall_mean_seconds": 1.5795,
+                "rtf_median": 0.2771,
+                "rtf_p95": 0.3481,
+                "rtf_mean": 0.2867,
+                "audio_mean_seconds": 5.52,
+                "gpu_peak_mib": 9966,
+                "gpu_peak_delta_mib": 7903,
+                "gpu_mean_utilization_percent": 43.6
+              },
+              "container_memory_after": {
+                "current_mib": 2697.6,
+                "peak_mib": 2701.8
+              }
+            },
+            {
+              "code": "CR",
+              "label": "reference_clone",
+              "description": "English zero-shot clone with the same reference audio mounted into both containers.",
+              "payload": {
+                "language": "English",
+                "device": "cuda:0",
+                "output_format": "wav",
+                "cfg_value": 2.0,
+                "inference_timesteps": 10,
+                "normalize": false,
+                "denoise": false,
+                "text": "This sample checks how quickly the model can carry a reference voice into a new sentence.",
+                "ref_audio": "/benchmark/original_clone.mp3"
+              },
+              "warmups": [
+                {
+                  "wall_seconds": 11.6984,
+                  "audio_seconds": 4.64,
+                  "rtf": 2.5212,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 51,
+                    "peak_mib": 9939,
+                    "peak_delta_mib": 7876,
+                    "mean_utilization_percent": 9.9,
+                    "peak_utilization_percent": 83
+                  }
+                },
+                {
+                  "wall_seconds": 1.2175,
+                  "audio_seconds": 4.32,
+                  "rtf": 0.2818,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9625,
+                    "peak_delta_mib": 7562,
+                    "mean_utilization_percent": 54.0,
+                    "peak_utilization_percent": 81
+                  }
+                }
+              ],
+              "measurements": [
+                {
+                  "wall_seconds": 1.236,
+                  "audio_seconds": 4.48,
+                  "rtf": 0.2759,
+                  "bytes": 430124,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.480",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9587,
+                    "peak_delta_mib": 7524,
+                    "mean_utilization_percent": 53.3,
+                    "peak_utilization_percent": 83
+                  }
+                },
+                {
+                  "wall_seconds": 1.3923,
+                  "audio_seconds": 4.96,
+                  "rtf": 0.2807,
+                  "bytes": 476204,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.960",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 7,
+                    "peak_mib": 10009,
+                    "peak_delta_mib": 7946,
+                    "mean_utilization_percent": 35.0,
+                    "peak_utilization_percent": 77
+                  }
+                },
+                {
+                  "wall_seconds": 1.1741,
+                  "audio_seconds": 4.48,
+                  "rtf": 0.2621,
+                  "bytes": 430124,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.480",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9585,
+                    "peak_delta_mib": 7522,
+                    "mean_utilization_percent": 45.7,
+                    "peak_utilization_percent": 77
+                  }
+                },
+                {
+                  "wall_seconds": 1.303,
+                  "audio_seconds": 4.64,
+                  "rtf": 0.2808,
+                  "bytes": 445484,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.640",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9639,
+                    "peak_delta_mib": 7576,
+                    "mean_utilization_percent": 53.3,
+                    "peak_utilization_percent": 79
+                  }
+                },
+                {
+                  "wall_seconds": 1.2046,
+                  "audio_seconds": 4.32,
+                  "rtf": 0.2788,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9601,
+                    "peak_delta_mib": 7538,
+                    "mean_utilization_percent": 53.0,
+                    "peak_utilization_percent": 80
+                  }
+                },
+                {
+                  "wall_seconds": 1.2173,
+                  "audio_seconds": 4.32,
+                  "rtf": 0.2818,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9639,
+                    "peak_delta_mib": 7576,
+                    "mean_utilization_percent": 55.3,
+                    "peak_utilization_percent": 80
+                  }
+                },
+                {
+                  "wall_seconds": 1.2762,
+                  "audio_seconds": 4.32,
+                  "rtf": 0.2954,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9599,
+                    "peak_delta_mib": 7536,
+                    "mean_utilization_percent": 54.5,
+                    "peak_utilization_percent": 80
+                  }
+                },
+                {
+                  "wall_seconds": 1.2672,
+                  "audio_seconds": 4.32,
+                  "rtf": 0.2933,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9711,
+                    "peak_delta_mib": 7648,
+                    "mean_utilization_percent": 57.3,
+                    "peak_utilization_percent": 85
+                  }
+                },
+                {
+                  "wall_seconds": 1.3511,
+                  "audio_seconds": 4.32,
+                  "rtf": 0.3127,
+                  "bytes": 414764,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.320",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9988,
+                    "peak_delta_mib": 7925,
+                    "mean_utilization_percent": 71.3,
+                    "peak_utilization_percent": 83
+                  }
+                },
+                {
+                  "wall_seconds": 1.1608,
+                  "audio_seconds": 4.16,
+                  "rtf": 0.279,
+                  "bytes": 399404,
+                  "sample_rate": 48000,
+                  "channels": 1,
+                  "response_duration": "4.160",
+                  "response_model": "openbmb/VoxCPM2",
+                  "gpu": {
+                    "samples": 6,
+                    "peak_mib": 9946,
+                    "peak_delta_mib": 7883,
+                    "mean_utilization_percent": 53.3,
+                    "peak_utilization_percent": 81
+                  }
+                }
+              ],
+              "summary": {
+                "calls": 10,
+                "wall_median_seconds": 1.2516,
+                "wall_p95_seconds": 1.3738,
+                "wall_mean_seconds": 1.2583,
+                "rtf_median": 0.2807,
+                "rtf_p95": 0.3049,
+                "rtf_mean": 0.2841,
+                "audio_mean_seconds": 4.432,
+                "gpu_peak_mib": 10009,
+                "gpu_peak_delta_mib": 7946,
+                "gpu_mean_utilization_percent": 53.2
+              },
+              "container_memory_after": {
+                "current_mib": 3067.1,
+                "peak_mib": 3069.7
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "latest": {
+    "schema": 1,
+    "started_at": "2026-10-07T16:23:32+00:00",
+    "finished_at": "2026-10-07T16:33:28+00:00",
+    "comment": "Historical native image 68787abb versus current Nano backend; same GPU, checkpoint cache, API payloads, 10 steps, concurrency 1",
+    "git": {
+      "revision": "d9e163bcccc3bbcaf6927b411e3b7854937bb8a4",
+      "dirty": true,
+      "status": [
+        " M Taskfile.yml",
+        "?? benchmarks/"
+      ],
+      "diff_sha256": "4d2ec160b07ba1242b5e8a6185e91107707b3ab618086f3210a70bca0f561855"
+    },
+    "hardware": {
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 5070 Ti",
+      "driver": "610.88",
+      "total_mib": 16303,
+      "used_mib": 1889,
+      "utilization_percent": 1
+    },
+    "settings": {
+      "model_id": "openbmb/VoxCPM2",
+      "gpu_index": 0,
+      "calls": 10,
+      "warmup_calls": 2,
+      "sample_interval_seconds": 0.1,
+      "inference_timesteps": 10,
+      "cfg_value": 2.0,
+      "output_format": "wav",
+      "concurrency": 1,
+      "nano_gpu_memory_utilization": 0.49,
+      "nano_enforce_eager": false
+    },
+    "scenarios": [
+      {
+        "code": "PS",
+        "label": "plain_short_english",
+        "description": "Short English generation without voice control or reference audio."
+      },
+      {
+        "code": "DM",
+        "label": "designed_medium_english",
+        "description": "Medium English generation with a fixed voice-design instruction."
+      },
+      {
+        "code": "MN",
+        "label": "designed_norwegian",
+        "description": "Norwegian generation with the same fixed voice-design instruction."
+      },
+      {
+        "code": "CR",
+        "label": "reference_clone",
+        "description": "English zero-shot clone with the same reference audio mounted into both containers."
+      }
+    ],
+    "backends": [
+      {
+        "backend": "native",
+        "image": {
+          "tag": "voxcpmtts:benchmark-native",
+          "id": "sha256:68787abb3ecca6fa04d579e43f93d0ce30d3e74d89497450896e1d04fe7d1413",
+          "created": "2026-10-07T10:06:02.193219714Z",
+          "size_bytes": 4832268446,
+          "repo_digests": [
+            "voxcpmtts@sha256:68787abb3ecca6fa04d579e43f93d0ce30d3e74d89497450896e1d04fe7d1413"
+          ],
+          "labels": {}
+        },
+        "runtime_versions": {
+          "python": "3.13.16",
+          "torch": "2.10.0+cu128",
+          "transformers": "5.3.0",
+          "huggingface-hub": null,
+          "nano-vllm-voxcpm": null,
+          "flash-attn": null,
+          "triton": "3.6.0"
+        },
+        "api_ready_seconds": 6.056,
+        "status_before_load": {
+          "msg": "pong",
+          "type": "VoxCPMTTS",
+          "version": "0.1-snapshot",
+          "build_id": "stable",
+          "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+          "device": "auto",
+          "model_id": "openbmb/VoxCPM2",
+          "load_denoiser": false,
+          "load_asr": false,
+          "asr_model_id": "iic/SenseVoiceSmall",
+          "optimize": false,
+          "languages": [
+            "Arabic",
+            "Burmese",
+            "Chinese",
+            "Danish",
+            "Dutch",
+            "English",
+            "Finnish",
+            "French",
+            "German",
+            "Greek",
+            "Hebrew",
+            "Hindi",
+            "Indonesian",
+            "Italian",
+            "Japanese",
+            "Khmer",
+            "Korean",
+            "Lao",
+            "Malay",
+            "Norwegian",
+            "Polish",
+            "Portuguese",
+            "Russian",
+            "Spanish",
+            "Swahili",
+            "Swedish",
+            "Tagalog",
+            "Thai",
+            "Turkish",
+            "Vietnamese"
+          ],
+          "loaded_model_devices": [],
+          "output_formats": {
+            "wav": {
+              "label": "WAV",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "MP3",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            },
+            "flac": {
+              "label": "FLAC",
+              "extension": "flac",
+              "media_type": "audio/flac"
+            },
+            "ogg": {
+              "label": "OGG Vorbis",
+              "extension": "ogg",
+              "media_type": "audio/ogg"
+            }
+          },
+          "stream_formats": {
+            "wav": {
+              "label": "Full WAV response",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "Full MP3 response",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            }
+          }
+        },
+        "status_after": {
+          "msg": "pong",
+          "type": "VoxCPMTTS",
+          "version": "0.1-snapshot",
+          "build_id": "stable",
+          "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+          "device": "auto",
+          "model_id": "openbmb/VoxCPM2",
+          "load_denoiser": false,
+          "load_asr": false,
+          "asr_model_id": "iic/SenseVoiceSmall",
+          "optimize": false,
+          "languages": [
+            "Arabic",
+            "Burmese",
+            "Chinese",
+            "Danish",
+            "Dutch",
+            "English",
+            "Finnish",
+            "French",
+            "German",
+            "Greek",
+            "Hebrew",
+            "Hindi",
+            "Indonesian",
+            "Italian",
+            "Japanese",
+            "Khmer",
+            "Korean",
+            "Lao",
+            "Malay",
+            "Norwegian",
+            "Polish",
+            "Portuguese",
+            "Russian",
+            "Spanish",
+            "Swahili",
+            "Swedish",
+            "Tagalog",
+            "Thai",
+            "Turkish",
+            "Vietnamese"
+          ],
+          "loaded_model_devices": [
+            "cuda:0"
+          ],
+          "output_formats": {
+            "wav": {
+              "label": "WAV",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "MP3",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            },
+            "flac": {
+              "label": "FLAC",
+              "extension": "flac",
+              "media_type": "audio/flac"
+            },
+            "ogg": {
+              "label": "OGG Vorbis",
+              "extension": "ogg",
+              "media_type": "audio/ogg"
+            }
+          },
+          "stream_formats": {
+            "wav": {
+              "label": "Full WAV response",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "Full MP3 response",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            }
+          }
+        },
+        "gpu_baseline": {
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "driver": "610.88",
+          "total_mib": 16303,
+          "used_mib": 1890,
+          "utilization_percent": 2
+        },
+        "cold_request": {
+          "wall_seconds": 19.3369,
+          "audio_seconds": 3.84,
+          "rtf": 5.0356,
+          "bytes": 368684,
+          "sample_rate": 48000,
+          "channels": 1,
+          "response_duration": "3.840",
+          "response_model": "openbmb/VoxCPM2",
+          "gpu": {
+            "samples": 80,
+            "peak_mib": 7661,
+            "peak_delta_mib": 5771,
+            "mean_utilization_percent": 11.6,
+            "peak_utilization_percent": 46
+          }
+        },
+        "gpu_final": {
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "driver": "610.88",
+          "total_mib": 16303,
+          "used_mib": 8349,
+          "utilization_percent": 1
+        },
+        "gpu_final_delta_mib": 6459,
+        "container_memory_before_load": {
+          "current_mib": 475.6,
+          "peak_mib": 478.2
+        },
+        "container_memory_after_load": {
+          "current_mib": 3506.5,
+          "peak_mib": 10866.8
+        },
+        "container_memory_final": {
+          "current_mib": 3590.1,
+          "peak_mib": 10866.8
+        },
+        "scenarios": [
+          {
+            "code": "PS",
+            "label": "plain_short_english",
+            "description": "Short English generation without voice control or reference audio.",
+            "payload": {
+              "language": "English",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "The morning coffee negotiated hard, but eventually agreed to help."
+            },
+            "warmups": [
+              {
+                "wall_seconds": 4.6025,
+                "audio_seconds": 3.68,
+                "rtf": 1.2507,
+                "bytes": 353324,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.680",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 18,
+                  "peak_mib": 7854,
+                  "peak_delta_mib": 5964,
+                  "mean_utilization_percent": 22.2,
+                  "peak_utilization_percent": 37
+                }
+              },
+              {
+                "wall_seconds": 4.539,
+                "audio_seconds": 4.0,
+                "rtf": 1.1348,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 19,
+                  "peak_mib": 7863,
+                  "peak_delta_mib": 5973,
+                  "mean_utilization_percent": 26.4,
+                  "peak_utilization_percent": 41
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 4.167,
+                "audio_seconds": 3.52,
+                "rtf": 1.1838,
+                "bytes": 337964,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.520",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 17,
+                  "peak_mib": 7863,
+                  "peak_delta_mib": 5973,
+                  "mean_utilization_percent": 37.3,
+                  "peak_utilization_percent": 47
+                }
+              },
+              {
+                "wall_seconds": 4.0584,
+                "audio_seconds": 3.52,
+                "rtf": 1.1529,
+                "bytes": 337964,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.520",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 17,
+                  "peak_mib": 7855,
+                  "peak_delta_mib": 5965,
+                  "mean_utilization_percent": 26.8,
+                  "peak_utilization_percent": 44
+                }
+              },
+              {
+                "wall_seconds": 4.6097,
+                "audio_seconds": 4.0,
+                "rtf": 1.1524,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 19,
+                  "peak_mib": 7862,
+                  "peak_delta_mib": 5972,
+                  "mean_utilization_percent": 34.0,
+                  "peak_utilization_percent": 47
+                }
+              },
+              {
+                "wall_seconds": 3.9071,
+                "audio_seconds": 3.36,
+                "rtf": 1.1628,
+                "bytes": 322604,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.360",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 16,
+                  "peak_mib": 7855,
+                  "peak_delta_mib": 5965,
+                  "mean_utilization_percent": 29.1,
+                  "peak_utilization_percent": 41
+                }
+              },
+              {
+                "wall_seconds": 4.4934,
+                "audio_seconds": 4.0,
+                "rtf": 1.1234,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 18,
+                  "peak_mib": 7861,
+                  "peak_delta_mib": 5971,
+                  "mean_utilization_percent": 34.0,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 3.6599,
+                "audio_seconds": 3.36,
+                "rtf": 1.0893,
+                "bytes": 322604,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.360",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 15,
+                  "peak_mib": 7862,
+                  "peak_delta_mib": 5972,
+                  "mean_utilization_percent": 28.2,
+                  "peak_utilization_percent": 47
+                }
+              },
+              {
+                "wall_seconds": 4.5232,
+                "audio_seconds": 4.0,
+                "rtf": 1.1308,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 18,
+                  "peak_mib": 7855,
+                  "peak_delta_mib": 5965,
+                  "mean_utilization_percent": 36.3,
+                  "peak_utilization_percent": 52
+                }
+              },
+              {
+                "wall_seconds": 5.7037,
+                "audio_seconds": 4.8,
+                "rtf": 1.1883,
+                "bytes": 460844,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.800",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 23,
+                  "peak_mib": 7862,
+                  "peak_delta_mib": 5972,
+                  "mean_utilization_percent": 27.4,
+                  "peak_utilization_percent": 43
+                }
+              },
+              {
+                "wall_seconds": 4.2667,
+                "audio_seconds": 3.52,
+                "rtf": 1.2121,
+                "bytes": 337964,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.520",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 17,
+                  "peak_mib": 7856,
+                  "peak_delta_mib": 5966,
+                  "mean_utilization_percent": 25.7,
+                  "peak_utilization_percent": 37
+                }
+              },
+              {
+                "wall_seconds": 4.981,
+                "audio_seconds": 4.32,
+                "rtf": 1.153,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 19,
+                  "peak_mib": 7863,
+                  "peak_delta_mib": 5973,
+                  "mean_utilization_percent": 31.8,
+                  "peak_utilization_percent": 48
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 4.3801,
+              "wall_p95_seconds": 5.3785,
+              "wall_mean_seconds": 4.437,
+              "rtf_median": 1.153,
+              "rtf_p95": 1.2014,
+              "rtf_mean": 1.1549,
+              "audio_mean_seconds": 3.84,
+              "gpu_peak_mib": 7863,
+              "gpu_peak_delta_mib": 5973,
+              "gpu_mean_utilization_percent": 31.1
+            },
+            "container_memory_after": {
+              "current_mib": 3506.3,
+              "peak_mib": 10866.8
+            }
+          },
+          {
+            "code": "DM",
+            "label": "designed_medium_english",
+            "description": "Medium English generation with a fixed voice-design instruction.",
+            "payload": {
+              "language": "English",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "Local speech generation keeps private text on your own machine while producing clear, natural audio for applications, accessibility tools, and creative work.",
+              "control": "warm adult female narrator, clear and friendly"
+            },
+            "warmups": [
+              {
+                "wall_seconds": 10.1395,
+                "audio_seconds": 8.8,
+                "rtf": 1.1522,
+                "bytes": 844844,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.800",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 38,
+                  "peak_mib": 7864,
+                  "peak_delta_mib": 5974,
+                  "mean_utilization_percent": 32.7,
+                  "peak_utilization_percent": 46
+                }
+              },
+              {
+                "wall_seconds": 9.8613,
+                "audio_seconds": 8.64,
+                "rtf": 1.1414,
+                "bytes": 829484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 37,
+                  "peak_mib": 7864,
+                  "peak_delta_mib": 5974,
+                  "mean_utilization_percent": 32.5,
+                  "peak_utilization_percent": 45
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 11.2412,
+                "audio_seconds": 9.44,
+                "rtf": 1.1908,
+                "bytes": 906284,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.440",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 43,
+                  "peak_mib": 7866,
+                  "peak_delta_mib": 5976,
+                  "mean_utilization_percent": 28.8,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 11.8399,
+                "audio_seconds": 9.92,
+                "rtf": 1.1935,
+                "bytes": 952364,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.920",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 46,
+                  "peak_mib": 7865,
+                  "peak_delta_mib": 5975,
+                  "mean_utilization_percent": 31.7,
+                  "peak_utilization_percent": 56
+                }
+              },
+              {
+                "wall_seconds": 9.8484,
+                "audio_seconds": 8.48,
+                "rtf": 1.1614,
+                "bytes": 814124,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.480",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 37,
+                  "peak_mib": 8002,
+                  "peak_delta_mib": 6112,
+                  "mean_utilization_percent": 29.5,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 11.6134,
+                "audio_seconds": 10.4,
+                "rtf": 1.1167,
+                "bytes": 998444,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "10.400",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 44,
+                  "peak_mib": 8061,
+                  "peak_delta_mib": 6171,
+                  "mean_utilization_percent": 32.3,
+                  "peak_utilization_percent": 47
+                }
+              },
+              {
+                "wall_seconds": 11.4614,
+                "audio_seconds": 9.28,
+                "rtf": 1.2351,
+                "bytes": 890924,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.280",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 43,
+                  "peak_mib": 8170,
+                  "peak_delta_mib": 6280,
+                  "mean_utilization_percent": 29.9,
+                  "peak_utilization_percent": 48
+                }
+              },
+              {
+                "wall_seconds": 10.2654,
+                "audio_seconds": 9.12,
+                "rtf": 1.1256,
+                "bytes": 875564,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.120",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 40,
+                  "peak_mib": 8095,
+                  "peak_delta_mib": 6205,
+                  "mean_utilization_percent": 31.5,
+                  "peak_utilization_percent": 47
+                }
+              },
+              {
+                "wall_seconds": 10.9945,
+                "audio_seconds": 8.64,
+                "rtf": 1.2725,
+                "bytes": 829484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 43,
+                  "peak_mib": 8093,
+                  "peak_delta_mib": 6203,
+                  "mean_utilization_percent": 29.0,
+                  "peak_utilization_percent": 47
+                }
+              },
+              {
+                "wall_seconds": 10.1818,
+                "audio_seconds": 8.64,
+                "rtf": 1.1784,
+                "bytes": 829484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 38,
+                  "peak_mib": 8086,
+                  "peak_delta_mib": 6196,
+                  "mean_utilization_percent": 30.4,
+                  "peak_utilization_percent": 44
+                }
+              },
+              {
+                "wall_seconds": 12.4848,
+                "audio_seconds": 9.76,
+                "rtf": 1.2792,
+                "bytes": 937004,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.760",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 44,
+                  "peak_mib": 8370,
+                  "peak_delta_mib": 6480,
+                  "mean_utilization_percent": 26.7,
+                  "peak_utilization_percent": 43
+                }
+              },
+              {
+                "wall_seconds": 10.7598,
+                "audio_seconds": 8.64,
+                "rtf": 1.2453,
+                "bytes": 829484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 39,
+                  "peak_mib": 8410,
+                  "peak_delta_mib": 6520,
+                  "mean_utilization_percent": 28.8,
+                  "peak_utilization_percent": 42
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 11.1179,
+              "wall_p95_seconds": 12.1946,
+              "wall_mean_seconds": 11.0691,
+              "rtf_median": 1.1922,
+              "rtf_p95": 1.2762,
+              "rtf_mean": 1.1999,
+              "audio_mean_seconds": 9.232,
+              "gpu_peak_mib": 8410,
+              "gpu_peak_delta_mib": 6520,
+              "gpu_mean_utilization_percent": 29.9
+            },
+            "container_memory_after": {
+              "current_mib": 3506.9,
+              "peak_mib": 10866.8
+            }
+          },
+          {
+            "code": "MN",
+            "label": "designed_norwegian",
+            "description": "Norwegian generation with the same fixed voice-design instruction.",
+            "payload": {
+              "language": "Norwegian",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "Denne testen måler hvor raskt modellen lager tydelig norsk tale med de samme innstillingene.",
+              "control": "warm adult female narrator, clear and friendly"
+            },
+            "warmups": [
+              {
+                "wall_seconds": 7.3226,
+                "audio_seconds": 5.44,
+                "rtf": 1.3461,
+                "bytes": 522284,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.440",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 26,
+                  "peak_mib": 8274,
+                  "peak_delta_mib": 6384,
+                  "mean_utilization_percent": 27.6,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 7.3394,
+                "audio_seconds": 5.6,
+                "rtf": 1.3106,
+                "bytes": 537644,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.600",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 29,
+                  "peak_mib": 8149,
+                  "peak_delta_mib": 6259,
+                  "mean_utilization_percent": 28.7,
+                  "peak_utilization_percent": 44
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 5.6976,
+                "audio_seconds": 5.12,
+                "rtf": 1.1128,
+                "bytes": 491564,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.120",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 21,
+                  "peak_mib": 8149,
+                  "peak_delta_mib": 6259,
+                  "mean_utilization_percent": 29.2,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 4.3653,
+                "audio_seconds": 4.0,
+                "rtf": 1.0913,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 18,
+                  "peak_mib": 8368,
+                  "peak_delta_mib": 6478,
+                  "mean_utilization_percent": 32.3,
+                  "peak_utilization_percent": 46
+                }
+              },
+              {
+                "wall_seconds": 7.2195,
+                "audio_seconds": 6.08,
+                "rtf": 1.1874,
+                "bytes": 583724,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "6.080",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 28,
+                  "peak_mib": 8417,
+                  "peak_delta_mib": 6527,
+                  "mean_utilization_percent": 31.6,
+                  "peak_utilization_percent": 46
+                }
+              },
+              {
+                "wall_seconds": 7.2642,
+                "audio_seconds": 6.56,
+                "rtf": 1.1073,
+                "bytes": 629804,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "6.560",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 28,
+                  "peak_mib": 8420,
+                  "peak_delta_mib": 6530,
+                  "mean_utilization_percent": 29.2,
+                  "peak_utilization_percent": 48
+                }
+              },
+              {
+                "wall_seconds": 5.7981,
+                "audio_seconds": 4.96,
+                "rtf": 1.169,
+                "bytes": 476204,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.960",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 23,
+                  "peak_mib": 8362,
+                  "peak_delta_mib": 6472,
+                  "mean_utilization_percent": 29.3,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 5.7691,
+                "audio_seconds": 4.64,
+                "rtf": 1.2433,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 23,
+                  "peak_mib": 8168,
+                  "peak_delta_mib": 6278,
+                  "mean_utilization_percent": 28.5,
+                  "peak_utilization_percent": 46
+                }
+              },
+              {
+                "wall_seconds": 7.3345,
+                "audio_seconds": 6.24,
+                "rtf": 1.1754,
+                "bytes": 599084,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "6.240",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 29,
+                  "peak_mib": 8168,
+                  "peak_delta_mib": 6278,
+                  "mean_utilization_percent": 32.7,
+                  "peak_utilization_percent": 46
+                }
+              },
+              {
+                "wall_seconds": 7.7826,
+                "audio_seconds": 6.24,
+                "rtf": 1.2472,
+                "bytes": 599084,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "6.240",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 30,
+                  "peak_mib": 8168,
+                  "peak_delta_mib": 6278,
+                  "mean_utilization_percent": 26.7,
+                  "peak_utilization_percent": 46
+                }
+              },
+              {
+                "wall_seconds": 5.3838,
+                "audio_seconds": 4.64,
+                "rtf": 1.1603,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 22,
+                  "peak_mib": 8160,
+                  "peak_delta_mib": 6270,
+                  "mean_utilization_percent": 29.6,
+                  "peak_utilization_percent": 44
+                }
+              },
+              {
+                "wall_seconds": 5.549,
+                "audio_seconds": 5.12,
+                "rtf": 1.0838,
+                "bytes": 491564,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.120",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 22,
+                  "peak_mib": 8309,
+                  "peak_delta_mib": 6419,
+                  "mean_utilization_percent": 27.4,
+                  "peak_utilization_percent": 45
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 5.7836,
+              "wall_p95_seconds": 7.581,
+              "wall_mean_seconds": 6.2164,
+              "rtf_median": 1.1646,
+              "rtf_p95": 1.2454,
+              "rtf_mean": 1.1578,
+              "audio_mean_seconds": 5.36,
+              "gpu_peak_mib": 8420,
+              "gpu_peak_delta_mib": 6530,
+              "gpu_mean_utilization_percent": 29.6
+            },
+            "container_memory_after": {
+              "current_mib": 3508.3,
+              "peak_mib": 10866.8
+            }
+          },
+          {
+            "code": "CR",
+            "label": "reference_clone",
+            "description": "English zero-shot clone with the same reference audio mounted into both containers.",
+            "payload": {
+              "language": "English",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "This sample checks how quickly the model can carry a reference voice into a new sentence.",
+              "ref_audio": "/benchmark/original_clone.mp3"
+            },
+            "warmups": [
+              {
+                "wall_seconds": 17.6292,
+                "audio_seconds": 5.6,
+                "rtf": 3.1481,
+                "bytes": 537644,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.600",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 73,
+                  "peak_mib": 8293,
+                  "peak_delta_mib": 6403,
+                  "mean_utilization_percent": 11.1,
+                  "peak_utilization_percent": 44
+                }
+              },
+              {
+                "wall_seconds": 5.811,
+                "audio_seconds": 4.96,
+                "rtf": 1.1716,
+                "bytes": 476204,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.960",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 23,
+                  "peak_mib": 8425,
+                  "peak_delta_mib": 6535,
+                  "mean_utilization_percent": 31.4,
+                  "peak_utilization_percent": 44
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 5.6347,
+                "audio_seconds": 4.8,
+                "rtf": 1.1739,
+                "bytes": 460844,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.800",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 22,
+                  "peak_mib": 8347,
+                  "peak_delta_mib": 6457,
+                  "mean_utilization_percent": 30.9,
+                  "peak_utilization_percent": 44
+                }
+              },
+              {
+                "wall_seconds": 5.2156,
+                "audio_seconds": 4.64,
+                "rtf": 1.1241,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 21,
+                  "peak_mib": 8340,
+                  "peak_delta_mib": 6450,
+                  "mean_utilization_percent": 30.0,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 4.4747,
+                "audio_seconds": 4.0,
+                "rtf": 1.1187,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 18,
+                  "peak_mib": 8347,
+                  "peak_delta_mib": 6457,
+                  "mean_utilization_percent": 32.1,
+                  "peak_utilization_percent": 47
+                }
+              },
+              {
+                "wall_seconds": 4.7618,
+                "audio_seconds": 4.32,
+                "rtf": 1.1023,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 19,
+                  "peak_mib": 8349,
+                  "peak_delta_mib": 6459,
+                  "mean_utilization_percent": 28.3,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 6.0473,
+                "audio_seconds": 4.96,
+                "rtf": 1.2192,
+                "bytes": 476204,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.960",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 23,
+                  "peak_mib": 8348,
+                  "peak_delta_mib": 6458,
+                  "mean_utilization_percent": 26.4,
+                  "peak_utilization_percent": 44
+                }
+              },
+              {
+                "wall_seconds": 5.5075,
+                "audio_seconds": 4.64,
+                "rtf": 1.187,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 22,
+                  "peak_mib": 8354,
+                  "peak_delta_mib": 6464,
+                  "mean_utilization_percent": 32.0,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 5.3604,
+                "audio_seconds": 4.48,
+                "rtf": 1.1965,
+                "bytes": 430124,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.480",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 22,
+                  "peak_mib": 8362,
+                  "peak_delta_mib": 6472,
+                  "mean_utilization_percent": 31.4,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 5.2353,
+                "audio_seconds": 4.48,
+                "rtf": 1.1686,
+                "bytes": 430124,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.480",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 20,
+                  "peak_mib": 8355,
+                  "peak_delta_mib": 6465,
+                  "mean_utilization_percent": 32.6,
+                  "peak_utilization_percent": 45
+                }
+              },
+              {
+                "wall_seconds": 5.7813,
+                "audio_seconds": 4.8,
+                "rtf": 1.2044,
+                "bytes": 460844,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.800",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 22,
+                  "peak_mib": 8363,
+                  "peak_delta_mib": 6473,
+                  "mean_utilization_percent": 30.5,
+                  "peak_utilization_percent": 44
+                }
+              },
+              {
+                "wall_seconds": 5.4564,
+                "audio_seconds": 4.8,
+                "rtf": 1.1367,
+                "bytes": 460844,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.800",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 22,
+                  "peak_mib": 8349,
+                  "peak_delta_mib": 6459,
+                  "mean_utilization_percent": 29.6,
+                  "peak_utilization_percent": 45
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 5.4084,
+              "wall_p95_seconds": 5.9276,
+              "wall_mean_seconds": 5.3475,
+              "rtf_median": 1.1713,
+              "rtf_p95": 1.2125,
+              "rtf_mean": 1.1631,
+              "audio_mean_seconds": 4.592,
+              "gpu_peak_mib": 8363,
+              "gpu_peak_delta_mib": 6473,
+              "gpu_mean_utilization_percent": 30.4
+            },
+            "container_memory_after": {
+              "current_mib": 3589.2,
+              "peak_mib": 10866.8
+            }
+          }
+        ]
+      },
+      {
+        "backend": "nano",
+        "image": {
+          "tag": "voxcpmtts:benchmark-nano",
+          "id": "sha256:3a4e1ccda4af76e389521374637905c6462974480dac20c476da9414255923f1",
+          "created": "2026-10-07T16:21:51.274308704Z",
+          "size_bytes": 4847177171,
+          "repo_digests": [
+            "voxcpmtts@sha256:3a4e1ccda4af76e389521374637905c6462974480dac20c476da9414255923f1"
+          ],
+          "labels": {
+            "org.opencontainers.image.created": "2026-10-07T14:52:34Z",
+            "org.opencontainers.image.revision": "ac1d0b3b2bcb",
+            "org.opencontainers.image.source": "https://github.com/hangry-labs/VoxCPMTTS"
+          }
+        },
+        "runtime_versions": {
+          "python": "3.13.16",
+          "torch": "2.8.0+cu128",
+          "transformers": "5.3.0",
+          "huggingface-hub": null,
+          "nano-vllm-voxcpm": "2.0.4",
+          "flash-attn": null,
+          "triton": "3.4.0"
+        },
+        "api_ready_seconds": 4.037,
+        "status_before_load": {
+          "msg": "pong",
+          "type": "VoxCPMTTS",
+          "version": "0.1-snapshot",
+          "build_id": "2026-10-07T14:52:34Z@ac1d0b3b2bcb",
+          "build_date": "2026-10-07T14:52:34Z",
+          "revision": "ac1d0b3b2bcb",
+          "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+          "device": "auto",
+          "backend": "nano",
+          "model_id": "openbmb/VoxCPM2",
+          "load_denoiser": false,
+          "load_asr": false,
+          "asr_model_id": "iic/SenseVoiceSmall",
+          "optimize": false,
+          "languages": [
+            "Arabic",
+            "Burmese",
+            "Chinese",
+            "Danish",
+            "Dutch",
+            "English",
+            "Finnish",
+            "French",
+            "German",
+            "Greek",
+            "Hebrew",
+            "Hindi",
+            "Indonesian",
+            "Italian",
+            "Japanese",
+            "Khmer",
+            "Korean",
+            "Lao",
+            "Malay",
+            "Norwegian",
+            "Polish",
+            "Portuguese",
+            "Russian",
+            "Spanish",
+            "Swahili",
+            "Swedish",
+            "Tagalog",
+            "Thai",
+            "Turkish",
+            "Vietnamese"
+          ],
+          "loaded_model_devices": [],
+          "output_formats": {
+            "wav": {
+              "label": "WAV",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "MP3",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            },
+            "flac": {
+              "label": "FLAC",
+              "extension": "flac",
+              "media_type": "audio/flac"
+            },
+            "ogg": {
+              "label": "OGG Vorbis",
+              "extension": "ogg",
+              "media_type": "audio/ogg"
+            }
+          },
+          "stream_formats": {
+            "wav": {
+              "label": "Full WAV response",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "Full MP3 response",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            }
+          }
+        },
+        "status_after": {
+          "msg": "pong",
+          "type": "VoxCPMTTS",
+          "version": "0.1-snapshot",
+          "build_id": "2026-10-07T14:52:34Z@ac1d0b3b2bcb",
+          "build_date": "2026-10-07T14:52:34Z",
+          "revision": "ac1d0b3b2bcb",
+          "runtime": "GPU x1 (visible=0) [0:NVIDIA GeForce RTX 5070 Ti]",
+          "device": "auto",
+          "backend": "nano",
+          "model_id": "openbmb/VoxCPM2",
+          "load_denoiser": false,
+          "load_asr": false,
+          "asr_model_id": "iic/SenseVoiceSmall",
+          "optimize": false,
+          "languages": [
+            "Arabic",
+            "Burmese",
+            "Chinese",
+            "Danish",
+            "Dutch",
+            "English",
+            "Finnish",
+            "French",
+            "German",
+            "Greek",
+            "Hebrew",
+            "Hindi",
+            "Indonesian",
+            "Italian",
+            "Japanese",
+            "Khmer",
+            "Korean",
+            "Lao",
+            "Malay",
+            "Norwegian",
+            "Polish",
+            "Portuguese",
+            "Russian",
+            "Spanish",
+            "Swahili",
+            "Swedish",
+            "Tagalog",
+            "Thai",
+            "Turkish",
+            "Vietnamese"
+          ],
+          "loaded_model_devices": [
+            "cuda:0"
+          ],
+          "output_formats": {
+            "wav": {
+              "label": "WAV",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "MP3",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            },
+            "flac": {
+              "label": "FLAC",
+              "extension": "flac",
+              "media_type": "audio/flac"
+            },
+            "ogg": {
+              "label": "OGG Vorbis",
+              "extension": "ogg",
+              "media_type": "audio/ogg"
+            }
+          },
+          "stream_formats": {
+            "wav": {
+              "label": "Full WAV response",
+              "extension": "wav",
+              "media_type": "audio/wav"
+            },
+            "mp3": {
+              "label": "Full MP3 response",
+              "extension": "mp3",
+              "media_type": "audio/mpeg"
+            }
+          }
+        },
+        "gpu_baseline": {
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "driver": "610.88",
+          "total_mib": 16303,
+          "used_mib": 2063,
+          "utilization_percent": 8
+        },
+        "cold_request": {
+          "wall_seconds": 22.4175,
+          "audio_seconds": 4.16,
+          "rtf": 5.3888,
+          "bytes": 399404,
+          "sample_rate": 48000,
+          "channels": 1,
+          "response_duration": "4.160",
+          "response_model": "openbmb/VoxCPM2",
+          "gpu": {
+            "samples": 95,
+            "peak_mib": 10414,
+            "peak_delta_mib": 8351,
+            "mean_utilization_percent": 9.2,
+            "peak_utilization_percent": 100
+          }
+        },
+        "gpu_final": {
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "driver": "610.88",
+          "total_mib": 16303,
+          "used_mib": 9564,
+          "utilization_percent": 2
+        },
+        "gpu_final_delta_mib": 7501,
+        "container_memory_before_load": {
+          "current_mib": 369.8,
+          "peak_mib": 372.7
+        },
+        "container_memory_after_load": {
+          "current_mib": 2672.4,
+          "peak_mib": 2701.8
+        },
+        "container_memory_final": {
+          "current_mib": 3067.5,
+          "peak_mib": 3324.3
+        },
+        "scenarios": [
+          {
+            "code": "PS",
+            "label": "plain_short_english",
+            "description": "Short English generation without voice control or reference audio.",
+            "payload": {
+              "language": "English",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "The morning coffee negotiated hard, but eventually agreed to help."
+            },
+            "warmups": [
+              {
+                "wall_seconds": 1.0834,
+                "audio_seconds": 3.84,
+                "rtf": 0.2821,
+                "bytes": 368684,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.840",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9502,
+                  "peak_delta_mib": 7439,
+                  "mean_utilization_percent": 25.7,
+                  "peak_utilization_percent": 77
+                }
+              },
+              {
+                "wall_seconds": 1.0014,
+                "audio_seconds": 4.0,
+                "rtf": 0.2504,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9502,
+                  "peak_delta_mib": 7439,
+                  "mean_utilization_percent": 65.3,
+                  "peak_utilization_percent": 82
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 1.1387,
+                "audio_seconds": 4.0,
+                "rtf": 0.2847,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 33.7,
+                  "peak_utilization_percent": 81
+                }
+              },
+              {
+                "wall_seconds": 1.2282,
+                "audio_seconds": 4.8,
+                "rtf": 0.2559,
+                "bytes": 460844,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.800",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 32.5,
+                  "peak_utilization_percent": 85
+                }
+              },
+              {
+                "wall_seconds": 1.0627,
+                "audio_seconds": 3.84,
+                "rtf": 0.2767,
+                "bytes": 368684,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.840",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 63.8,
+                  "peak_utilization_percent": 81
+                }
+              },
+              {
+                "wall_seconds": 1.344,
+                "audio_seconds": 4.8,
+                "rtf": 0.28,
+                "bytes": 460844,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.800",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 40.0,
+                  "peak_utilization_percent": 78
+                }
+              },
+              {
+                "wall_seconds": 1.1481,
+                "audio_seconds": 4.16,
+                "rtf": 0.276,
+                "bytes": 399404,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.160",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 49.7,
+                  "peak_utilization_percent": 84
+                }
+              },
+              {
+                "wall_seconds": 1.3264,
+                "audio_seconds": 4.64,
+                "rtf": 0.2859,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 50.0,
+                  "peak_utilization_percent": 84
+                }
+              },
+              {
+                "wall_seconds": 0.944,
+                "audio_seconds": 3.68,
+                "rtf": 0.2565,
+                "bytes": 353324,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.680",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 5,
+                  "peak_mib": 9502,
+                  "peak_delta_mib": 7439,
+                  "mean_utilization_percent": 30.0,
+                  "peak_utilization_percent": 75
+                }
+              },
+              {
+                "wall_seconds": 1.0478,
+                "audio_seconds": 3.52,
+                "rtf": 0.2977,
+                "bytes": 337964,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "3.520",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9502,
+                  "peak_delta_mib": 7439,
+                  "mean_utilization_percent": 28.0,
+                  "peak_utilization_percent": 84
+                }
+              },
+              {
+                "wall_seconds": 1.0808,
+                "audio_seconds": 4.16,
+                "rtf": 0.2598,
+                "bytes": 399404,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.160",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9502,
+                  "peak_delta_mib": 7439,
+                  "mean_utilization_percent": 32.8,
+                  "peak_utilization_percent": 82
+                }
+              },
+              {
+                "wall_seconds": 1.0694,
+                "audio_seconds": 4.0,
+                "rtf": 0.2674,
+                "bytes": 384044,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.000",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 40.0,
+                  "peak_utilization_percent": 78
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 1.1098,
+              "wall_p95_seconds": 1.3361,
+              "wall_mean_seconds": 1.139,
+              "rtf_median": 0.2763,
+              "rtf_p95": 0.2924,
+              "rtf_mean": 0.2741,
+              "audio_mean_seconds": 4.16,
+              "gpu_peak_mib": 9502,
+              "gpu_peak_delta_mib": 7439,
+              "gpu_mean_utilization_percent": 40.0
+            },
+            "container_memory_after": {
+              "current_mib": 2676.1,
+              "peak_mib": 2701.8
+            }
+          },
+          {
+            "code": "DM",
+            "label": "designed_medium_english",
+            "description": "Medium English generation with a fixed voice-design instruction.",
+            "payload": {
+              "language": "English",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "Local speech generation keeps private text on your own machine while producing clear, natural audio for applications, accessibility tools, and creative work.",
+              "control": "warm adult female narrator, clear and friendly"
+            },
+            "warmups": [
+              {
+                "wall_seconds": 2.6789,
+                "audio_seconds": 9.92,
+                "rtf": 0.27,
+                "bytes": 952364,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.920",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 12,
+                  "peak_mib": 9494,
+                  "peak_delta_mib": 7431,
+                  "mean_utilization_percent": 48.8,
+                  "peak_utilization_percent": 84
+                }
+              },
+              {
+                "wall_seconds": 2.8458,
+                "audio_seconds": 8.96,
+                "rtf": 0.3176,
+                "bytes": 860204,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.960",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 10,
+                  "peak_mib": 9502,
+                  "peak_delta_mib": 7439,
+                  "mean_utilization_percent": 55.0,
+                  "peak_utilization_percent": 86
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 2.9523,
+                "audio_seconds": 9.28,
+                "rtf": 0.3181,
+                "bytes": 890924,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.280",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 12,
+                  "peak_mib": 9502,
+                  "peak_delta_mib": 7439,
+                  "mean_utilization_percent": 48.5,
+                  "peak_utilization_percent": 83
+                }
+              },
+              {
+                "wall_seconds": 2.7632,
+                "audio_seconds": 9.6,
+                "rtf": 0.2878,
+                "bytes": 921644,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.600",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 12,
+                  "peak_mib": 9474,
+                  "peak_delta_mib": 7411,
+                  "mean_utilization_percent": 51.8,
+                  "peak_utilization_percent": 82
+                }
+              },
+              {
+                "wall_seconds": 2.5298,
+                "audio_seconds": 8.96,
+                "rtf": 0.2823,
+                "bytes": 860204,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.960",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 12,
+                  "peak_mib": 9474,
+                  "peak_delta_mib": 7411,
+                  "mean_utilization_percent": 41.2,
+                  "peak_utilization_percent": 81
+                }
+              },
+              {
+                "wall_seconds": 2.5078,
+                "audio_seconds": 9.28,
+                "rtf": 0.2702,
+                "bytes": 890924,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.280",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 11,
+                  "peak_mib": 9474,
+                  "peak_delta_mib": 7411,
+                  "mean_utilization_percent": 58.7,
+                  "peak_utilization_percent": 83
+                }
+              },
+              {
+                "wall_seconds": 2.7617,
+                "audio_seconds": 9.76,
+                "rtf": 0.283,
+                "bytes": 937004,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.760",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 12,
+                  "peak_mib": 9482,
+                  "peak_delta_mib": 7419,
+                  "mean_utilization_percent": 34.9,
+                  "peak_utilization_percent": 78
+                }
+              },
+              {
+                "wall_seconds": 3.106,
+                "audio_seconds": 10.88,
+                "rtf": 0.2855,
+                "bytes": 1044524,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "10.880",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 13,
+                  "peak_mib": 9475,
+                  "peak_delta_mib": 7412,
+                  "mean_utilization_percent": 48.0,
+                  "peak_utilization_percent": 80
+                }
+              },
+              {
+                "wall_seconds": 2.8919,
+                "audio_seconds": 10.72,
+                "rtf": 0.2698,
+                "bytes": 1029164,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "10.720",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 12,
+                  "peak_mib": 9702,
+                  "peak_delta_mib": 7639,
+                  "mean_utilization_percent": 49.9,
+                  "peak_utilization_percent": 82
+                }
+              },
+              {
+                "wall_seconds": 2.7315,
+                "audio_seconds": 9.92,
+                "rtf": 0.2753,
+                "bytes": 952364,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.920",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 12,
+                  "peak_mib": 9705,
+                  "peak_delta_mib": 7642,
+                  "mean_utilization_percent": 37.6,
+                  "peak_utilization_percent": 84
+                }
+              },
+              {
+                "wall_seconds": 2.4368,
+                "audio_seconds": 8.96,
+                "rtf": 0.272,
+                "bytes": 860204,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "8.960",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 11,
+                  "peak_mib": 9705,
+                  "peak_delta_mib": 7642,
+                  "mean_utilization_percent": 58.3,
+                  "peak_utilization_percent": 85
+                }
+              },
+              {
+                "wall_seconds": 2.2976,
+                "audio_seconds": 9.12,
+                "rtf": 0.2519,
+                "bytes": 875564,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "9.120",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 11,
+                  "peak_mib": 9668,
+                  "peak_delta_mib": 7605,
+                  "mean_utilization_percent": 52.0,
+                  "peak_utilization_percent": 84
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 2.7466,
+              "wall_p95_seconds": 3.0368,
+              "wall_mean_seconds": 2.6979,
+              "rtf_median": 0.2788,
+              "rtf_p95": 0.3045,
+              "rtf_mean": 0.2796,
+              "audio_mean_seconds": 9.648,
+              "gpu_peak_mib": 9705,
+              "gpu_peak_delta_mib": 7642,
+              "gpu_mean_utilization_percent": 48.1
+            },
+            "container_memory_after": {
+              "current_mib": 2692.4,
+              "peak_mib": 2701.8
+            }
+          },
+          {
+            "code": "MN",
+            "label": "designed_norwegian",
+            "description": "Norwegian generation with the same fixed voice-design instruction.",
+            "payload": {
+              "language": "Norwegian",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "Denne testen måler hvor raskt modellen lager tydelig norsk tale med de samme innstillingene.",
+              "control": "warm adult female narrator, clear and friendly"
+            },
+            "warmups": [
+              {
+                "wall_seconds": 1.4953,
+                "audio_seconds": 5.44,
+                "rtf": 0.2749,
+                "bytes": 522284,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.440",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 9548,
+                  "peak_delta_mib": 7485,
+                  "mean_utilization_percent": 44.3,
+                  "peak_utilization_percent": 78
+                }
+              },
+              {
+                "wall_seconds": 1.4264,
+                "audio_seconds": 4.64,
+                "rtf": 0.3074,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 9548,
+                  "peak_delta_mib": 7485,
+                  "mean_utilization_percent": 46.6,
+                  "peak_utilization_percent": 81
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 1.5716,
+                "audio_seconds": 5.92,
+                "rtf": 0.2655,
+                "bytes": 568364,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.920",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 8,
+                  "peak_mib": 9515,
+                  "peak_delta_mib": 7452,
+                  "mean_utilization_percent": 30.6,
+                  "peak_utilization_percent": 85
+                }
+              },
+              {
+                "wall_seconds": 1.5992,
+                "audio_seconds": 5.92,
+                "rtf": 0.2701,
+                "bytes": 568364,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.920",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 8,
+                  "peak_mib": 9523,
+                  "peak_delta_mib": 7460,
+                  "mean_utilization_percent": 51.0,
+                  "peak_utilization_percent": 82
+                }
+              },
+              {
+                "wall_seconds": 2.0514,
+                "audio_seconds": 7.36,
+                "rtf": 0.2787,
+                "bytes": 706604,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "7.360",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 10,
+                  "peak_mib": 9516,
+                  "peak_delta_mib": 7453,
+                  "mean_utilization_percent": 44.4,
+                  "peak_utilization_percent": 77
+                }
+              },
+              {
+                "wall_seconds": 2.163,
+                "audio_seconds": 5.6,
+                "rtf": 0.3862,
+                "bytes": 537644,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.600",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 8,
+                  "peak_mib": 9516,
+                  "peak_delta_mib": 7453,
+                  "mean_utilization_percent": 28.1,
+                  "peak_utilization_percent": 73
+                }
+              },
+              {
+                "wall_seconds": 1.4104,
+                "audio_seconds": 5.12,
+                "rtf": 0.2755,
+                "bytes": 491564,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.120",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 9516,
+                  "peak_delta_mib": 7453,
+                  "mean_utilization_percent": 47.6,
+                  "peak_utilization_percent": 84
+                }
+              },
+              {
+                "wall_seconds": 1.3455,
+                "audio_seconds": 4.64,
+                "rtf": 0.29,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 9516,
+                  "peak_delta_mib": 7453,
+                  "mean_utilization_percent": 44.3,
+                  "peak_utilization_percent": 79
+                }
+              },
+              {
+                "wall_seconds": 1.2764,
+                "audio_seconds": 5.12,
+                "rtf": 0.2493,
+                "bytes": 491564,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.120",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9626,
+                  "peak_delta_mib": 7563,
+                  "mean_utilization_percent": 51.3,
+                  "peak_utilization_percent": 79
+                }
+              },
+              {
+                "wall_seconds": 1.3508,
+                "audio_seconds": 4.48,
+                "rtf": 0.3015,
+                "bytes": 430124,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.480",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9954,
+                  "peak_delta_mib": 7891,
+                  "mean_utilization_percent": 57.0,
+                  "peak_utilization_percent": 83
+                }
+              },
+              {
+                "wall_seconds": 1.4682,
+                "audio_seconds": 5.12,
+                "rtf": 0.2868,
+                "bytes": 491564,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.120",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 9966,
+                  "peak_delta_mib": 7903,
+                  "mean_utilization_percent": 44.9,
+                  "peak_utilization_percent": 76
+                }
+              },
+              {
+                "wall_seconds": 1.5586,
+                "audio_seconds": 5.92,
+                "rtf": 0.2633,
+                "bytes": 568364,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "5.920",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 9939,
+                  "peak_delta_mib": 7876,
+                  "mean_utilization_percent": 37.1,
+                  "peak_utilization_percent": 84
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 1.5134,
+              "wall_p95_seconds": 2.1128,
+              "wall_mean_seconds": 1.5795,
+              "rtf_median": 0.2771,
+              "rtf_p95": 0.3481,
+              "rtf_mean": 0.2867,
+              "audio_mean_seconds": 5.52,
+              "gpu_peak_mib": 9966,
+              "gpu_peak_delta_mib": 7903,
+              "gpu_mean_utilization_percent": 43.6
+            },
+            "container_memory_after": {
+              "current_mib": 2697.6,
+              "peak_mib": 2701.8
+            }
+          },
+          {
+            "code": "CR",
+            "label": "reference_clone",
+            "description": "English zero-shot clone with the same reference audio mounted into both containers.",
+            "payload": {
+              "language": "English",
+              "device": "cuda:0",
+              "output_format": "wav",
+              "cfg_value": 2.0,
+              "inference_timesteps": 10,
+              "normalize": false,
+              "denoise": false,
+              "text": "This sample checks how quickly the model can carry a reference voice into a new sentence.",
+              "ref_audio": "/benchmark/original_clone.mp3"
+            },
+            "warmups": [
+              {
+                "wall_seconds": 11.6984,
+                "audio_seconds": 4.64,
+                "rtf": 2.5212,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 51,
+                  "peak_mib": 9939,
+                  "peak_delta_mib": 7876,
+                  "mean_utilization_percent": 9.9,
+                  "peak_utilization_percent": 83
+                }
+              },
+              {
+                "wall_seconds": 1.2175,
+                "audio_seconds": 4.32,
+                "rtf": 0.2818,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9625,
+                  "peak_delta_mib": 7562,
+                  "mean_utilization_percent": 54.0,
+                  "peak_utilization_percent": 81
+                }
+              }
+            ],
+            "measurements": [
+              {
+                "wall_seconds": 1.236,
+                "audio_seconds": 4.48,
+                "rtf": 0.2759,
+                "bytes": 430124,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.480",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9587,
+                  "peak_delta_mib": 7524,
+                  "mean_utilization_percent": 53.3,
+                  "peak_utilization_percent": 83
+                }
+              },
+              {
+                "wall_seconds": 1.3923,
+                "audio_seconds": 4.96,
+                "rtf": 0.2807,
+                "bytes": 476204,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.960",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 7,
+                  "peak_mib": 10009,
+                  "peak_delta_mib": 7946,
+                  "mean_utilization_percent": 35.0,
+                  "peak_utilization_percent": 77
+                }
+              },
+              {
+                "wall_seconds": 1.1741,
+                "audio_seconds": 4.48,
+                "rtf": 0.2621,
+                "bytes": 430124,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.480",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9585,
+                  "peak_delta_mib": 7522,
+                  "mean_utilization_percent": 45.7,
+                  "peak_utilization_percent": 77
+                }
+              },
+              {
+                "wall_seconds": 1.303,
+                "audio_seconds": 4.64,
+                "rtf": 0.2808,
+                "bytes": 445484,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.640",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9639,
+                  "peak_delta_mib": 7576,
+                  "mean_utilization_percent": 53.3,
+                  "peak_utilization_percent": 79
+                }
+              },
+              {
+                "wall_seconds": 1.2046,
+                "audio_seconds": 4.32,
+                "rtf": 0.2788,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9601,
+                  "peak_delta_mib": 7538,
+                  "mean_utilization_percent": 53.0,
+                  "peak_utilization_percent": 80
+                }
+              },
+              {
+                "wall_seconds": 1.2173,
+                "audio_seconds": 4.32,
+                "rtf": 0.2818,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9639,
+                  "peak_delta_mib": 7576,
+                  "mean_utilization_percent": 55.3,
+                  "peak_utilization_percent": 80
+                }
+              },
+              {
+                "wall_seconds": 1.2762,
+                "audio_seconds": 4.32,
+                "rtf": 0.2954,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9599,
+                  "peak_delta_mib": 7536,
+                  "mean_utilization_percent": 54.5,
+                  "peak_utilization_percent": 80
+                }
+              },
+              {
+                "wall_seconds": 1.2672,
+                "audio_seconds": 4.32,
+                "rtf": 0.2933,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9711,
+                  "peak_delta_mib": 7648,
+                  "mean_utilization_percent": 57.3,
+                  "peak_utilization_percent": 85
+                }
+              },
+              {
+                "wall_seconds": 1.3511,
+                "audio_seconds": 4.32,
+                "rtf": 0.3127,
+                "bytes": 414764,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.320",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9988,
+                  "peak_delta_mib": 7925,
+                  "mean_utilization_percent": 71.3,
+                  "peak_utilization_percent": 83
+                }
+              },
+              {
+                "wall_seconds": 1.1608,
+                "audio_seconds": 4.16,
+                "rtf": 0.279,
+                "bytes": 399404,
+                "sample_rate": 48000,
+                "channels": 1,
+                "response_duration": "4.160",
+                "response_model": "openbmb/VoxCPM2",
+                "gpu": {
+                  "samples": 6,
+                  "peak_mib": 9946,
+                  "peak_delta_mib": 7883,
+                  "mean_utilization_percent": 53.3,
+                  "peak_utilization_percent": 81
+                }
+              }
+            ],
+            "summary": {
+              "calls": 10,
+              "wall_median_seconds": 1.2516,
+              "wall_p95_seconds": 1.3738,
+              "wall_mean_seconds": 1.2583,
+              "rtf_median": 0.2807,
+              "rtf_p95": 0.3049,
+              "rtf_mean": 0.2841,
+              "audio_mean_seconds": 4.432,
+              "gpu_peak_mib": 10009,
+              "gpu_peak_delta_mib": 7946,
+              "gpu_mean_utilization_percent": 53.2
+            },
+            "container_memory_after": {
+              "current_mib": 3067.1,
+              "peak_mib": 3069.7
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

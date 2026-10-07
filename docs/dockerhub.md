@@ -1,6 +1,6 @@
-<p>
-  <a href="https://github.com/Hangry-Labs/VoxCPMTTS">
-    <img src="https://github.com/Hangry-Labs/VoxCPMTTS/raw/main/logo.jpg" alt="Hangry Labs VoxCPMTTS logo">
+<p align="center">
+  <a href="https://hangrylabs.app/">
+    <img src="https://github.com/Hangry-Labs/VoxCPMTTS/raw/main/assets/voxcpmtts_logo_horizontal.webp" alt="Hangry Labs VoxCPMTTS logo">
   </a>
 </p>
 
@@ -20,20 +20,20 @@ VoxCPM2 supports highly realistic voice cloning. Do not use this image for unaut
 - Project page: https://hangry-labs.github.io/VoxCPMTTS/examples/
 - Upstream VoxCPM project: https://github.com/OpenBMB/VoxCPM
 - Upstream model: https://huggingface.co/openbmb/VoxCPM2
-- Hangry Labs: https://nuggies.website/
+- Hangry Labs: https://hangrylabs.app/
 
 ## Quick Start
 
 Run with NVIDIA GPU support:
 
 ```bash
-docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 hangrylabs/voxcpmtts:latest
 ```
 
-Run on a specific GPU:
+Run on another physical GPU, for example index `1`:
 
 ```bash
-docker run -p 8808:8808 --gpus '"device=0"' hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=1 hangrylabs/voxcpmtts:latest
 ```
 
 Then open:
@@ -48,12 +48,10 @@ The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.49` gives the engine a budget 
 
 Nano-vLLM fixes the diffusion step count at engine startup. The image default is 10; set `VOXCPM_NANO_INFERENCE_TIMESTEPS` before startup to change it, and use the same value in API requests.
 
-The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face and ModelScope caches are warmed on first online use:
+The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face cache is warmed on first online use:
 
 ```bash
-docker run -p 8808:8808 --gpus all \
-  -v voxcpmtts_hf_cache:/app/.cache/huggingface \
-  hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface hangrylabs/voxcpmtts:latest_tiny
 ```
 
 ## What You Get
@@ -127,9 +125,16 @@ http://localhost:8808/tts/docs
 
 ## Image Tags
 
-- `latest` and `latest_tiny` follow the current development snapshot on `main`.
-- Fixed releases use `vX.Y` and `vX.Y_tiny` tags.
+- `latest` and `latest_tiny` are rolling development snapshots from `main`.
+- Immutable releases use `vX.Y` / `vX.Y.Z` and matching `_tiny` tags.
+- Release documentation pins Docker Hub's top-level OCI digest as `vX.Y@sha256:...` for reproducible deployment.
 - Every published tag is mirrored to `ghcr.io/hangry-labs/voxcpmtts`.
+
+Snapshot tags remain intentionally unpinned because they move with `main`. No immutable `v0.1` image has been published yet.
+
+## Measured Runtime
+
+The controlled 24-language baseline measured Nano-vLLM at `0.271` median real-time factor versus `1.134` for the native backend, a **4.19x speedup**, with comparable aggregate transcript fidelity. The complete methodology, raw results, VRAM measurements, and language tables are available in the [benchmark suite](https://github.com/Hangry-Labs/VoxCPMTTS/tree/main/benchmarks).
 
 ## Attribution
 
