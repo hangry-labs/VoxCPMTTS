@@ -25,7 +25,7 @@ FROM dependencies AS app-builder
 
 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION /app/
 COPY voxcpm /app/voxcpm
-COPY hangrylabs /app/hangrylabs
+COPY assets /app/assets
 
 RUN python -m pip install -e . --no-deps
 
@@ -76,7 +76,7 @@ FROM nano-dependencies AS nano-app-builder
 
 COPY README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION /app/
 COPY voxcpm /app/voxcpm
-COPY hangrylabs /app/hangrylabs
+COPY assets /app/assets
 
 FROM nano-dependencies AS nano-asset-builder
 
