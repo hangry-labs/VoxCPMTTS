@@ -4,7 +4,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
-    SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0 \
     HF_HOME=/app/.cache/huggingface \
     MODELSCOPE_CACHE=/app/.cache/modelscope \
     VOXCPM_PREFETCH_DENOISER=1 \
@@ -74,9 +73,11 @@ RUN python /tmp/patch-nanovllm-voxcpm.py
 
 FROM nano-dependencies AS nano-app-builder
 
-COPY README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION /app/
+COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION /app/
 COPY voxcpm /app/voxcpm
 COPY assets /app/assets
+
+RUN python -m pip install -e . --no-deps
 
 FROM nano-dependencies AS nano-asset-builder
 

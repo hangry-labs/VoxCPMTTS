@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=64", "wheel", "setuptools_scm>=8"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "voxcpm"
-dynamic = ["version"]
+version = "1.0.0.dev0"
 description = "Hangry Labs Docker-first runtime packaging for VoxCPM2 text-to-speech"
 readme = "README.md"
 license = "Apache-2.0"
@@ -16,7 +16,6 @@ maintainers = [
 ]
 keywords = ["voxcpm", "text-to-speech", "tts", "speech-synthesis", "voice-cloning", "deep-learning", "pytorch"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -47,7 +46,6 @@ dependencies = [
     "funasr",
     "spaces",
     "safetensors",
-
 ]
 
 [project.optional-dependencies]
@@ -83,9 +81,6 @@ include = ["voxcpm*"]
     "static/vendor/wavesurfer/LICENSE",
     "static/vendor/wavesurfer/plugins/*.js",
 ]
-
-[tool.setuptools_scm]
-version_scheme = "post-release"
 
 [tool.black]
 line-length = 120

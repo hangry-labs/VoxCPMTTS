@@ -21,30 +21,55 @@ function Set-Text {
     [System.IO.File]::WriteAllText($resolved, $Text, $encoding)
 }
 
+function Convert-ToPackageVersion {
+    param([string]$Version)
+    if ($Version -match '^\d+\.\d+$') {
+        return "$Version.0"
+    }
+    if ($Version -match '^\d+\.\d+\.\d+$') {
+        return $Version
+    }
+    throw "Release version '$Version' must look like 1.0 or 1.0.0."
+}
+
 function Get-NextSnapshot {
     param([string]$Version)
     if ($Version -match '^(\d+)\.(\d+)$') {
-        $major = [int]$Matches[1]
-        $minor = [int]$Matches[2] + 1
-        return "$major.$minor-snapshot"
+        return "$($Matches[1]).$([int]$Matches[2] + 1)-snapshot"
     }
     if ($Version -match '^(\d+)\.(\d+)\.(\d+)$') {
-        $major = [int]$Matches[1]
-        $minor = [int]$Matches[2] + 1
-        return "$major.$minor-snapshot"
+        return "$($Matches[1]).$([int]$Matches[2] + 1)-snapshot"
     }
     throw "Cannot infer next snapshot from '$Version'. Pass NEXT_VERSION=..."
 }
 
-function Invoke-Step {
-    param(
-        [string]$Description,
-        [scriptblock]$Action
-    )
-    Write-Host "==> $Description"
-    if (-not (Test-Enabled $DryRun)) {
-        & $Action
+function Get-ProjectVersion {
+    param([string]$Text)
+    $match = [regex]::Match($Text, '(?m)^version = "([^"]+)"$')
+    if (-not $match.Success) {
+        throw "pyproject.toml must contain one explicit project version."
     }
+    return $match.Groups[1].Value
+}
+
+function Set-ProjectVersion {
+    param(
+        [string]$Text,
+        [string]$Version
+    )
+    return [regex]::Replace($Text, '(?m)^version = "[^"]+"$', "version = `"$Version`"")
+}
+
+function Update-DockerImageTags {
+    param(
+        [string]$Text,
+        [string]$ReleaseTag
+    )
+    return [regex]::Replace(
+        $Text,
+        'hangrylabs/voxcpmtts:(?:latest|v\d+\.\d+(?:\.\d+)?)(_tiny)?(?:@sha256:[0-9a-f]{64})?',
+        { param($match) "hangrylabs/voxcpmtts:$ReleaseTag$($match.Groups[1].Value)" }
+    )
 }
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
@@ -56,11 +81,13 @@ if (-not (Test-Path -LiteralPath "VERSION")) {
 
 $snapshotVersion = (Get-Content -Raw -LiteralPath "VERSION").Trim()
 if ($snapshotVersion -notmatch '^(\d+\.\d+(?:\.\d+)?)-snapshot$') {
-    throw "VERSION must be a snapshot version like 0.2-snapshot before release. Current: '$snapshotVersion'"
+    throw "VERSION must be a snapshot version like 1.0-snapshot before release. Current: '$snapshotVersion'"
 }
 
 $releaseVersion = $Matches[1]
 $releaseTag = "v$releaseVersion"
+$releasePackageVersion = Convert-ToPackageVersion $releaseVersion
+$snapshotPackageVersion = "$releasePackageVersion.dev0"
 
 if ([string]::IsNullOrWhiteSpace($NextVersion)) {
     $nextSnapshotVersion = Get-NextSnapshot $releaseVersion
@@ -69,12 +96,45 @@ if ([string]::IsNullOrWhiteSpace($NextVersion)) {
 }
 
 if ($nextSnapshotVersion -notmatch '^\d+\.\d+(?:\.\d+)?-snapshot$') {
-    throw "NextVersion must look like 0.3-snapshot or 0.3.0-snapshot. Current: '$nextSnapshotVersion'"
+    throw "NextVersion must look like 1.1-snapshot or 1.1.0-snapshot. Current: '$nextSnapshotVersion'"
 }
 
-$status = git status --porcelain -- . ":(exclude)todo"
+$nextReleaseBase = $nextSnapshotVersion -replace '-snapshot$', ''
+$nextPackageVersion = "$(Convert-ToPackageVersion $nextReleaseBase).dev0"
+
+$pyproject = Get-Content -Raw -LiteralPath "pyproject.toml"
+$currentPackageVersion = Get-ProjectVersion $pyproject
+if ($currentPackageVersion -ne $snapshotPackageVersion) {
+    throw "pyproject.toml version must be '$snapshotPackageVersion' for VERSION '$snapshotVersion'. Current: '$currentPackageVersion'"
+}
+
+$readme = Get-Content -Raw -LiteralPath "README.md"
+$snapshotHeading = "### v$releaseVersion Snapshot"
+if (-not $readme.Contains($snapshotHeading)) {
+    throw "README.md is missing the candidate heading '$snapshotHeading'."
+}
+
+$releasePyproject = Set-ProjectVersion $pyproject $releasePackageVersion
+$releaseReadme = $readme.Replace($snapshotHeading, "### $releaseTag")
+$releaseReadme = $releaseReadme.Replace(
+    "The current development snapshot is published through the rolling tags from ``main``:",
+    "The ``$releaseTag`` release is available through the immutable version tags:"
+)
+$releaseReadme = Update-DockerImageTags $releaseReadme $releaseTag
+
+$dockerHub = Get-Content -Raw -LiteralPath "docs/dockerhub.md"
+$releaseDockerHub = Update-DockerImageTags $dockerHub $releaseTag
+
+if ($releaseReadme.Contains($snapshotHeading) -or -not $releaseReadme.Contains("### $releaseTag")) {
+    throw "README.md release transformation did not promote the candidate heading."
+}
+if ((Get-ProjectVersion $releasePyproject) -ne $releasePackageVersion) {
+    throw "pyproject.toml release transformation did not produce '$releasePackageVersion'."
+}
+
+$status = git status --porcelain -- . ":(exclude)todo" ":(exclude).ai"
 if ($status -and -not (Test-Enabled $DryRun)) {
-    throw "Working tree outside todo/ must be clean before release. Commit or stash release-relevant changes first."
+    throw "Working tree outside .ai/ and todo/ must be clean before release. Commit or stash release-relevant changes first."
 }
 
 if (git rev-parse -q --verify "refs/tags/$releaseTag" 2>$null) {
@@ -83,38 +143,42 @@ if (git rev-parse -q --verify "refs/tags/$releaseTag" 2>$null) {
 
 Write-Host "Release version: $releaseVersion"
 Write-Host "Release tag:     $releaseTag"
+Write-Host "Package version: $releasePackageVersion"
 Write-Host "Next snapshot:   $nextSnapshotVersion"
+Write-Host "Next package:    $nextPackageVersion"
+Write-Host "==> Release document and version transformations validated in memory"
 
-Invoke-Step "Update docs for $releaseTag" {
-    Set-Text "VERSION" $releaseVersion
-
-    foreach ($doc in @("README.md", "docs/dockerhub.md")) {
-        if (Test-Path -LiteralPath $doc) {
-            $text = Get-Content -Raw -LiteralPath $doc
-            $text = $text -replace [regex]::Escape(":v$snapshotVersion"), ":$releaseTag"
-            $text = $text -replace [regex]::Escape(":$snapshotVersion"), ":$releaseTag"
-            Set-Text $doc $text
-        }
-    }
+if (Test-Enabled $DryRun) {
+    Write-Host "Dry run only: no files, builds, commits, or tags were changed."
+    exit 0
 }
 
-Invoke-Step "Run release validation" {
-    if (-not (Test-Enabled $SkipValidation)) {
-        python -m compileall -q voxcpm scripts
-        task image
-    }
+Write-Host "==> Update files for $releaseTag"
+Set-Text "VERSION" $releaseVersion
+Set-Text "pyproject.toml" $releasePyproject
+Set-Text "README.md" $releaseReadme
+Set-Text "docs/dockerhub.md" $releaseDockerHub
+
+if (-not (Test-Enabled $SkipValidation)) {
+    Write-Host "==> Run release validation"
+    python -m compileall -q voxcpm scripts
+    task image-tiny
+    task test
+    task image
 }
 
-Invoke-Step "Commit and tag $releaseTag" {
-    git add VERSION README.md docs/dockerhub.md
-    git commit -m "release: $releaseTag"
-    git tag -a $releaseTag -m "Release $releaseTag"
-}
+Write-Host "==> Commit and tag $releaseTag"
+git add VERSION pyproject.toml README.md docs/dockerhub.md
+git commit -m "release: $releaseTag"
+git tag -a $releaseTag -m "Release $releaseTag"
 
-Invoke-Step "Prepare $nextSnapshotVersion" {
-    Set-Text "VERSION" $nextSnapshotVersion
-    git add VERSION
-    git commit -m "chore: start $nextSnapshotVersion"
-}
+Write-Host "==> Prepare $nextSnapshotVersion"
+Set-Text "VERSION" $nextSnapshotVersion
+$nextPyproject = Set-ProjectVersion $releasePyproject $nextPackageVersion
+Set-Text "pyproject.toml" $nextPyproject
+git add VERSION pyproject.toml
+git commit -m "chore: start $nextSnapshotVersion"
 
-Write-Host "Release workflow complete."
+Write-Host "Release workflow complete. Commits and tag are local. Publish with:"
+Write-Host "  git push origin main"
+Write-Host "  git push origin $releaseTag"

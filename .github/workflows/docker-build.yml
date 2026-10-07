@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Optional Docker tag to publish, for example v0.2"
+        description: "Optional Docker tag to publish, for example v1.0"
         required: false
         type: string
       checkout_ref:

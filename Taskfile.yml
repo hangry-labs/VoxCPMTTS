@@ -58,9 +58,19 @@ tasks:
       - cmd /c python -m compileall -q voxcpm scripts
 
   test:
-    desc: Run checked-in tests only
+    desc: Run checked-in tests in an ephemeral CPU-only container
+    preconditions:
+      - sh: cmd /c docker image inspect {{.TINY_IMAGE}} ^>nul
+        msg: Run `task image-tiny` before `task test`.
     cmds:
-      - cmd /c python -m pytest -q voxcpm/tests
+      - >-
+        docker run --rm --entrypoint sh
+        -v "{{.TASKFILE_DIR}}\voxcpm:/workspace/voxcpm:ro"
+        -v "{{.TASKFILE_DIR}}\assets:/workspace/assets:ro"
+        -v "{{.TASKFILE_DIR}}\VERSION:/workspace/VERSION:ro"
+        -w /workspace
+        {{.TINY_IMAGE}}
+        -lc "python -m pip install --quiet --only-binary=:all: 'pytest>=8,<10' && python -m pytest -q voxcpm/tests"
 
   cli-help:
     desc: Show VoxCPM CLI help
@@ -207,7 +217,7 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.VOICE_DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.VOICE_DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.VOICE_DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   localrun-tiny:
@@ -217,7 +227,7 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
       - cmd /c docker volume create {{.VOICE_DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.VOICE_DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" {{.TINY_IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.VOICE_DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   imageweb:

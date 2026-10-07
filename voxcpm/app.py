@@ -11,6 +11,7 @@ import time
 import wave
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Any, Optional
 
@@ -34,7 +35,10 @@ def _read_version() -> str:
     version_path = Path(__file__).resolve().parents[1] / "VERSION"
     if version_path.exists():
         return version_path.read_text(encoding="utf-8").strip()
-    return "0.1-snapshot"
+    try:
+        return package_version("voxcpm")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 DEFAULT_MODEL_ID = os.getenv("VOXCPM_MODEL_ID", "openbmb/VoxCPM2")

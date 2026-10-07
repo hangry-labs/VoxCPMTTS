@@ -199,11 +199,13 @@ This repository is validated primarily through Docker:
 task --list
 task doctor
 task compile
+task image-tiny
+task test
 task image
 task imagerun
 ```
 
-`task image` builds the full baked image. `task imagerun` runs it without an external model-cache mount so the image proves its baked assets. `task image-tiny` and `task imagerun-tiny` cover the online first-use cache workflow. All Docker dependency installs require binary wheels.
+`task image-tiny` prepares the test/runtime base, and `task test` runs the checked-in suite in an ephemeral CPU-only container based on that image. `task image` builds the full baked image. `task imagerun` runs it without an external model-cache mount so the image proves its baked assets. `task imagerun-tiny` covers the online first-use cache workflow. All Docker dependency installs require binary wheels.
 
 Hot-swap local package code into the selected image without rebuilding:
 
@@ -220,7 +222,7 @@ task release DRY_RUN=1
 task release
 ```
 
-The release task requires a snapshot `VERSION` such as `0.1-snapshot`, validates a full baked image build, creates the local release commit and annotated `vX.Y` tag, and prepares the next minor snapshot commit. After review and push, GitHub Actions publishes matching full and tiny tags to Docker Hub and GHCR. Creating the public GitHub Release and recording Docker Hub's top-level OCI digests in the release notes remain deliberate post-publish steps.
+The release task requires a snapshot `VERSION` such as `1.0-snapshot`, validates the tiny image, checked-in tests, and full baked image, creates the local release commit and annotated `vX.Y` tag, and prepares the next minor snapshot commit. After review and push, GitHub Actions publishes matching full and tiny tags to Docker Hub and GHCR. Creating the public GitHub Release and recording Docker Hub's top-level OCI digests in the release notes remain deliberate post-publish steps.
 
 ## Upstream Project
 
@@ -248,11 +250,12 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
-### v0.1 Snapshot
+### v1.0 Snapshot
 
 - Promoted the VoxCPM2 Nano-vLLM backend to the standard runtime with CUDA graph acceleration and ten-step generation.
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
 - Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
+- Added persistent voice profiles shared by generation and cloning, drag-and-drop reference audio, truthful generation stages, live streaming output, recording waveforms, and persistent playback volume.
 - Added one-instance model caching, serialized generation, compile-worker limits, and reference-latent allocator cleanup to prevent duplicate weights and repeated-request RAM/VRAM growth.
 - Added 30-language public examples with voice-variety, translated introduction, and cross-language clone samples.
 - Added the controlled native-versus-Nano baseline suite covering generation speed, VRAM, container RAM, and Qwen3-ASR transcript fidelity across 24 common languages.
@@ -274,7 +277,7 @@ docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e 
 docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
 ```
 
-No immutable `v0.1` image has been published yet. After publication and validation, this section must be updated with the exact `v0.1@sha256:...` and `v0.1_tiny@sha256:...` Docker Hub references before the GitHub Release is announced.
+No immutable `v1.0` image has been published yet. After publication and validation, this section must be updated with the exact `v1.0@sha256:...` and `v1.0_tiny@sha256:...` Docker Hub references before the GitHub Release is announced.
 
 ## Responsible Use And Privacy
 

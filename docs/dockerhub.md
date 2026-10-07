@@ -66,7 +66,7 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 - GPU support when Docker/NVIDIA support is available
 - Nano-vLLM inference with a single cached GPU engine
 - Offline-friendly usage with the standard full image once it is available locally
-- Kokoro-shaped compatibility fields such as `voice`, `use_gpu`, `/tts/voices`, `/tts/speakers`, `/tts/stream-formats`, and `/tts/stream`
+- Common TTS compatibility fields such as `voice`, `use_gpu`, `/tts/voices`, `/tts/speakers`, `/tts/stream-formats`, and `/tts/stream`
 
 ## API Example
 
@@ -141,7 +141,7 @@ http://localhost:8808/tts/docs
 - Release documentation pins Docker Hub's top-level OCI digest as `vX.Y@sha256:...` for reproducible deployment.
 - Every published tag is mirrored to `ghcr.io/hangry-labs/voxcpmtts`.
 
-Snapshot tags remain intentionally unpinned because they move with `main`. No immutable `v0.1` image has been published yet.
+Snapshot tags remain intentionally unpinned because they move with `main`. No immutable `v1.0` image has been published yet.
 
 ## Measured Runtime
 
