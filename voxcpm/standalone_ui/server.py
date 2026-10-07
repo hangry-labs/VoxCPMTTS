@@ -52,9 +52,10 @@ def attach_ui(*, api_app: FastAPI) -> FastAPI:
     @api_app.middleware("http")
     async def disable_development_asset_cache(request, call_next):
         response = await call_next(request)
-        if development_assets and (
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store" if development_assets else "no-cache"
+        elif development_assets and (
             request.url.path == "/"
-            or request.url.path.startswith("/static/")
             or request.url.path.startswith("/assets/")
         ):
             response.headers["Cache-Control"] = "no-store"

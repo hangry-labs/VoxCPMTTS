@@ -19,9 +19,10 @@ async function convertToWav(blob) {
 }
 
 export class AudioRecorder {
-  constructor({ button, status, onFile, onError, labels }) {
+  constructor({ button, status, canvas = null, onFile, onError, labels }) {
     this.button = button
     this.status = status
+    this.canvas = canvas
     this.onFile = onFile
     this.onError = onError
     this.labels = labels
@@ -30,6 +31,7 @@ export class AudioRecorder {
     this.chunks = []
     this.startedAt = 0
     this.timer = null
+    this.animationFrame = null
 
     this.button.addEventListener('click', () => this.toggle())
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder || !window.AudioContext) {
@@ -37,6 +39,7 @@ export class AudioRecorder {
       this.status.textContent = this.labels.unavailable
       this.button.title = this.labels.unavailable
     }
+    this.clearCanvas()
   }
 
   setButton(recording, busy = false) {
@@ -68,6 +71,15 @@ export class AudioRecorder {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       })
+      if (this.canvas) {
+        this.audioContext = new AudioContext()
+        this.source = this.audioContext.createMediaStreamSource(this.stream)
+        this.analyser = this.audioContext.createAnalyser()
+        this.analyser.fftSize = 2048
+        this.source.connect(this.analyser)
+        await this.audioContext.resume()
+        this.draw()
+      }
       this.chunks = []
       this.recorder = new MediaRecorder(this.stream)
       this.recorder.addEventListener('dataavailable', (event) => {
@@ -110,12 +122,61 @@ export class AudioRecorder {
     window.clearInterval(this.timer)
     this.timer = null
     this.stream?.getTracks().forEach((track) => track.stop())
+    cancelAnimationFrame(this.animationFrame)
+    this.source?.disconnect()
+    if (this.audioContext?.state !== 'closed') this.audioContext?.close().catch(() => {})
+    this.audioContext = null
+    this.source = null
+    this.analyser = null
+    this.animationFrame = null
     this.stream = null
     this.recorder = null
     this.chunks = []
+    this.clearCanvas()
+  }
+
+  draw() {
+    if (!this.canvas || !this.analyser) return
+    const context = this.canvas.getContext('2d')
+    const values = new Uint8Array(this.analyser.fftSize)
+    this.analyser.getByteTimeDomainData(values)
+    const ratio = window.devicePixelRatio || 1
+    const width = this.canvas.width = Math.max(1, Math.round(this.canvas.clientWidth * ratio))
+    const height = this.canvas.height = Math.max(1, Math.round(this.canvas.clientHeight * ratio))
+    context.clearRect(0, 0, width, height)
+    context.strokeStyle = '#ff7a1a'
+    context.lineWidth = 2 * ratio
+    context.beginPath()
+    values.forEach((value, index) => {
+      const x = index / (values.length - 1) * width
+      const y = value / 255 * height
+      if (index === 0) context.moveTo(x, y)
+      else context.lineTo(x, y)
+    })
+    context.stroke()
+    this.animationFrame = requestAnimationFrame(() => this.draw())
+  }
+
+  clearCanvas() {
+    if (!this.canvas) return
+    const context = this.canvas.getContext('2d')
+    const ratio = window.devicePixelRatio || 1
+    const width = this.canvas.width = Math.max(1, Math.round(this.canvas.clientWidth * ratio))
+    const height = this.canvas.height = Math.max(1, Math.round(this.canvas.clientHeight * ratio))
+    context.clearRect(0, 0, width, height)
+    context.strokeStyle = '#393b43'
+    context.lineWidth = ratio
+    context.beginPath()
+    context.moveTo(0, height / 2)
+    context.lineTo(width, height / 2)
+    context.stroke()
   }
 
   stop() {
     if (this.recorder?.state === 'recording') this.recorder.stop()
+  }
+
+  refresh() {
+    if (this.recorder?.state !== 'recording') this.clearCanvas()
   }
 }

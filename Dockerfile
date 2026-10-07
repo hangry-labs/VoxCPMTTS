@@ -124,6 +124,7 @@ ENV VOXCPMTTS_BUILD_DATE="${BUILD_DATE}" \
     BUILD_ID="${BUILD_DATE}@${VCS_REF}"
 
 EXPOSE 8808
+VOLUME ["/app/persistent"]
 
 CMD ["python", "-u", "-m", "voxcpm.app"]
 

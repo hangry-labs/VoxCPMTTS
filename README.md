@@ -13,6 +13,7 @@ This Hangry Labs fork is made for local use without the usual Python environment
 ## What This Project Provides
 
 - A browser UI for voice design, voice cloning, and transcript-guided cloning
+- Persistent saved voices that can be reused across Generate, Clone, and Stream
 - An HTTP API for applications and local integrations
 - Multilingual generation across 30 VoxCPM2 languages
 - WAV, MP3, FLAC, and OGG output
@@ -41,10 +42,12 @@ Hangry Labs home: [hangrylabs.app](https://hangrylabs.app/).
 Run the full image on the first visible NVIDIA GPU:
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
 ```
 
 Then open **[http://localhost:8808](http://localhost:8808)**. Interactive API documentation is available at **[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)**.
+
+The `voxcpmtts_data` volume stores saved voice profiles and their reference audio across container replacement.
 
 To select another physical GPU, change `CUDA_VISIBLE_DEVICES`. Keep one VoxCPMTTS model-serving container per GPU.
 
@@ -55,7 +58,7 @@ The full image contains its pinned VoxCPM2 model assets. After the image is pull
 Use `latest_tiny` when you want the runtime dependencies in the image but prefer the model to download into a persistent volume on first online use:
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
 ```
 
 Later tiny-image versions can reuse the same `voxcpmtts_hf_cache` volume. The full image does not require this volume.
@@ -119,7 +122,7 @@ curl -X POST "http://localhost:8808/tts/generate" \
 Mount a reference directory when using container-local cloning paths:
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v "$(pwd)/samples:/data:ro" hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v "$(pwd)/samples:/data:ro" -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
 ```
 
 ```bash
@@ -138,6 +141,15 @@ curl -X POST "http://localhost:8808/tts/generate" \
   -o guided.mp3
 ```
 
+Progressive MP3 streaming begins returning encoded model chunks before synthesis finishes:
+
+```bash
+curl --no-buffer -X POST "http://localhost:8808/tts/stream" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"This audio is generated and played progressively.","stream_format":"mp3"}' \
+  -o streamed.mp3
+```
+
 Cheap process health check:
 
 ```bash
@@ -147,6 +159,8 @@ curl http://localhost:8808/tts/ping
 Runtime discovery is available from the local API:
 
 - Status and loaded backend: `GET /tts/status`
+- Current generation stage: `GET /tts/activity`
+- Saved voices: `GET`, `POST`, and `DELETE /tts/voice-profiles`
 - Supported languages: `GET /tts/languages`
 - Output formats: `GET /tts/formats`
 - Interactive API reference: `GET /tts/docs`
@@ -238,7 +252,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 
 - Promoted the VoxCPM2 Nano-vLLM backend to the standard runtime with CUDA graph acceleration and ten-step generation.
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
-- Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, streaming compatibility, GPU telemetry, model status, and model purge.
+- Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
 - Added one-instance model caching, serialized generation, compile-worker limits, and reference-latent allocator cleanup to prevent duplicate weights and repeated-request RAM/VRAM growth.
 - Added 30-language public examples with voice-variety, translated introduction, and cross-language clone samples.
 - Added the controlled native-versus-Nano baseline suite covering generation speed, VRAM, container RAM, and Qwen3-ASR transcript fidelity across 24 common languages.
@@ -251,13 +265,13 @@ The current development snapshot is published through the rolling tags from `mai
 **Full image**
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
 ```
 
 **Tiny image**
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
 ```
 
 No immutable `v0.1` image has been published yet. After publication and validation, this section must be updated with the exact `v0.1@sha256:...` and `v0.1_tiny@sha256:...` Docker Hub references before the GitHub Release is announced.

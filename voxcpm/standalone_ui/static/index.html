@@ -24,7 +24,7 @@
       <span class="powered-label">Powered by</span>
       <img class="labs-logo" src="/assets/hangrylabs_logo.webp" alt="Hangry Labs">
     </a>
-    <img class="collapsed-mascot" src="/assets/voxcpmtts_badge.webp" alt="VoxCPMTTS mascot">
+    <img class="collapsed-mascot" src="/assets/voxcpmtts_mascot.webp" alt="VoxCPMTTS mascot">
     <nav class="brand-nav" aria-label="Application links">
       <div class="brand-links">
         <a class="primary-link" href="https://hangry-labs.github.io/VoxCPMTTS/examples/" target="_blank" rel="noreferrer"><i class="icon-sparkles"></i><span>Examples</span></a>
@@ -39,14 +39,16 @@
     <div class="runtime-badge" id="runtime-badge" data-state="starting">
       <i class="icon-activity"></i>
       <div class="runtime-copy"><strong id="runtime-state">Inference starting</strong><span id="runtime-model">Waiting for inference service</span></div>
-      <a class="runtime-version" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" title="Open VoxCPMTTS releases">UI v{{UI_VERSION}}</a>
+      <a class="runtime-version" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" title="Open VoxCPMTTS releases">v{{UI_VERSION}}</a>
     </div>
     <button class="hero-toggle" id="hero-toggle" type="button" aria-controls="brand-hero" aria-expanded="true" aria-label="Collapse header" title="Collapse header"><i class="icon-chevron-up"></i></button>
   </header>
 
   <div class="app-tabs" role="tablist" aria-label="Workspace views">
     <button class="tab-button active" type="button" role="tab" aria-selected="true" data-tab="generate">Generate</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="clone">Clone</button>
     <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="stream">Stream</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="voices">Voices</button>
     <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="api">API</button>
     <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="system">System</button>
   </div>
@@ -54,15 +56,8 @@
   <main class="workspace" data-view="generate">
     <aside class="settings-panel workflow-only" id="inference-settings">
       <div class="section-title"><i class="icon-sliders-horizontal"></i><span>Voice setup</span></div>
-      <label class="field"><span>Voice mode</span>
-        <select id="voice-mode">
-          <option value="natural">Natural voice</option>
-          <option value="design">Voice design</option>
-          <option value="clone">Reference clone</option>
-          <option value="guided">Transcript-guided clone</option>
-        </select>
-      </label>
       <label class="field"><span>Language</span><select id="language"><option value="English">English</option></select></label>
+      <label class="field"><span>Saved voice</span><select id="voice-profile"><option value="">None</option></select><small id="voice-profile-note">Use a saved design or clone sample</small></label>
       <div class="field-grid">
         <label class="field"><span>Hardware</span><select id="device"><option value="auto">Auto</option><option value="cpu">CPU</option></select></label>
         <label class="field"><span>Output format</span><select id="output-format"><option value="mp3">MP3</option></select></label>
@@ -87,35 +82,58 @@
           <div class="composer-actions"><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span>New sample</span></button></div>
         </div>
         <textarea id="text-input" rows="7" spellcheck="true" aria-label="Text to synthesize">VoxCPM2 generates natural multilingual speech with voice design and cloning.</textarea>
-      </section>
-
-      <section class="conditioning-panel workflow-only" id="design-panel" hidden>
-        <div class="section-title"><i class="icon-sparkles"></i><span>Voice design</span></div>
-        <label class="field"><span>Voice description</span><textarea id="control-input" rows="3" placeholder="A calm, warm narrator with clear pacing"></textarea></label>
-      </section>
-
-      <section class="conditioning-panel workflow-only" id="clone-panel" hidden>
-        <div class="section-title"><i class="icon-mic"></i><span>Reference voice</span></div>
-        <div class="reference-source-grid">
-          <label class="file-drop" id="reference-audio-drop"><input id="reference-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"><i class="icon-upload"></i><span>Choose or drop reference audio</span><small id="reference-audio-name">WAV, MP3, FLAC, OGG, or M4A</small></label>
-          <div class="microphone-capture"><div><i class="icon-mic"></i><strong>Microphone</strong><small>Record a reference sample</small></div><span class="record-state" id="reference-record-state" aria-live="polite">Ready to record</span><button class="record-button" id="reference-record-toggle" type="button" aria-pressed="false"><i class="icon-mic"></i><span>Record</span></button></div>
-        </div>
-        <section class="reference-audio-preview" id="reference-audio-preview" aria-live="polite"></section>
-        <div id="guided-fields" hidden>
-          <label class="field"><span>Reference transcript</span><textarea id="reference-text" rows="4" placeholder="Enter exactly what is spoken in the reference audio"></textarea></label>
-          <button class="secondary-button" id="transcribe-reference" type="button"><i class="icon-message-square-text"></i><span>Transcribe reference</span></button>
-        </div>
+        <details class="voice-design-details" id="voice-design-details">
+          <summary><span><i class="icon-sparkles"></i>Design your voice here</span><span class="conditioning-state" id="voice-design-state">Optional</span></summary>
+          <label class="field"><span>Voice description</span><textarea id="control-input" rows="3" placeholder="A calm, warm narrator with clear pacing"></textarea></label>
+          <div class="inline-save-row"><button class="secondary-button" id="save-designed-voice" type="button" disabled><i class="icon-check"></i><span>Save designed voice</span></button></div>
+        </details>
       </section>
 
       <div class="tab-panel" data-panel="generate">
         <div class="generate-action-row"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span>Generate audio</span></button></div>
+        <div class="inference-progress" id="generate-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong>Preparing request</strong><span>VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
         <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Generated audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="generate-output" aria-live="polite"></section></section>
+      </div>
+
+      <div class="tab-panel" data-panel="clone" hidden>
+        <section class="conditioning-panel" id="clone-panel">
+          <div class="section-title"><i class="icon-mic"></i><span>Reference voice</span></div>
+          <div class="reference-source-grid">
+            <label class="file-drop" id="reference-audio-drop"><input id="reference-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"><i class="icon-upload"></i><span>Choose or drop reference audio</span><small id="reference-audio-name">WAV, MP3, FLAC, OGG, or M4A</small></label>
+            <div class="microphone-capture"><div><i class="icon-mic"></i><strong>Microphone</strong><small>Record a reference sample</small></div><canvas class="recording-wave" id="reference-record-wave" aria-label="Live microphone waveform"></canvas><span class="record-state" id="reference-record-state" aria-live="polite">Ready to record</span><button class="record-button" id="reference-record-toggle" type="button" aria-pressed="false"><i class="icon-mic"></i><span>Record</span></button></div>
+          </div>
+          <section class="reference-audio-preview" id="reference-audio-preview" aria-live="polite"></section>
+          <div class="clone-guidance-grid">
+            <label class="field"><span>Reference transcript <small>Optional</small></span><textarea id="reference-text" rows="4" placeholder="Enter exactly what is spoken in the reference audio"></textarea></label>
+            <label class="field"><span>Clone direction <small id="clone-direction-state">Optional</small></span><textarea id="clone-control-input" rows="4" placeholder="Warm, measured delivery with a clear tone"></textarea></label>
+          </div>
+          <div class="clone-command-row"><button class="secondary-button" id="transcribe-reference" type="button"><i class="icon-message-square-text"></i><span>Transcribe reference</span></button><button class="secondary-button" id="save-cloned-voice" type="button" disabled><i class="icon-check"></i><span>Save reference voice</span></button></div>
+        </section>
+        <div class="generate-action-row"><button class="primary-button" id="clone-button" type="button"><i class="icon-audio-lines"></i><span>Generate cloned audio</span></button></div>
+        <div class="inference-progress" id="clone-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong>Preparing request</strong><span>VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Cloned audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="clone-output" aria-live="polite"></section></section>
       </div>
 
       <div class="tab-panel" data-panel="stream" hidden>
         <div class="generate-action-row"><button class="primary-button" id="stream-start" type="button"><i class="icon-radio"></i><span>Start stream</span></button><button class="secondary-button stop-button" id="stream-stop" type="button" disabled>Stop</button></div>
         <div class="stream-progress" id="stream-progress" hidden><span></span></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-radio"></i><span>Stream output</span></div></div><section id="stream-output" aria-live="polite"></section></section>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-radio"></i><span>Stream output</span></div></div><div class="live-stream-surface" id="stream-live" hidden><canvas id="stream-live-wave" aria-label="Live streamed audio waveform"></canvas><div><strong id="stream-live-state">Waiting for audio</strong><span id="stream-live-detail">0 KiB buffered</span></div></div><section id="stream-output" aria-live="polite"></section></section>
+      </div>
+
+      <div class="tab-panel" data-panel="voices" hidden>
+        <div class="view-heading"><div><h2>Voices</h2><p>Reusable designs and reference voices stored in the persistent product volume</p></div></div>
+        <div class="voices-grid">
+          <form class="voice-form" id="voice-form">
+            <div class="voice-form-intro"><div class="section-title"><i class="icon-upload"></i><span>Add a reference voice</span></div><p>Drop a clean voice sample here, then use it from Generate, Clone, or Stream.</p></div>
+            <label class="field"><span>Voice name</span><input id="profile-name" type="text" maxlength="48" placeholder="studio-narrator" required><small id="profile-name-preview">Letters, numbers, hyphens, and underscores</small></label>
+            <label class="field"><span>Description <small>Optional</small></span><input id="profile-description" type="text" maxlength="240" placeholder="Warm narrator recorded in the studio"></label>
+            <label class="profile-audio-drop" id="profile-audio-drop"><input id="profile-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"><i class="icon-file-audio"></i><strong>Choose or drop voice audio</strong><small id="profile-audio-name">WAV, MP3, FLAC, OGG, or M4A</small></label>
+            <section id="profile-audio-preview" aria-live="polite"></section>
+            <label class="field"><span>Reference transcript <small>Optional</small></span><textarea id="profile-transcript" rows="3" placeholder="Enter exactly what is spoken in the sample"></textarea></label>
+            <button class="primary-button voice-save-button" type="submit"><i class="icon-check"></i><span>Save voice</span></button>
+          </form>
+          <section class="saved-voices-panel"><div class="saved-voices-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Saved voices</span><span class="count-badge" id="profile-count">0</span></div><label class="profile-search"><span class="visually-hidden">Search saved voices</span><input id="profile-filter" type="search" placeholder="Search voices"></label></div><div class="profile-list" id="profile-list"></div></section>
+        </div>
       </div>
 
       <div class="tab-panel" data-panel="api" hidden>
@@ -132,6 +150,16 @@
       </div>
     </section>
   </main>
+  <dialog class="guide-dialog" id="save-profile-dialog">
+    <form id="quick-save-form" method="dialog">
+      <div class="dialog-heading"><h2 id="save-profile-title">Save voice</h2><button class="icon-button" id="save-profile-close" type="button" title="Close" aria-label="Close"><i class="icon-x"></i></button></div>
+      <p id="save-profile-copy">Store this voice in the persistent product volume.</p>
+      <label class="field"><span>Voice name</span><input id="quick-profile-name" type="text" maxlength="48" placeholder="studio-narrator" required></label>
+      <label class="field"><span>Description <small>Optional</small></span><input id="quick-profile-description" type="text" maxlength="240" placeholder="Where this voice works best"></label>
+      <div class="dialog-actions"><button class="secondary-button" id="save-profile-cancel" type="button">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span>Save voice</span></button></div>
+    </form>
+  </dialog>
+  <dialog class="confirm-dialog" id="delete-profile-dialog"><div class="dialog-heading"><h2>Delete saved voice</h2><button class="icon-button" id="delete-profile-close" type="button" title="Close" aria-label="Close"><i class="icon-x"></i></button></div><p>Delete <strong id="delete-profile-name"></strong> and its stored audio?</p><div class="dialog-actions"><button class="secondary-button" id="delete-profile-cancel" type="button">Cancel</button><button class="danger-button" id="delete-profile-confirm" type="button">Delete</button></div></dialog>
   <div class="toast" id="toast" role="alert" hidden></div>
 </body>
 </html>

@@ -7,7 +7,9 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
 import wave
+from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
@@ -16,11 +18,17 @@ import numpy as np
 import torch
 import uvicorn
 from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from voxcpm.standalone_ui.gpu import GPU_MONITOR
 from voxcpm.standalone_ui.server import attach_ui
+from voxcpm.voice_profiles import (
+    delete_voice_profile,
+    load_voice_profiles,
+    resolve_voice_profile,
+    save_voice_profile,
+)
 
 def _read_version() -> str:
     version_path = Path(__file__).resolve().parents[1] / "VERSION"
@@ -47,6 +55,7 @@ BUILD_DATE = os.getenv("VOXCPMTTS_BUILD_DATE", "unknown")
 VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
 MAX_REFERENCE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_REFERENCE_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 REFERENCE_AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".webm"}
+VOICE_PROFILE_DIR = Path(os.getenv("VOXCPM_VOICE_PROFILE_DIR", "/app/persistent/voices"))
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -116,19 +125,13 @@ FORMAT_ALIASES = {
     "vorbis": "ogg",
 }
 STREAM_FORMATS = {
-    "wav": {
-        "label": "Full WAV response",
-        "extension": "wav",
-        "media_type": "audio/wav",
-    },
     "mp3": {
-        "label": "Full MP3 response",
+        "label": "Progressive MP3",
         "extension": "mp3",
         "media_type": "audio/mpeg",
     },
 }
 STREAM_FORMAT_ALIASES = {
-    ".wav": "wav",
     ".mp3": "mp3",
     "mpeg": "mp3",
 }
@@ -139,6 +142,28 @@ MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
 MODEL_LOCK = threading.Lock()
 ASR_MODEL = None
 ASR_LOCK = threading.Lock()
+ACTIVITY_LOCK = threading.Lock()
+GENERATION_ACTIVITY: dict[str, Any] = {
+    "active": False,
+    "phase": "ready",
+    "message": "Ready",
+    "updated_at": time.time(),
+}
+
+
+def set_generation_activity(phase: str, message: str, *, active: bool) -> None:
+    with ACTIVITY_LOCK:
+        GENERATION_ACTIVITY.update(
+            active=active,
+            phase=phase,
+            message=message,
+            updated_at=time.time(),
+        )
+
+
+def get_generation_activity() -> dict[str, Any]:
+    with ACTIVITY_LOCK:
+        return dict(GENERATION_ACTIVITY)
 
 
 def _close_model(model: Any) -> None:
@@ -282,7 +307,7 @@ def normalize_output_format(output_format: str | None) -> str:
 
 
 def normalize_stream_format(stream_format: str | None) -> str:
-    normalized = (stream_format or "wav").strip().lower()
+    normalized = (stream_format or "mp3").strip().lower()
     normalized = STREAM_FORMAT_ALIASES.get(normalized, normalized)
     if normalized not in STREAM_FORMATS:
         supported = ", ".join(STREAM_FORMATS)
@@ -308,6 +333,11 @@ def audio_to_wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
         wav_file.setframerate(sample_rate)
         wav_file.writeframes(audio_int16.tobytes())
     return buffer.getvalue()
+
+
+def to_int16_audio(audio: np.ndarray) -> np.ndarray:
+    normalized = np.clip(to_float32_audio(np.asarray(audio)).reshape(-1), -1.0, 1.0)
+    return (normalized * 32767).astype("<i2")
 
 
 def encode_audio_bytes(audio: np.ndarray, output_format: str, sample_rate: int) -> bytes:
@@ -345,6 +375,101 @@ def encode_audio_bytes(audio: np.ndarray, output_format: str, sample_rate: int) 
     return result.stdout
 
 
+def encode_audio_stream(
+    chunks: Iterator[np.ndarray],
+    output_format: str,
+    sample_rate: int,
+) -> Iterator[bytes]:
+    normalized_format = normalize_stream_format(output_format)
+    ffmpeg_args = OUTPUT_FORMATS[normalized_format]["ffmpeg_args"]
+    if ffmpeg_args is None:
+        raise RuntimeError(f"{normalized_format} does not support progressive streaming")
+
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "s16le",
+        "-acodec",
+        "pcm_s16le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "-i",
+        "pipe:0",
+        *ffmpeg_args,
+        "pipe:1",
+    ]
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"ffmpeg is required to stream {normalized_format}") from exc
+
+    assert process.stdin is not None
+    assert process.stdout is not None
+    stop_writer = threading.Event()
+    writer_errors: list[BaseException] = []
+
+    def write_chunks() -> None:
+        try:
+            for chunk in chunks:
+                if stop_writer.is_set():
+                    break
+                process.stdin.write(to_int16_audio(chunk).tobytes())
+                process.stdin.flush()
+        except (BrokenPipeError, OSError) as exc:
+            if not stop_writer.is_set():
+                writer_errors.append(exc)
+        except Exception as exc:  # Generation errors must reach the response iterator.
+            writer_errors.append(exc)
+        finally:
+            try:
+                process.stdin.close()
+            except OSError:
+                pass
+            close = getattr(chunks, "close", None)
+            if callable(close):
+                close()
+
+    writer = threading.Thread(target=write_chunks, name="voxcpmtts-stream-encoder", daemon=True)
+    writer.start()
+    try:
+        while True:
+            data = process.stdout.read(65536)
+            if data:
+                yield data
+                continue
+            if process.poll() is not None:
+                break
+    finally:
+        stop_writer.set()
+        try:
+            process.stdin.close()
+        except OSError:
+            pass
+        if process.poll() is None:
+            process.terminate()
+        writer.join(timeout=5)
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=5)
+
+    stderr = process.stderr.read().decode("utf-8", errors="replace").strip() if process.stderr else ""
+    if writer_errors:
+        raise RuntimeError(f"Audio streaming failed: {writer_errors[0]}")
+    if process.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed to stream {normalized_format}: {stderr}")
+
+
 def clean_control(control: str | None) -> str:
     control = (control or "").strip()
     return control.replace("(", "").replace(")", "").replace("（", "").replace("）", "").strip()
@@ -362,12 +487,21 @@ def build_generate_kwargs(payload: "TTSRequest", model: Any) -> dict:
     ref_audio = payload.ref_audio or payload.reference_audio
     prompt_audio = payload.prompt_audio
     prompt_text = payload.prompt_text
+    control = payload.control or payload.instruct
+    if payload.voice_profile:
+        _, profile = resolve_voice_profile(VOICE_PROFILE_DIR, payload.voice_profile)
+        if not ref_audio and not prompt_audio:
+            ref_audio = profile.get("ref_audio") or None
+        if not prompt_text and not payload.ref_text:
+            prompt_text = profile.get("ref_text") or None
+        if not control:
+            control = profile.get("control") or None
     if payload.ref_text and not prompt_text:
         prompt_text = payload.ref_text
     if ref_audio and prompt_text and not prompt_audio:
         prompt_audio = ref_audio
 
-    final_text = build_final_text(payload.text, payload.control or payload.instruct, prompt_text)
+    final_text = build_final_text(payload.text, control, prompt_text)
     kwargs = {
         "text": final_text,
         "reference_wav_path": ref_audio,
@@ -391,6 +525,7 @@ class TTSRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Text to synthesize.")
     language: str = Field("English", description="Compatibility hint; VoxCPM2 auto-detects supported languages.")
     voice: str = Field("auto", description="Compatibility field. Use instruct/control or reference audio for VoxCPM voices.")
+    voice_profile: Optional[str] = Field(None, description="Saved local voice profile name.")
     control: Optional[str] = Field(None, description="VoxCPM voice design/control instruction.")
     instruct: Optional[str] = Field(None, description="Alias for control.")
     reference_audio: Optional[str] = Field(None, description="Container-visible reference audio path.")
@@ -418,7 +553,7 @@ class TTSRequest(BaseModel):
 
 
 class StreamingTTSRequest(TTSRequest):
-    stream_format: str = Field("wav", description="Streaming response format. Supported: wav, mp3.")
+    stream_format: str = Field("mp3", description="Progressive response format. Supported: mp3.")
 
 
 class MetricsRequest(BaseModel):
@@ -444,22 +579,67 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray]:
 
     requested_device = resolve_requested_device(payload.device, payload.use_gpu)
     try:
+        canonical_device = canonical_model_device(requested_device)
+        cache_key = (DEFAULT_BACKEND, DEFAULT_MODEL_ID, canonical_device)
+        with MODEL_LOCK:
+            model_loaded = cache_key in MODEL_CACHE
+        if model_loaded:
+            set_generation_activity("preparing", "Preparing the loaded model", active=True)
+        else:
+            set_generation_activity("loading_model", "Loading VoxCPM2 weights", active=True)
         model = get_model(requested_device, load_denoiser=payload.denoise)
+        set_generation_activity("generating", "Generating speech", active=True)
         wav = model.generate(**build_generate_kwargs(payload, model))
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
+        set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"VoxCPM generation failed: {exc}") from exc
 
     return output_format, int(model.tts_model.sample_rate), to_float32_audio(wav)
 
 
+def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, Iterator[np.ndarray]]:
+    if not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Text must not be empty")
+    try:
+        output_format = normalize_stream_format(payload.stream_format)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    requested_device = resolve_requested_device(payload.device, payload.use_gpu)
+    try:
+        canonical_device = canonical_model_device(requested_device)
+        cache_key = (DEFAULT_BACKEND, DEFAULT_MODEL_ID, canonical_device)
+        with MODEL_LOCK:
+            model_loaded = cache_key in MODEL_CACHE
+        if model_loaded:
+            set_generation_activity("preparing", "Preparing the loaded model", active=True)
+        else:
+            set_generation_activity("loading_model", "Loading VoxCPM2 weights", active=True)
+        model = get_model(requested_device, load_denoiser=payload.denoise)
+        set_generation_activity("streaming", "Generating the live audio stream", active=True)
+        chunks = model.generate_streaming(**build_generate_kwargs(payload, model))
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=500, detail=f"VoxCPM streaming failed: {exc}") from exc
+
+    return output_format, int(model.tts_model.sample_rate), chunks
+
+
 def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResponse:
     output_format, sample_rate, waveform = synthesize_payload(payload)
     try:
+        set_generation_activity("encoding", f"Encoding {output_format.upper()} audio", active=True)
         audio_bytes = encode_audio_bytes(waveform, output_format, sample_rate)
     except RuntimeError as exc:
+        set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    set_generation_activity("complete", "Audio is ready", active=False)
 
     extension = OUTPUT_FORMATS[output_format]["extension"]
     media_type = OUTPUT_FORMATS[output_format]["media_type"]
@@ -473,6 +653,47 @@ def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResp
         "X-VoxCPM-Format": output_format,
     }
     return StreamingResponse(io.BytesIO(audio_bytes), media_type=media_type, headers=headers)
+
+
+def progressive_audio_response(
+    payload: StreamingTTSRequest,
+    route_name: str,
+    *,
+    cleanup_paths: tuple[str, ...] = (),
+) -> StreamingResponse:
+    try:
+        output_format, sample_rate, chunks = synthesize_payload_chunks(payload)
+    except Exception:
+        for path in cleanup_paths:
+            Path(path).unlink(missing_ok=True)
+        raise
+
+    extension = STREAM_FORMATS[output_format]["extension"]
+    media_type = STREAM_FORMATS[output_format]["media_type"]
+
+    def body() -> Iterator[bytes]:
+        try:
+            yield from encode_audio_stream(chunks, output_format, sample_rate)
+            set_generation_activity("complete", "Stream is ready", active=False)
+        except Exception as exc:
+            set_generation_activity("failed", str(exc), active=False)
+            raise
+        finally:
+            close = getattr(chunks, "close", None)
+            if callable(close):
+                close()
+            for path in cleanup_paths:
+                Path(path).unlink(missing_ok=True)
+
+    headers = {
+        "Content-Disposition": f"inline; filename=voxcpm-stream.{extension}",
+        "X-VoxCPM-Model": DEFAULT_MODEL_ID,
+        "X-VoxCPM-Sample-Rate": str(sample_rate),
+        "X-VoxCPM-Route": route_name,
+        "X-VoxCPM-Format": output_format,
+        "X-VoxCPM-Streaming": "progressive-chunks",
+    }
+    return StreamingResponse(body(), media_type=media_type, headers=headers)
 
 
 def get_supported_output_formats() -> dict[str, dict[str, str]]:
@@ -512,6 +733,23 @@ def get_status_payload() -> dict:
             for label, value in get_hardware_choices()
         ],
     }
+
+
+def voice_profile_payloads() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": name,
+            "profile_type": profile["profile_type"],
+            "description": profile["description"],
+            "language": profile["language"],
+            "has_audio": bool(profile["audio_file"]),
+            "has_transcript": bool(profile["ref_text"]),
+            "has_control": bool(profile["control"]),
+            "created_at": profile["created_at"],
+            "audio_url": f"/tts/voice-profiles/{name}/audio" if profile["audio_file"] else None,
+        }
+        for name, profile in sorted(load_voice_profiles(VOICE_PROFILE_DIR).items())
+    ]
 
 
 async def save_reference_upload(upload: UploadFile) -> str:
@@ -558,12 +796,15 @@ async def uploaded_audio_response(
     request.ref_audio = reference_path
     request.reference_audio = None
     route_name = "/tts/stream-upload" if streaming else "/tts/generate-upload"
+    if streaming:
+        assert isinstance(request, StreamingTTSRequest)
+        return await asyncio.to_thread(
+            progressive_audio_response,
+            request,
+            route_name,
+            cleanup_paths=(reference_path,),
+        )
     try:
-        if streaming:
-            try:
-                request.output_format = normalize_stream_format(request.stream_format)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
         return await asyncio.to_thread(stream_audio_response, request, route_name)
     finally:
         Path(reference_path).unlink(missing_ok=True)
@@ -605,6 +846,11 @@ def status() -> dict:
     return get_status_payload()
 
 
+@api.get("/tts/activity")
+def activity() -> dict:
+    return get_generation_activity()
+
+
 @api.get("/tts/defaults")
 def defaults() -> dict:
     return {
@@ -615,7 +861,7 @@ def defaults() -> dict:
         "cfg_value": 2.0,
         "inference_timesteps": DEFAULT_INFERENCE_TIMESTEPS,
         "output_formats": {"default": "wav", "available": get_supported_output_formats()},
-        "stream_formats": {"default": "wav", "available": STREAM_FORMATS},
+        "stream_formats": {"default": "mp3", "available": STREAM_FORMATS},
     }
 
 
@@ -627,10 +873,10 @@ def formats() -> dict:
 @api.get("/tts/stream-formats")
 def stream_formats() -> dict:
     return {
-        "default": "wav",
+        "default": "mp3",
         "formats": STREAM_FORMATS,
         "aliases": STREAM_FORMAT_ALIASES,
-        "granularity": "full_synthesis_result",
+        "granularity": "progressive_model_chunks",
     }
 
 
@@ -641,13 +887,75 @@ def languages() -> dict:
 
 @api.get("/tts/voices")
 def voices() -> dict:
+    saved = voice_profile_payloads()
     return {
         "voices": [
             {"id": "auto", "name": "Auto Voice Design", "language": "auto"},
             {"id": "reference", "name": "Reference Audio Clone", "language": "auto"},
         ],
+        "saved_profiles": saved,
         "note": "VoxCPM2 does not use a fixed speaker inventory. Use control/instruct or ref_audio.",
     }
+
+
+@api.get("/tts/voice-profiles")
+def voice_profiles() -> dict:
+    profiles = voice_profile_payloads()
+    return {"object": "list", "data": profiles, "count": len(profiles)}
+
+
+@api.post("/tts/voice-profiles")
+async def create_voice_profile(
+    name: str = Form(...),
+    profile_type: str = Form(...),
+    description: str = Form(""),
+    ref_text: str = Form(""),
+    control: str = Form(""),
+    language: str = Form(""),
+    reference_audio: UploadFile | None = File(None),
+) -> dict:
+    temporary_path: str | None = None
+    try:
+        if reference_audio is not None:
+            temporary_path = await save_reference_upload(reference_audio)
+        profile_name, _ = await asyncio.to_thread(
+            save_voice_profile,
+            VOICE_PROFILE_DIR,
+            name=name,
+            profile_type=profile_type,
+            source_audio=temporary_path,
+            ref_text=ref_text,
+            control=control,
+            description=description,
+            language=language,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        if temporary_path:
+            Path(temporary_path).unlink(missing_ok=True)
+    return next(profile for profile in voice_profile_payloads() if profile["id"] == profile_name)
+
+
+@api.get("/tts/voice-profiles/{profile_name}/audio")
+def voice_profile_audio(profile_name: str) -> FileResponse:
+    try:
+        _, profile = resolve_voice_profile(VOICE_PROFILE_DIR, profile_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    audio_path = profile.get("ref_audio")
+    if not audio_path:
+        raise HTTPException(status_code=404, detail="Designed voice profiles do not contain reference audio.")
+    return FileResponse(audio_path, filename=Path(audio_path).name)
+
+
+@api.delete("/tts/voice-profiles/{profile_name}")
+def remove_voice_profile(profile_name: str) -> dict[str, str]:
+    try:
+        deleted = delete_voice_profile(VOICE_PROFILE_DIR, profile_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"deleted": deleted}
 
 
 @api.get("/tts/speakers")
@@ -709,11 +1017,7 @@ def convert(payload: TTSRequest = Body(...)) -> StreamingResponse:
 
 @api.post("/tts/stream")
 def stream_tts(payload: StreamingTTSRequest = Body(...)) -> StreamingResponse:
-    try:
-        payload.output_format = normalize_stream_format(payload.stream_format)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return stream_audio_response(payload, "/tts/stream")
+    return progressive_audio_response(payload, "/tts/stream")
 
 
 @api.post("/tts/stream-upload")
