@@ -35,6 +35,58 @@ COPY voxcpm/prefetch_assets.py /tmp/prefetch_assets.py
 
 RUN python -u /tmp/prefetch_assets.py
 
+FROM python:3.13-slim AS nano-dependencies
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    HF_HOME=/app/.cache/huggingface \
+    MODELSCOPE_CACHE=/app/.cache/modelscope \
+    VOXCPM_PREFETCH_DENOISER=1 \
+    VOXCPM_PREFETCH_ASR=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.nano.txt /app/requirements.nano.txt
+
+ARG NANO_VLLM_VERSION=2.0.4
+ARG FLASH_ATTN_WHEEL_URL=https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu12torch2.8cxx11abiTRUE-cp313-cp313-linux_x86_64.whl
+ARG FLASH_ATTN_WHEEL_SHA256=7dd8c64a414130c82d83a472f5498c1b899fba37a30e2a793a7a4dc5dd61a062
+
+RUN python -m pip install --upgrade --only-binary=:all: pip setuptools wheel
+
+RUN python -m pip install --only-binary=:all: \
+    --extra-index-url https://download.pytorch.org/whl/cu128 \
+    torch==2.8.0 torchaudio==2.8.0 triton==3.4.0
+
+RUN python -m pip install --only-binary=:all: -r /app/requirements.nano.txt \
+    && python -m pip install --only-binary=:all: --no-deps "${FLASH_ATTN_WHEEL_URL}#sha256=${FLASH_ATTN_WHEEL_SHA256}" \
+    && python -m pip install --only-binary=:all: --no-deps --ignore-requires-python "nano-vllm-voxcpm==${NANO_VLLM_VERSION}"
+
+COPY scripts/patch-nanovllm-voxcpm.py /tmp/patch-nanovllm-voxcpm.py
+
+RUN python /tmp/patch-nanovllm-voxcpm.py
+
+FROM nano-dependencies AS nano-app-builder
+
+COPY README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION /app/
+COPY voxcpm /app/voxcpm
+COPY hangrylabs /app/hangrylabs
+
+FROM nano-dependencies AS nano-asset-builder
+
+ENV VOXCPM_PREFETCH_DENOISER=0 \
+    VOXCPM_PREFETCH_ASR=0
+
+COPY voxcpm/prefetch_assets.py /tmp/prefetch_assets.py
+
+RUN python -u /tmp/prefetch_assets.py
+
 FROM python:3.13-slim AS runtime-base
 
 LABEL org.opencontainers.image.source="https://github.com/hangry-labs/VoxCPMTTS"
@@ -58,7 +110,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
+    && apt-get install -y --no-install-recommends build-essential ffmpeg libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG BUILD_DATE=unknown
@@ -80,11 +132,36 @@ FROM runtime-base AS runtime-app
 COPY --from=app-builder /usr/local /usr/local
 COPY --from=app-builder /app /app
 
-FROM runtime-app AS tiny
+FROM runtime-app AS native-tiny
 
 ENV HF_HUB_OFFLINE=0 \
     TRANSFORMERS_OFFLINE=0
 
-FROM runtime-app AS baked
+FROM runtime-app AS native-baked
 
 COPY --from=asset-builder /app/.cache /app/.cache
+
+FROM runtime-base AS nano-runtime-app
+
+ENV VOXCPM_BACKEND=nano \
+    VOXCPM_LOAD_DENOISER=0 \
+    VOXCPM_LOAD_ASR=0 \
+    VOXCPM_NANO_INFERENCE_TIMESTEPS=10 \
+    VOXCPM_NANO_MAX_NUM_BATCHED_TOKENS=4096 \
+    VOXCPM_NANO_MAX_NUM_SEQS=1 \
+    VOXCPM_NANO_MAX_MODEL_LEN=4096 \
+    VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.49 \
+    VOXCPM_NANO_ENFORCE_EAGER=0 \
+    TORCHINDUCTOR_COMPILE_THREADS=1
+
+COPY --from=nano-app-builder /usr/local /usr/local
+COPY --from=nano-app-builder /app /app
+
+FROM nano-runtime-app AS tiny
+
+ENV HF_HUB_OFFLINE=0 \
+    TRANSFORMERS_OFFLINE=0
+
+FROM nano-runtime-app AS baked
+
+COPY --from=nano-asset-builder /app/.cache /app/.cache

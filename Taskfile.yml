@@ -7,9 +7,11 @@ vars:
   GPU_DEVICE: '0'
   APP_DEVICE: 'auto'
   APP_OPTIMIZE: '0'
+  NANO_GPU_MEMORY_UTILIZATION: '0.49'
+  NANO_ENFORCE_EAGER: '0'
+  NANO_COMPILE_THREADS: '1'
   HF_TOKEN: ''
   HF_CACHE_VOLUME: voxcpmtts_hf_cache
-  MODELSCOPE_CACHE_VOLUME: voxcpmtts_modelscope_cache
   HF_HUB_OFFLINE: '1'
   TRANSFORMERS_OFFLINE: '1'
   CONTAINER: voxcpmtts
@@ -73,11 +75,10 @@ tasks:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-image.ps1 -Target tiny -Image "{{.TINY_IMAGE}}"
 
   cache-init:
-    desc: Seed persistent Hugging Face and ModelScope cache volumes from the baked image
+    desc: Seed the persistent Hugging Face cache volume from the baked image
     cmds:
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker volume create {{.MODELSCOPE_CACHE_VOLUME}} >nul
-      - cmd /c docker run --rm -v {{.HF_CACHE_VOLUME}}:/hf-cache -v {{.MODELSCOPE_CACHE_VOLUME}}:/modelscope-cache {{.IMAGE}} sh -c "mkdir -p /hf-cache /modelscope-cache && cp -an /app/.cache/huggingface/. /hf-cache/ || true && cp -an /app/.cache/modelscope/. /modelscope-cache/ || true"
+      - cmd /c docker run --rm -v {{.HF_CACHE_VOLUME}}:/hf-cache {{.IMAGE}} sh -c "mkdir -p /hf-cache && cp -an /app/.cache/huggingface/. /hf-cache/ || true"
 
   release:
     desc: Release current VERSION snapshot, tag it, and prepare next snapshot
@@ -85,44 +86,47 @@ tasks:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -DryRun "{{.DRY_RUN}}" -NextVersion "{{.NEXT_VERSION}}" -SkipValidation "{{.SKIP_VALIDATION}}"
 
   deps:
-    desc: Regenerate Linux/Python 3.13 requirements.txt from requirements.in
+    desc: Regenerate native Linux/Python 3.13 requirements.txt from requirements.in
     cmds:
       - uv pip compile requirements.in --python-version 3.13 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --no-header --no-annotate --output-file requirements.txt
+
+  deps-nano:
+    desc: Regenerate Linux/Python 3.13 Nano-vLLM requirements
+    cmds:
+      - uv pip compile requirements.nano.in --python-version 3.13 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --no-header --no-annotate --output-file requirements.nano.txt
 
   imagerun:
     desc: Run baked image with UI and API on PORT, without external model cache mounts
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   imagerun-tiny:
-    desc: Run tiny image online on first use, using persistent Hugging Face and ModelScope cache volumes
+    desc: Run tiny image online on first use, using a persistent Hugging Face cache volume
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker volume create {{.MODELSCOPE_CACHE_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.MODELSCOPE_CACHE_VOLUME}}:/app/.cache/modelscope {{.TINY_IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   localrun:
-    desc: Run baked image with local voxcpm/ bind-mounted for hot-swapping package code
+    desc: Run baked image with local voxcpm/ bind-mounted for package development
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   localrun-tiny:
-    desc: Run tiny image with local voxcpm/ bind-mounted, online on first use
+    desc: Run tiny image with local voxcpm/ bind-mounted and persistent model caches
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker volume create {{.MODELSCOPE_CACHE_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_OPTIMIZE={{.APP_OPTIMIZE}} -e PORT=8808 -e UVICORN_RELOAD=1 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.MODELSCOPE_CACHE_VOLUME}}:/app/.cache/modelscope -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.TINY_IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   imageweb:
@@ -170,4 +174,3 @@ tasks:
       - cmd /c docker rmi -f {{.IMAGE}} >nul 2>&1
       - cmd /c docker rmi -f {{.TINY_IMAGE}} >nul 2>&1
       - cmd /c docker volume rm -f {{.HF_CACHE_VOLUME}} >nul 2>&1
-      - cmd /c docker volume rm -f {{.MODELSCOPE_CACHE_VOLUME}} >nul 2>&1

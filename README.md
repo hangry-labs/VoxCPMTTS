@@ -6,7 +6,7 @@
 
 # Hangry Labs VoxCPMTTS
 
-Easy-to-run Docker packaging for VoxCPM2 with a browser UI and HTTP API included.
+Easy-to-run Docker packaging for VoxCPM2 with Nano-vLLM inference, a browser UI, and an HTTP API included.
 
 This fork keeps the upstream OpenBMB VoxCPM code, license, and attribution intact, then adds Hangry Labs runtime packaging for local use: Docker images, task automation, API routes under `/tts/*`, format conversion, and a browser UI.
 
@@ -18,16 +18,10 @@ Run with NVIDIA GPU support:
 docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:latest
 ```
 
-Run on CPU:
-
-```bash
-docker run -p 8808:8808 -e VOXCPM_DEVICE=cpu hangrylabs/voxcpmtts:latest
-```
-
 Run on a specific GPU:
 
 ```bash
-docker run -p 8808:8808 --gpus "device=1" -e CUDA_VISIBLE_DEVICES=1 hangrylabs/voxcpmtts:latest
+docker run -p 8808:8808 --gpus '"device=0"' hangrylabs/voxcpmtts:latest
 ```
 
 Open:
@@ -40,11 +34,13 @@ http://localhost:8808/tts/docs
 
 All published tags are mirrored on Docker Hub as `hangrylabs/voxcpmtts` and GHCR as `ghcr.io/hangry-labs/voxcpmtts`. The moving `latest` and `latest_tiny` tags follow `main`; fixed releases use `vX.Y` and `vX.Y_tiny`.
 
-The full image bakes VoxCPM2 model assets plus denoiser and ASR support assets for offline-friendly use after the image is pulled. Tiny images warm Hugging Face and ModelScope caches on first online use.
+The full image bakes the VoxCPM2 model assets for offline use after the image is pulled. Tiny images warm a persistent Hugging Face cache on first online use.
 
-Docker defaults to `VOXCPM_OPTIMIZE=0` to avoid first-run Triton/C compiler requirements in the slim runtime. Advanced users can opt into optimization later by setting `VOXCPM_OPTIMIZE=1`.
+The runtime uses Nano-vLLM with Python 3.13, CUDA 12.8, and a prebuilt FlashAttention wheel. Triton still performs normal first-use kernel JIT compilation inside the container; no Python packages or wheels are compiled during the image build.
 
-VoxCPM2 is a large model. Run one VoxCPMTTS container per GPU unless you intentionally want separate model copies in memory. The service canonicalizes `auto` and `cuda:0` to one cached model instance, and the denoiser is attached lazily to that same instance when `denoise=true`.
+The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.49` gives the engine a budget of about 7.5 GiB on a 16 GiB GPU. Run one VoxCPMTTS container per GPU. The service canonicalizes `auto` and `cuda:0` to one cached model instance and serializes generation with a concurrency of one. CUDA graphs are enabled for Nano-vLLM acceleration; set `VOXCPM_NANO_ENFORCE_EAGER=1` only for troubleshooting. `TORCHINDUCTOR_COMPILE_THREADS=1` prevents unused compile-worker pools from retaining RAM between engine reloads. The image also releases temporary CUDA allocator blocks after reference-audio encoding so different input lengths do not accumulate VRAM high-water allocations.
+
+Nano-vLLM fixes the diffusion step count when the engine starts. The image default is 10; set `VOXCPM_NANO_INFERENCE_TIMESTEPS` before startup when a different value is required, then send the same `inference_timesteps` value in API requests.
 
 ## Local Development
 
@@ -55,13 +51,7 @@ task compile
 task app
 ```
 
-This fork is validated primarily through Docker. `task image` builds the full baked offline image, and `task imagerun` runs it without external model cache mounts so the image proves its own baked assets. `task image-tiny` and `task imagerun-tiny` are for online first-use cache workflows.
-
-The package CLI remains available:
-
-```bash
-python -m voxcpm.cli --help
-```
+This fork is validated primarily through Docker. `task image` builds the full baked offline image, and `task imagerun` runs it without external model cache mounts so the image proves its own baked assets. `task image-tiny` and `task imagerun-tiny` are for online first-use cache workflows. All Docker dependency installs require binary wheels.
 
 ## HTTP API
 
@@ -114,7 +104,7 @@ curl http://localhost:8808/tts/ping
 - VoxCPM2 multilingual generation across the upstream supported languages
 - WAV, MP3, FLAC, and OGG output support
 - Lazy model loading so `/tts/ping` and `/tts/status` stay lightweight
-- Lazy denoiser and ASR loading
+- Nano-vLLM inference with a single cached GPU engine
 - Docker-first full and tiny image workflows
 
 ## Responsible Use
@@ -128,6 +118,7 @@ VoxCPM is an OpenBMB project released under Apache-2.0.
 - Upstream repository: https://github.com/OpenBMB/VoxCPM
 - Upstream model: https://huggingface.co/openbmb/VoxCPM2
 - Upstream documentation: https://voxcpm.readthedocs.io/
+- Nano-vLLM VoxCPM runtime: https://github.com/a710128/nanovllm-voxcpm
 
 This fork preserves the upstream license, public package code, citation, and attribution. Hangry Labs maintains the Docker packaging, Web UI/API integration, task automation, release tooling, and runtime documentation in this repository.
 

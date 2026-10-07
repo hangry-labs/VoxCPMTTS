@@ -6,7 +6,7 @@
 
 # Hangry Labs VoxCPMTTS
 
-Easy-to-run VoxCPM2 text-to-speech Docker images with a browser UI and HTTP API included.
+Easy-to-run VoxCPM2 text-to-speech Docker images with Nano-vLLM inference, a browser UI, and an HTTP API included.
 
 This Hangry Labs fork is built for people who want realistic multilingual text to speech, voice design, and voice cloning without a long setup. Install Docker, run one command, open the local UI, or call the API from your own application.
 
@@ -30,34 +30,29 @@ Run with NVIDIA GPU support:
 docker run -p 8808:8808 --gpus all hangrylabs/voxcpmtts:latest
 ```
 
-Run on CPU:
-
-```bash
-docker run -p 8808:8808 -e VOXCPM_DEVICE=cpu hangrylabs/voxcpmtts:latest
-```
-
 Run on a specific GPU:
 
 ```bash
-docker run -p 8808:8808 --gpus "device=1" -e CUDA_VISIBLE_DEVICES=1 hangrylabs/voxcpmtts:latest
+docker run -p 8808:8808 --gpus '"device=0"' hangrylabs/voxcpmtts:latest
 ```
 
 Then open:
 
 http://localhost:8808
 
-The standard full image (`latest` or a fixed `vX.Y` release) includes VoxCPM2 model assets plus the denoiser and ASR support assets for offline-friendly use after the image is pulled.
+The standard full image (`latest` or a fixed `vX.Y` release) includes the VoxCPM2 model assets for offline use after the image is pulled.
 
-The runtime defaults to `VOXCPM_OPTIMIZE=0` so the slim image does not need a C compiler for first-run Triton compilation. Set `VOXCPM_OPTIMIZE=1` only when you want to test compiled inference.
+The runtime uses Nano-vLLM on Python 3.13 with CUDA 12.8 and a prebuilt FlashAttention wheel. Triton performs normal first-use kernel JIT compilation inside the container. Image builds install binary Python wheels only.
 
-VoxCPM2 is memory-heavy. Run one VoxCPMTTS container per GPU unless you intentionally want duplicate model copies in RAM and VRAM. The service reuses one cached model for `auto` and `cuda:0`, and only attaches the denoiser to that existing model when `denoise=true`.
+The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.49` gives the engine a budget of about 7.5 GiB on a 16 GiB GPU. Run one VoxCPMTTS container per GPU. The service reuses one cached model for `auto` and `cuda:0` and serializes generation with a concurrency of one. CUDA graphs are enabled for Nano-vLLM acceleration; set `VOXCPM_NANO_ENFORCE_EAGER=1` only for troubleshooting. `TORCHINDUCTOR_COMPILE_THREADS=1` prevents unused compile-worker pools from retaining RAM between engine reloads. The image also releases temporary CUDA allocator blocks after reference-audio encoding so different input lengths do not accumulate VRAM high-water allocations.
+
+Nano-vLLM fixes the diffusion step count at engine startup. The image default is 10; set `VOXCPM_NANO_INFERENCE_TIMESTEPS` before startup to change it, and use the same value in API requests.
 
 The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face and ModelScope caches are warmed on first online use:
 
 ```bash
 docker run -p 8808:8808 --gpus all \
   -v voxcpmtts_hf_cache:/app/.cache/huggingface \
-  -v voxcpmtts_modelscope_cache:/app/.cache/modelscope \
   hangrylabs/voxcpmtts:latest_tiny
 ```
 
@@ -69,6 +64,7 @@ docker run -p 8808:8808 --gpus all \
 - 48 kHz output when using the VoxCPM2 AudioVAE V2 model
 - WAV, MP3, FLAC, and OGG output support
 - GPU support when Docker/NVIDIA support is available
+- Nano-vLLM inference with a single cached GPU engine
 - Offline-friendly usage with the standard full image once it is available locally
 - Kokoro-shaped compatibility fields such as `voice`, `use_gpu`, `/tts/voices`, `/tts/speakers`, `/tts/stream-formats`, and `/tts/stream`
 

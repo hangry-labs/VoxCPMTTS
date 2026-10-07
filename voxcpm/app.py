@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import os
 import subprocess
 import tempfile
 import threading
 import wave
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import gradio as gr
 import numpy as np
@@ -17,10 +19,6 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from voxcpm import VoxCPM
-from voxcpm.model.utils import resolve_runtime_device
-
-
 def _read_version() -> str:
     version_path = Path(__file__).resolve().parents[1] / "VERSION"
     if version_path.exists():
@@ -29,6 +27,12 @@ def _read_version() -> str:
 
 
 DEFAULT_MODEL_ID = os.getenv("VOXCPM_MODEL_ID", "openbmb/VoxCPM2")
+DEFAULT_BACKEND = os.getenv("VOXCPM_BACKEND", "native").strip().lower()
+if DEFAULT_BACKEND not in {"native", "nano"}:
+    raise ValueError("VOXCPM_BACKEND must be either 'native' or 'nano'")
+DEFAULT_INFERENCE_TIMESTEPS = int(os.getenv("VOXCPM_NANO_INFERENCE_TIMESTEPS", "10"))
+if not 1 <= DEFAULT_INFERENCE_TIMESTEPS <= 100:
+    raise ValueError("VOXCPM_NANO_INFERENCE_TIMESTEPS must be between 1 and 100")
 DEFAULT_DEVICE = os.getenv("VOXCPM_DEVICE", "auto")
 DEFAULT_LOAD_DENOISER = os.getenv("VOXCPM_LOAD_DENOISER", "0").lower() in {"1", "true", "yes"}
 DEFAULT_OPTIMIZE = os.getenv("VOXCPM_OPTIMIZE", "1").lower() not in {"0", "false", "no"}
@@ -126,10 +130,23 @@ STREAM_FORMAT_ALIASES = {
 ASR_MODEL_ID = os.getenv("VOXCPM_ASR_MODEL_ID", "iic/SenseVoiceSmall")
 DEFAULT_LOAD_ASR = os.getenv("VOXCPM_LOAD_ASR", "1").lower() in {"1", "true", "yes"}
 
-MODEL_CACHE: dict[tuple[str, str], VoxCPM] = {}
+MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
 MODEL_LOCK = threading.Lock()
 ASR_MODEL = None
 ASR_LOCK = threading.Lock()
+
+
+def _close_model(model: Any) -> None:
+    close = getattr(model, "close", None)
+    if callable(close):
+        close()
+
+
+def _close_all_models() -> None:
+    with MODEL_LOCK:
+        for model in MODEL_CACHE.values():
+            _close_model(model)
+        MODEL_CACHE.clear()
 
 
 def get_cuda_devices() -> list[str]:
@@ -167,19 +184,45 @@ def resolve_requested_device(device: str, use_gpu: Optional[bool] = None) -> str
 
 
 def canonical_model_device(device: str) -> str:
-    resolved = resolve_runtime_device(device, configured_device="cuda")
+    if device == "auto":
+        if torch.cuda.is_available():
+            resolved = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            resolved = "mps"
+        else:
+            resolved = "cpu"
+    elif device.startswith("cuda"):
+        if not torch.cuda.is_available():
+            raise ValueError(f"Requested device '{device}', but CUDA is not available")
+        resolved = device
+    elif device == "mps":
+        if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+            raise ValueError("Requested device 'mps', but MPS is not available")
+        resolved = device
+    elif device == "cpu":
+        resolved = device
+    else:
+        raise ValueError(f"Unsupported device '{device}'")
     if resolved == "cuda":
         return "cuda:0"
     return resolved
 
 
-def get_model(device: str = DEFAULT_DEVICE, load_denoiser: bool = False) -> VoxCPM:
+def get_model(device: str = DEFAULT_DEVICE, load_denoiser: bool = False) -> Any:
     requested_device = canonical_model_device(resolve_requested_device(device))
     should_load_denoiser = DEFAULT_LOAD_DENOISER and load_denoiser
-    cache_key = (DEFAULT_MODEL_ID, requested_device)
+    cache_key = (DEFAULT_BACKEND, DEFAULT_MODEL_ID, requested_device)
     with MODEL_LOCK:
         if cache_key not in MODEL_CACHE:
-            MODEL_CACHE[cache_key] = VoxCPM.from_pretrained(
+            if DEFAULT_BACKEND == "nano":
+                from voxcpm.nano_backend import NanoVoxCPM
+
+                model_class = NanoVoxCPM
+            else:
+                from voxcpm import VoxCPM
+
+                model_class = VoxCPM
+            MODEL_CACHE[cache_key] = model_class.from_pretrained(
                 hf_model_id=DEFAULT_MODEL_ID,
                 load_denoiser=False,
                 zipenhancer_model_id=ZIPENHANCER_MODEL_ID,
@@ -319,7 +362,7 @@ def build_final_text(text: str, control: str | None, prompt_text: str | None) ->
     return stripped
 
 
-def build_generate_kwargs(payload: "TTSRequest", model: VoxCPM) -> dict:
+def build_generate_kwargs(payload: "TTSRequest", model: Any) -> dict:
     ref_audio = payload.ref_audio or payload.reference_audio
     prompt_audio = payload.prompt_audio
     prompt_text = payload.prompt_text
@@ -360,7 +403,12 @@ class TTSRequest(BaseModel):
     prompt_audio: Optional[str] = Field(None, description="Prompt audio path for continuation cloning.")
     prompt_text: Optional[str] = Field(None, description="Transcript for prompt_audio.")
     cfg_value: float = Field(2.0, ge=0.1, le=10.0, description="Classifier-free guidance scale.")
-    inference_timesteps: int = Field(10, ge=1, le=100, description="LocDiT flow-matching steps.")
+    inference_timesteps: int = Field(
+        DEFAULT_INFERENCE_TIMESTEPS,
+        ge=1,
+        le=100,
+        description="LocDiT flow-matching steps. Nano-vLLM fixes this value when the engine starts.",
+    )
     normalize_text: bool = Field(False, alias="normalize", description="Normalize text before synthesis.")
     denoise: bool = Field(False, description="Apply ZipEnhancer to prompt/reference audio when denoiser is enabled.")
     speed: float = Field(1.0, ge=0.25, le=4.0, description="Compatibility field; VoxCPM2 has no direct speed scalar.")
@@ -443,7 +491,7 @@ def get_supported_output_formats() -> dict[str, dict[str, str]]:
 
 
 def get_status_payload() -> dict:
-    loaded_devices = [device for _, device in MODEL_CACHE]
+    loaded_devices = [device for _, _, device in MODEL_CACHE]
     return {
         "msg": "pong",
         "type": "VoxCPMTTS",
@@ -453,6 +501,7 @@ def get_status_payload() -> dict:
         "revision": VCS_REF,
         "runtime": get_runtime_label(),
         "device": DEFAULT_DEVICE,
+        "backend": DEFAULT_BACKEND,
         "model_id": DEFAULT_MODEL_ID,
         "load_denoiser": DEFAULT_LOAD_DENOISER,
         "load_asr": DEFAULT_LOAD_ASR,
@@ -503,7 +552,7 @@ def create_ui() -> gr.Blocks:
             return (
                 gr.update(visible=True),
                 gr.update(interactive=False, value=""),
-                gr.update(interactive=True),
+                gr.update(interactive=DEFAULT_LOAD_ASR),
             )
         return (
             gr.update(visible=False, value=""),
@@ -570,9 +619,19 @@ def create_ui() -> gr.Blocks:
                     )
                 with gr.Accordion("Advanced", open=False):
                     cfg_value = gr.Slider(0.1, 10.0, value=2.0, step=0.1, label="CFG")
-                    inference_timesteps = gr.Slider(1, 100, value=10, step=1, label="Inference Timesteps")
+                    inference_timesteps = gr.Slider(
+                        1,
+                        100,
+                        value=DEFAULT_INFERENCE_TIMESTEPS,
+                        step=1,
+                        label="Inference Timesteps",
+                    )
                     normalize_text = gr.Checkbox(value=False, label="Normalize Text")
-                    denoise = gr.Checkbox(value=False, label="Denoise Reference Audio")
+                    denoise = gr.Checkbox(
+                        value=False,
+                        label="Denoise Reference Audio",
+                        interactive=DEFAULT_LOAD_DENOISER,
+                    )
                 generate_btn = gr.Button("Generate", variant="primary")
             with gr.Column():
                 audio_output = gr.Audio(label="Generated Audio", interactive=False, autoplay=True)
@@ -616,6 +675,12 @@ def create_ui() -> gr.Blocks:
     return ui
 
 
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    yield
+    await asyncio.to_thread(_close_all_models)
+
+
 api = FastAPI(
     title="VoxCPMTTS Service API",
     description="HTTP API for Hangry Labs VoxCPMTTS.",
@@ -623,6 +688,7 @@ api = FastAPI(
     openapi_url="/tts/openapi.json",
     docs_url="/tts/docs",
     redoc_url="/tts/redoc",
+    lifespan=app_lifespan,
 )
 
 
@@ -635,6 +701,7 @@ def ping() -> dict:
         "build_id": BUILD_ID,
         "build_date": BUILD_DATE,
         "revision": VCS_REF,
+        "backend": DEFAULT_BACKEND,
     }
 
 
@@ -651,7 +718,7 @@ def defaults() -> dict:
         "voice": "auto",
         "device": "auto",
         "cfg_value": 2.0,
-        "inference_timesteps": 10,
+        "inference_timesteps": DEFAULT_INFERENCE_TIMESTEPS,
         "output_formats": {"default": "wav", "available": get_supported_output_formats()},
         "stream_formats": {"default": "wav", "available": STREAM_FORMATS},
     }
@@ -732,18 +799,22 @@ def stream_tts(payload: StreamingTTSRequest = Body(...)) -> StreamingResponse:
 @api.post("/tts/purge")
 def purge_models(payload: PurgeRequest | None = Body(None)) -> dict:
     requested_device = payload.device if payload else None
-    if requested_device:
-        device = canonical_model_device(resolve_requested_device(requested_device))
-        purged = []
-        for cache_key in list(MODEL_CACHE):
-            if cache_key[1] == device:
-                del MODEL_CACHE[cache_key]
-                purged.append(device)
-        return {"purged": purged, "remaining_model_devices": [device for _, device in MODEL_CACHE]}
+    with MODEL_LOCK:
+        if requested_device:
+            device = canonical_model_device(resolve_requested_device(requested_device))
+            purged = []
+            for cache_key in list(MODEL_CACHE):
+                if cache_key[2] == device:
+                    _close_model(MODEL_CACHE.pop(cache_key))
+                    purged.append(device)
+            remaining = [cached_device for _, _, cached_device in MODEL_CACHE]
+            return {"purged": purged, "remaining_model_devices": remaining}
 
-    purged = [device for _, device in MODEL_CACHE]
-    MODEL_CACHE.clear()
-    return {"purged": purged, "remaining_model_devices": []}
+        purged = [device for _, _, device in MODEL_CACHE]
+        for model in MODEL_CACHE.values():
+            _close_model(model)
+        MODEL_CACHE.clear()
+        return {"purged": purged, "remaining_model_devices": []}
 
 
 app = gr.mount_gradio_app(api, create_ui(), path="/")
