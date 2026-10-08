@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import numpy as np
 from fastapi.testclient import TestClient
 from fastapi.responses import StreamingResponse
 
@@ -43,6 +44,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="generate-progress"' in responses["/"].text
     assert 'id="randomize-seed"' in responses["/"].text
     assert 'id="generation-settings"' in responses["/"].text
+    assert 'id="normalize-loudness"' in responses["/"].text
+    assert 'id="normalize-text"' in responses["/"].text
+    assert 'id="timing-settings"' in responses["/"].text
     assert 'id="generate-timestamps"' in responses["/"].text
     assert 'id="stream-live-wave"' in responses["/"].text
     assert 'id="reference-record-wave"' in responses["/"].text
@@ -65,6 +69,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "function stopGpuMonitor(" in script
     assert "inputDrafts: { text: null, ssml: null, 'ssml-h': null }" in script
     assert "input_type: state.inputType" in script
+    assert "normalize_loudness: $('#normalize-loudness').checked" in script
     assert "openProfileEditor(profile)" in script
     assert "sessionStorage.setItem(GPU_SESSION_KEY" in script
 
@@ -125,12 +130,17 @@ def test_stream_upload_applies_stream_format() -> None:
         )
         return "mp3", 24_000, iter([b"model-chunk"]), 123
 
-    def fake_encoder(chunks, output_format, sample_rate):
-        observed.update(output_format=output_format, sample_rate=sample_rate, chunks=list(chunks))
+    def fake_encoder(chunks, output_format, sample_rate, *, normalize_loudness=False):
+        observed.update(
+            output_format=output_format,
+            sample_rate=sample_rate,
+            chunks=list(chunks),
+            normalize_loudness=normalize_loudness,
+        )
         yield b"first-"
         yield b"second"
 
-    request = {"text": "Stream this.", "stream_format": "mp3"}
+    request = {"text": "Stream this.", "stream_format": "mp3", "normalize_loudness": True}
     with (
         patch.object(runtime, "synthesize_payload_chunks", side_effect=fake_chunks),
         patch.object(runtime, "encode_audio_stream", side_effect=fake_encoder),
@@ -153,7 +163,31 @@ def test_stream_upload_applies_stream_format() -> None:
     assert observed["output_format"] == "mp3"
     assert observed["sample_rate"] == 24_000
     assert observed["chunks"] == [b"model-chunk"]
+    assert observed["normalize_loudness"] is True
+    assert response.headers["x-voxcpm-loudness-normalized"] == "true"
     assert not observed["path"].exists()
+
+
+def test_loudness_normalization_uses_shared_ffmpeg_target() -> None:
+    source = np.array([0.1, -0.1], dtype=np.float32)
+    normalized_pcm = np.array([8192, -8192], dtype="<i2")
+    completed = Mock(stdout=normalized_pcm.tobytes(), stderr=b"")
+
+    with patch.object(runtime.subprocess, "run", return_value=completed) as run:
+        result = runtime.normalize_audio_loudness(source, 24_000)
+
+    command = run.call_args.args[0]
+    assert command[command.index("-af") + 1] == "loudnorm=I=-16:TP=-1.5:LRA=11"
+    assert command[command.index("-ar") + 1] == "24000"
+    assert np.allclose(result, np.array([0.25, -0.25], dtype=np.float32))
+
+
+def test_defaults_enable_browser_loudness_normalization() -> None:
+    with TestClient(runtime.app) as client:
+        response = client.get("/tts/defaults")
+
+    assert response.status_code == 200
+    assert response.json()["normalize_loudness"] is True
 
 
 def test_transcribe_upload_uses_and_removes_temporary_audio() -> None:

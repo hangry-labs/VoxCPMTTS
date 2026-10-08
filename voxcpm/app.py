@@ -82,6 +82,7 @@ SSML_STAGING_DIR = Path(os.getenv("VOXCPM_SSML_STAGING_DIR", "/tmp/voxcpmtts-ssm
 MAX_RANDOM_SEED = 2**32 - 1
 TIMESTAMP_MODEL = os.getenv("VOXCPM_TIMESTAMP_MODEL", "base")
 TIMESTAMP_DEVICE = os.getenv("VOXCPM_TIMESTAMP_DEVICE", "cpu")
+LOUDNESS_NORMALIZATION_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=11"
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -440,6 +441,47 @@ def to_int16_audio(audio: np.ndarray) -> np.ndarray:
     return (normalized * 32767).astype("<i2")
 
 
+def normalize_audio_loudness(audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    normalized = to_float32_audio(np.asarray(audio)).reshape(-1)
+    if normalized.size == 0:
+        return normalized
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "wav",
+        "-i",
+        "pipe:0",
+        "-af",
+        LOUDNESS_NORMALIZATION_FILTER,
+        "-f",
+        "s16le",
+        "-acodec",
+        "pcm_s16le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "pipe:1",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            input=audio_to_wav_bytes(normalized, sample_rate),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("ffmpeg is required for loudness normalization") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"ffmpeg failed to normalize output loudness: {stderr}") from exc
+    return np.frombuffer(result.stdout, dtype="<i2").astype(np.float32) / 32768.0
+
+
 def encode_audio_bytes(audio: np.ndarray, output_format: str, sample_rate: int) -> bytes:
     normalized_format = normalize_output_format(output_format)
     wav_bytes = audio_to_wav_bytes(audio, sample_rate)
@@ -479,6 +521,8 @@ def encode_audio_stream(
     chunks: Iterator[np.ndarray],
     output_format: str,
     sample_rate: int,
+    *,
+    normalize_loudness: bool = False,
 ) -> Iterator[bytes]:
     normalized_format = normalize_stream_format(output_format)
     ffmpeg_args = OUTPUT_FORMATS[normalized_format]["ffmpeg_args"]
@@ -500,6 +544,7 @@ def encode_audio_stream(
         str(sample_rate),
         "-i",
         "pipe:0",
+        *(["-af", LOUDNESS_NORMALIZATION_FILTER] if normalize_loudness else []),
         *ffmpeg_args,
         "pipe:1",
     ]
@@ -652,6 +697,10 @@ class TTSRequest(BaseModel):
         description="LocDiT flow-matching steps. Nano-vLLM fixes this value when the engine starts.",
     )
     normalize_text: bool = Field(False, alias="normalize", description="Normalize text before synthesis.")
+    normalize_loudness: bool = Field(
+        False,
+        description="Normalize output toward -16 LUFS with a -1.5 dB true-peak ceiling.",
+    )
     denoise: bool = Field(False, description="Apply ZipEnhancer to prompt/reference audio when denoiser is enabled.")
     speed: float = Field(1.0, ge=0.25, le=4.0, description="Compatibility field; VoxCPM2 has no direct speed scalar.")
     seed: Optional[int] = Field(42, ge=0, le=MAX_RANDOM_SEED, description="32-bit generation seed.")
@@ -1004,6 +1053,7 @@ def _ssml_headers(
         "X-VoxCPM-Format": output_format,
         "X-VoxCPM-Seed": str(seed),
         "X-VoxCPM-Input-Type": payload.input_type,
+        "X-VoxCPM-Loudness-Normalized": str(payload.normalize_loudness).lower(),
     }
     if streaming:
         headers["X-VoxCPM-Streaming"] = "ssml-units"
@@ -1020,6 +1070,8 @@ def ssml_audio_response(payload: TTSRequest, route_name: str) -> StreamingRespon
         session = create_ssml_execution_session(payload, seed)
         sample_rate, waveform = session.render_array()
         set_generation_activity("encoding", f"Encoding {output_format.upper()} audio", active=True)
+        if payload.normalize_loudness:
+            waveform = normalize_audio_loudness(waveform, sample_rate)
         audio_bytes = encode_audio_bytes(waveform, output_format, sample_rate)
         session.commit_profiles()
         set_generation_activity("complete", "Audio is ready", active=False)
@@ -1073,7 +1125,12 @@ def ssml_progressive_audio_response(
     def body() -> Iterator[bytes]:
         completed = False
         try:
-            yield from encode_audio_stream(session.iter_chunks(), output_format, sample_rate)
+            yield from encode_audio_stream(
+                session.iter_chunks(),
+                output_format,
+                sample_rate,
+                normalize_loudness=payload.normalize_loudness,
+            )
             session.commit_profiles()
             completed = True
             set_generation_activity("complete", "Stream is ready", active=False)
@@ -1107,6 +1164,8 @@ def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResp
     output_format, sample_rate, waveform, seed = synthesize_payload(payload)
     try:
         set_generation_activity("encoding", f"Encoding {output_format.upper()} audio", active=True)
+        if payload.normalize_loudness:
+            waveform = normalize_audio_loudness(waveform, sample_rate)
         audio_bytes = encode_audio_bytes(waveform, output_format, sample_rate)
     except RuntimeError as exc:
         set_generation_activity("failed", str(exc), active=False)
@@ -1125,6 +1184,7 @@ def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResp
         "X-VoxCPM-Format": output_format,
         "X-VoxCPM-Seed": str(seed),
         "X-VoxCPM-Input-Type": payload.input_type,
+        "X-VoxCPM-Loudness-Normalized": str(payload.normalize_loudness).lower(),
     }
     return StreamingResponse(io.BytesIO(audio_bytes), media_type=media_type, headers=headers)
 
@@ -1149,7 +1209,12 @@ def progressive_audio_response(
 
     def body() -> Iterator[bytes]:
         try:
-            yield from encode_audio_stream(chunks, output_format, sample_rate)
+            yield from encode_audio_stream(
+                chunks,
+                output_format,
+                sample_rate,
+                normalize_loudness=payload.normalize_loudness,
+            )
             set_generation_activity("complete", "Stream is ready", active=False)
         except Exception as exc:
             set_generation_activity("failed", str(exc), active=False)
@@ -1170,6 +1235,7 @@ def progressive_audio_response(
         "X-VoxCPM-Streaming": "progressive-chunks",
         "X-VoxCPM-Seed": str(seed),
         "X-VoxCPM-Input-Type": payload.input_type,
+        "X-VoxCPM-Loudness-Normalized": str(payload.normalize_loudness).lower(),
     }
     return StreamingResponse(body(), media_type=media_type, headers=headers)
 
@@ -1355,6 +1421,7 @@ def defaults() -> dict:
         "inference_timesteps": DEFAULT_INFERENCE_TIMESTEPS,
         "seed": 42,
         "randomize_seed": True,
+        "normalize_loudness": True,
         "output_formats": {"default": "wav", "available": get_supported_output_formats()},
         "stream_formats": {"default": "mp3", "available": STREAM_FORMATS},
     }

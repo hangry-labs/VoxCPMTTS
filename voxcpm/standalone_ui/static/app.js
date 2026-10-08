@@ -442,6 +442,11 @@ function updateSeedState() {
   $('#seed').disabled = $('#randomize-seed').checked
 }
 
+function updateTimestampState() {
+  const enabled = $('#generate-timestamps')
+  $('#timestamp-level').disabled = enabled.disabled || !enabled.checked
+}
+
 function updateWorkflowControls() {
   const cloning = state.activeTab === 'clone'
   const profile = selectedProfile()
@@ -468,7 +473,8 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
     ref_text: referenceText,
     cfg_value: Number($('#guidance').value),
     inference_timesteps: Number($('#steps').value),
-    normalize: $('#normalize').checked,
+    normalize: $('#normalize-text').checked,
+    normalize_loudness: $('#normalize-loudness').checked,
     denoise: cloning && $('#denoise').checked,
     seed: Number($('#seed').value || 42),
     randomize_seed: $('#randomize-seed').checked,
@@ -1327,7 +1333,8 @@ function resetControls() {
   $('#guidance-slider').value = 2
   $('#steps').value = state.defaults.inference_timesteps || 10
   $('#steps-slider').value = state.defaults.inference_timesteps || 10
-  $('#normalize').checked = false
+  $('#normalize-text').checked = false
+  $('#normalize-loudness').checked = state.defaults.normalize_loudness ?? true
   $('#denoise').checked = false
   $('#seed').value = state.defaults.seed ?? 42
   $('#randomize-seed').checked = state.defaults.randomize_seed ?? true
@@ -1359,9 +1366,9 @@ async function initialize() {
   $('#transcribe-reference').disabled = !status.load_asr
   const timestampsAvailable = Boolean(status.timestamps?.available)
   $('#generate-timestamps').disabled = !timestampsAvailable
-  $('#timestamp-level').disabled = !timestampsAvailable
-  $('#timestamp-state').textContent = timestampsAvailable ? 'Available' : 'Not installed'
+  $('#timestamp-state').textContent = timestampsAvailable ? 'Ready' : 'Unavailable'
   $('#timestamp-state').dataset.state = timestampsAvailable ? 'available' : 'unavailable'
+  updateTimestampState()
   $('#runtime-badge').dataset.state = 'ready'
   $('#runtime-state').textContent = `${status.backend === 'nano' ? 'Nano' : 'Native'} backend ready`
   $('#runtime-model').textContent = `${status.model_id} · ${status.runtime}`
@@ -1380,6 +1387,7 @@ $('#control-input').addEventListener('input', updateVoiceDesignState)
 $('#reference-text').addEventListener('input', updateCloneConditioning)
 $('#voice-profile').addEventListener('change', updateVoiceProfileState)
 $('#randomize-seed').addEventListener('change', updateSeedState)
+$('#generate-timestamps').addEventListener('change', updateTimestampState)
 $('#sample-button').addEventListener('click', () => {
   if (state.inputType === 'text') state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
   $('#text-input').value = inputSample(state.inputType)

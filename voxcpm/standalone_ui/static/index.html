@@ -56,35 +56,41 @@
   <main class="workspace" data-view="generate">
     <aside class="settings-panel workflow-only" id="inference-settings">
       <div class="section-title"><i class="icon-sliders-horizontal"></i><span>Voice setup</span></div>
-      <label class="field"><span>Language</span><select id="language"><option value="English">English</option></select></label>
-      <label class="field"><span>Saved voice</span><select id="voice-profile"><option value="">None</option></select><small id="voice-profile-note">Use a saved design or clone sample</small></label>
-      <div class="field-grid">
-        <label class="field"><span>Hardware</span><select id="device"><option value="auto">Auto</option><option value="cpu">CPU</option></select></label>
-        <label class="field"><span>Output format</span><select id="output-format"><option value="mp3">MP3</option></select></label>
+      <div class="voice-setup-grid">
+        <label class="compact-field"><span>Language</span><select id="language"><option value="English">English</option></select></label>
+        <label class="compact-field"><span>Saved voice</span><select id="voice-profile"><option value="">None</option></select></label>
+        <label class="compact-field"><span>Hardware</span><select id="device"><option value="auto">Auto</option><option value="cpu">CPU</option></select></label>
+        <label class="compact-field"><span>Format</span><select id="output-format"><option value="mp3">MP3</option></select></label>
       </div>
+      <small class="voice-profile-note" id="voice-profile-note">Use a saved design or clone sample</small>
 
       <details class="settings-details compact-advanced" id="generation-settings">
         <summary><span><i class="icon-sliders-horizontal"></i>Generation settings</span><i class="icon-chevron-down disclosure-icon"></i></summary>
-        <div class="section-heading-row settings-actions"><span>Model and output controls</span><button class="icon-button reset-controls" id="reset-controls" type="button" title="Reset controls" aria-label="Reset controls"><i class="icon-rotate-ccw"></i></button></div>
+        <div class="section-heading-row settings-actions"><strong>Model controls</strong><button class="icon-button reset-controls" id="reset-controls" type="button" title="Reset controls" aria-label="Reset controls"><i class="icon-rotate-ccw"></i></button></div>
         <div class="range-stack">
-          <label class="range-control"><span class="range-heading"><span>Guidance</span></span><span class="range-input-row"><input id="guidance-slider" type="range" min="0.1" max="10" step="0.1" value="2" data-value-input="guidance"><input id="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" data-range-input="guidance-slider"></span></label>
-          <label class="range-control"><span class="range-heading"><span>Inference steps</span></span><span class="range-input-row"><input id="steps-slider" type="range" min="1" max="100" step="1" value="10" data-value-input="steps"><input id="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" data-range-input="steps-slider"></span></label>
+          <label class="range-control"><span class="range-heading"><span>Guidance</span></span><span class="range-input-row"><input id="guidance-slider" type="range" min="0.1" max="10" step="0.1" value="2" data-value-input="guidance"><input id="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" aria-label="Guidance value" data-range-input="guidance-slider"></span></label>
+          <label class="range-control"><span class="range-heading"><span>Inference steps</span></span><span class="range-input-row"><input id="steps-slider" type="range" min="1" max="100" step="1" value="10" data-value-input="steps"><input id="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" aria-label="Inference steps value" data-range-input="steps-slider"></span></label>
         </div>
-        <div class="seed-panel">
-          <label class="field seed-field"><span>Seed</span><input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></label>
-          <label class="toggle-field seed-randomize"><span>Randomize</span><input id="randomize-seed" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
-          <div class="seed-result"><span>Last generated seed</span><output id="last-generated-seed">--</output></div>
-        </div>
-        <div class="timestamp-options">
-          <span>Timing</span>
-          <label><input id="generate-timestamps" type="checkbox">Align output</label>
-          <select id="timestamp-level" aria-label="Timestamp level"><option value="word">Words</option><option value="segment">Segments</option><option value="char">Characters</option></select>
-          <small id="timestamp-state" data-state="unavailable">Checking</small>
-        </div>
-        <div class="toggle-grid">
-          <label class="toggle-field"><span>Normalize text</span><input id="normalize" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
-          <label class="toggle-field"><span>Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
-        </div>
+        <section class="settings-group seed-panel" aria-labelledby="seed-heading">
+          <div class="compact-section-heading"><strong id="seed-heading">Seed</strong><label class="inline-toggle seed-randomize"><span>Randomize</span><input id="randomize-seed" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label></div>
+          <label class="seed-field"><span class="visually-hidden">Seed value</span><input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></label>
+          <div class="seed-result"><span>Last used seed</span><output id="last-generated-seed">--</output></div>
+        </section>
+        <section class="settings-group output-settings" aria-labelledby="output-settings-heading">
+          <div class="compact-section-heading"><strong id="output-settings-heading">Output processing</strong><span>-16 LUFS</span></div>
+          <div class="compact-toggle-list">
+            <label class="toggle-field"><span>Normalize loudness</span><input id="normalize-loudness" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
+            <label class="toggle-field"><span>Normalize text</span><input id="normalize-text" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+            <label class="toggle-field"><span>Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+          </div>
+        </section>
+        <details class="settings-subdetails" id="timing-settings">
+          <summary><span>Speech timing</span><span class="capability-state" id="timestamp-state" data-state="unavailable">Checking</span></summary>
+          <div class="timestamp-options">
+            <label class="toggle-field timestamp-toggle"><span>Generate timestamps</span><input id="generate-timestamps" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+            <label class="compact-field timestamp-level-field"><span>Detail</span><select id="timestamp-level"><option value="word">Words</option><option value="segment">Segments</option><option value="char">Characters</option></select></label>
+          </div>
+        </details>
       </details>
       <div class="status-line" id="global-status" data-tone="neutral">Connecting to inference</div>
     </aside>
