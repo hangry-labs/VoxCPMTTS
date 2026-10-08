@@ -194,7 +194,7 @@ Runtime discovery is available from the local API:
 
 ## Benchmarks
 
-The checked-in [benchmark suite](benchmarks/BENCHMARKS.md) measures warmed generation speed, GPU and container memory, and transcript fidelity through a fixed Qwen3-ASR comparative judge. Native and Nano backends run sequentially on one GPU with concurrency one, and raw per-call results are retained for regression tracking.
+The checked-in [benchmark suite](benchmarks/BENCHMARKS.md) measures warmed generation speed, GPU and container memory, transcript fidelity, and multi-turn SSML reliability through a fixed Qwen3-ASR comparative judge. Native and Nano backends run sequentially on one GPU with concurrency one, and raw per-call results are retained for regression tracking.
 
 The initial baseline covered 24 common languages and 312 measured calls per backend on an NVIDIA GeForce RTX 5070 Ti:
 
@@ -214,6 +214,7 @@ Run the complete suite manually with:
 ```bash
 task benchmark-build
 task benchmark-baseline -- --asr-url http://127.0.0.1:8000 --comment "description of the change"
+task benchmark-ssml -- --asr-url http://127.0.0.1:8000 --comment "description of the change"
 ```
 
 Benchmarks are intentionally excluded from normal tests, image builds, and releases.
@@ -296,6 +297,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Added one-instance model caching, serialized generation, compile-worker limits, and reference-latent allocator cleanup to prevent duplicate weights and repeated-request RAM/VRAM growth.
 - Added 30-language public examples with voice-variety, translated introduction, and cross-language clone samples based on the KokoroTTS-generated project seed voice.
 - Added the controlled native-versus-Nano baseline suite covering generation speed, VRAM, container RAM, and Qwen3-ASR transcript fidelity across 24 common languages.
+- Added a paired five-round standard SSML and SSML-H dialogue benchmark with Qwen3-ASR similarity, per-turn ending coverage, final-tail completion, latency, and real-time-factor evidence.
 - Added Docker Hub and GHCR publishing, build identity labels, offline baked-asset validation, release tooling, license notices, and third-party attribution.
 - Removed upstream training workflows and inherited project material unrelated to the inference-focused fork.
 - Replaced the inherited graphics with the VoxCPMTTS WebP brand set and updated public project links to `hangrylabs.app`.

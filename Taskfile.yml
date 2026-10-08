@@ -17,6 +17,9 @@ vars:
   BENCHMARK_CONTAINER: voxcpmtts_benchmark
   BENCHMARK_PORT: '8811'
   BENCHMARK_ASR_URL: 'http://127.0.0.1:8000'
+  SSML_BENCHMARK_TTS_URL: 'http://127.0.0.1:8808'
+  SSML_BENCHMARK_ASR_URL: 'http://127.0.0.1:8000'
+  SSML_BENCHMARK_ROUNDS: '5'
   HF_TOKEN: ''
   BENCHMARK_CACHE_VOLUME: voxcpmtts_hf_cache
   DATA_VOLUME: voxcpmtts_data
@@ -66,6 +69,7 @@ tasks:
       - >-
         docker run --rm --entrypoint sh
         -v "{{.TASKFILE_DIR}}\voxcpm:/workspace/voxcpm:ro"
+        -v "{{.TASKFILE_DIR}}\benchmarks:/workspace/benchmarks:ro"
         -v "{{.TASKFILE_DIR}}\assets:/workspace/assets:ro"
         -v "{{.TASKFILE_DIR}}\VERSION:/workspace/VERSION:ro"
         -w /workspace
@@ -194,6 +198,27 @@ tasks:
         --design-sentences 1
         --repeats 1
         --clone-repeats 1
+        --no-write
+        {{.CLI_ARGS}}
+
+  benchmark-ssml:
+    desc: Append paired standard SSML and SSML-H dialogue reliability results
+    cmds:
+      - >-
+        python benchmarks/ssml/run_benchmark.py
+        --tts-url {{.SSML_BENCHMARK_TTS_URL}}
+        --asr-url {{.SSML_BENCHMARK_ASR_URL}}
+        --rounds {{.SSML_BENCHMARK_ROUNDS}}
+        {{.CLI_ARGS}}
+
+  benchmark-ssml-smoke:
+    desc: Exercise one round per SSML mode without recording history
+    cmds:
+      - >-
+        python benchmarks/ssml/run_benchmark.py
+        --tts-url {{.SSML_BENCHMARK_TTS_URL}}
+        --asr-url {{.SSML_BENCHMARK_ASR_URL}}
+        --rounds 1
         --no-write
         {{.CLI_ARGS}}
 
