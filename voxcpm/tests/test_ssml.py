@@ -37,6 +37,21 @@ def test_shared_parser_preserves_order_and_explicit_zero_break() -> None:
     assert plan.units[2].prosody.rate == 0.75
 
 
+def test_standard_ssml_tag_adjacency_does_not_change_spoken_units() -> None:
+    adjacent = compile_ssml(
+        '<speak xml:lang="en-US">Hello.<break time="350ms"/><prosody>World.</prosody></speak>',
+        "ssml",
+        resolve_language=runtime.resolve_ssml_language,
+    )
+    spaced = compile_ssml(
+        '<speak xml:lang="en-US">Hello. <break time="350ms"/> <prosody>World.</prosody> </speak>',
+        "ssml",
+        resolve_language=runtime.resolve_ssml_language,
+    )
+
+    assert adjacent.units == spaced.units
+
+
 def test_capabilities_match_voxcpm_support() -> None:
     capabilities = ssml_capabilities()
 

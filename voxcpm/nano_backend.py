@@ -4,15 +4,47 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import tempfile
 import threading
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Generator
+from typing import Callable, Generator, Sequence
 
 import numpy as np
 import torch
 from huggingface_hub import snapshot_download
+
+
+MAX_GENERATION_SEED = 0xFFFFFFFF
+
+
+def _bounded_generation_length(
+    text: str,
+    tokenizer: Callable[[str], Sequence[int]],
+    requested_max: int,
+    ratio_threshold: float,
+    patch_size: int,
+) -> tuple[int, float]:
+    if requested_max < 1:
+        raise ValueError("max_len must be greater than zero")
+    if ratio_threshold <= 0:
+        raise ValueError("retry_badcase_ratio_threshold must be greater than zero")
+    if patch_size < 1:
+        raise ValueError("patch_size must be greater than zero")
+    token_count = max(1, len(tokenizer(text)))
+    badcase_threshold = token_count * ratio_threshold
+    latent_limit = min(requested_max, int(badcase_threshold + 10))
+    return max(1, (latent_limit + patch_size - 1) // patch_size), badcase_threshold
+
+
+def _materialize_seed(seed: int | None) -> int:
+    value = secrets.randbelow(MAX_GENERATION_SEED + 1) if seed is None else int(seed)
+    if not 0 <= value <= MAX_GENERATION_SEED:
+        raise ValueError("seed must be between 0 and 4294967295")
+    return value
+
 
 def _env_int(name: str, default: int) -> int:
     value = int(os.getenv(name, str(default)))
@@ -58,6 +90,9 @@ class NanoVoxCPM:
             raise ValueError("Nano-vLLM supports CUDA devices only")
 
         from nanovllm_voxcpm import VoxCPM as NanoEngine
+        from transformers import LlamaTokenizerFast
+
+        from .model.utils import mask_multichar_chinese_tokens
 
         device_index = int(device.split(":", 1)[1]) if ":" in device else 0
         self.inference_timesteps = _env_int("VOXCPM_NANO_INFERENCE_TIMESTEPS", 10)
@@ -74,6 +109,8 @@ class NanoVoxCPM:
         )
         model_info = self._server.get_model_info()
         self.tts_model = SimpleNamespace(sample_rate=int(model_info["sample_rate"]))
+        self._patch_size = int(model_info["patch_size"])
+        self._text_tokenizer = mask_multichar_chinese_tokens(LlamaTokenizerFast.from_pretrained(model_path))
         self.last_successful_seed: int | None = None
         self.text_normalizer = None
         self.denoiser = None
@@ -131,6 +168,9 @@ class NanoVoxCPM:
         max_len: int = 2000,
         normalize: bool = False,
         denoise: bool = False,
+        retry_badcase: bool = True,
+        retry_badcase_max_times: int = 3,
+        retry_badcase_ratio_threshold: float = 6.0,
         seed: int | None = None,
         **_: object,
     ) -> Generator[np.ndarray, None, None]:
@@ -151,6 +191,16 @@ class NanoVoxCPM:
                 self.text_normalizer = TextNormalizer()
             text = self.text_normalizer.normalize(text)
 
+        generation_limit, badcase_threshold = _bounded_generation_length(
+            text,
+            self._text_tokenizer,
+            max_len,
+            retry_badcase_ratio_threshold,
+            self._patch_size,
+        )
+        if retry_badcase_max_times < 1:
+            raise ValueError("retry_badcase_max_times must be greater than zero")
+
         temporary_paths: list[str] = []
         actual_prompt_path = prompt_wav_path
         actual_reference_path = reference_wav_path
@@ -170,17 +220,33 @@ class NanoVoxCPM:
             with self._generation_lock:
                 prompt_latents = self._encode_audio(actual_prompt_path) if actual_prompt_path else None
                 reference_latents = self._encode_audio(actual_reference_path) if actual_reference_path else None
-                for chunk in self._server.generate(
-                    target_text=text,
-                    prompt_latents=prompt_latents,
-                    prompt_text=prompt_text or "",
-                    ref_audio_latents=reference_latents,
-                    max_generate_length=max_len,
-                    cfg_value=cfg_value,
-                    seed=seed,
-                ):
-                    self.last_successful_seed = seed
-                    yield np.asarray(chunk, dtype=np.float32).reshape(-1)
+                current_seed = _materialize_seed(seed)
+                generation_kwargs = {
+                    "target_text": text,
+                    "prompt_latents": prompt_latents,
+                    "prompt_text": prompt_text or "",
+                    "ref_audio_latents": reference_latents,
+                    "max_generate_length": generation_limit,
+                    "cfg_value": cfg_value,
+                }
+                if not retry_badcase:
+                    for chunk in self._server.generate(**generation_kwargs, seed=current_seed):
+                        self.last_successful_seed = current_seed
+                        yield np.asarray(chunk, dtype=np.float32).reshape(-1)
+                    return
+
+                for attempt in range(retry_badcase_max_times):
+                    chunks = [
+                        np.asarray(chunk, dtype=np.float32).reshape(-1)
+                        for chunk in self._server.generate(**generation_kwargs, seed=current_seed)
+                    ]
+                    is_badcase = len(chunks) * self._patch_size >= badcase_threshold
+                    if is_badcase and attempt + 1 < retry_badcase_max_times:
+                        current_seed = (current_seed + 1) & MAX_GENERATION_SEED
+                        continue
+                    self.last_successful_seed = current_seed
+                    yield from chunks
+                    break
         finally:
             for temporary_path in temporary_paths:
                 Path(temporary_path).unlink(missing_ok=True)
@@ -192,6 +258,9 @@ class NanoVoxCPM:
         return np.concatenate(chunks)
 
     def generate_streaming(self, *args: object, **kwargs: object) -> Generator[np.ndarray, None, None]:
+        if kwargs.pop("retry_badcase", False):
+            warnings.warn("Retry on bad cases is not supported in streaming mode, setting retry_badcase=False.")
+        kwargs["retry_badcase"] = False
         yield from self._generate_chunks(*args, **kwargs)
 
     def close(self) -> None:
