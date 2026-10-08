@@ -50,6 +50,10 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="generate-timestamps"' in responses["/"].text
     assert 'id="stream-live-wave"' in responses["/"].text
     assert 'id="reference-record-wave"' in responses["/"].text
+    assert 'class="reference-audio-surface"' in responses["/"].text
+    assert 'id="reference-audio-choose"' in responses["/"].text
+    assert 'id="reference-audio-clear"' in responses["/"].text
+    assert responses["/"].text.count('id="transcribe-reference"') == 1
     assert 'id="profile-audio-drop"' in responses["/"].text
     assert 'data-input-type="ssml"' in responses["/"].text
     assert 'data-input-type="ssml-h"' in responses["/"].text
@@ -71,6 +75,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "input_type: state.inputType" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
     assert "openProfileEditor(profile)" in script
+    assert "referenceAudio.clear()" in script
+    assert "Unavailable with transcript" in script
     assert "sessionStorage.setItem(GPU_SESSION_KEY" in script
 
 

@@ -118,16 +118,28 @@
       <div class="tab-panel" data-panel="clone" hidden>
         <section class="conditioning-panel" id="clone-panel">
           <div class="section-title"><i class="icon-mic"></i><span>Reference voice</span></div>
-          <div class="reference-source-grid">
-            <label class="file-drop" id="reference-audio-drop"><input id="reference-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"><i class="icon-upload"></i><span>Choose or drop reference audio</span><small id="reference-audio-name">WAV, MP3, FLAC, OGG, or M4A</small></label>
-            <div class="microphone-capture"><div><i class="icon-mic"></i><strong>Microphone</strong><small>Record a reference sample</small></div><canvas class="recording-wave" id="reference-record-wave" aria-label="Live microphone waveform"></canvas><span class="record-state" id="reference-record-state" aria-live="polite">Ready to record</span><button class="record-button" id="reference-record-toggle" type="button" aria-pressed="false"><i class="icon-mic"></i><span>Record</span></button></div>
+          <div class="reference-audio-surface" id="reference-audio-drop">
+            <input class="visually-hidden" id="reference-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*">
+            <div class="reference-source-toolbar">
+              <div class="reference-source-label"><i class="icon-file-audio"></i><div><strong>Reference audio</strong><small id="reference-audio-name">No audio selected</small></div></div>
+              <div class="reference-source-actions">
+                <button class="icon-button bordered" id="reference-audio-clear" type="button" title="Remove reference audio" aria-label="Remove reference audio" hidden><i class="icon-x"></i></button>
+                <button class="secondary-button compact-command" id="reference-audio-choose" type="button"><i class="icon-upload"></i><span>Choose audio</span></button>
+                <button class="record-button compact-command" id="reference-record-toggle" type="button" aria-pressed="false"><i class="icon-mic"></i><span>Record</span></button>
+              </div>
+            </div>
+            <div class="reference-recording-monitor">
+              <canvas class="recording-wave" id="reference-record-wave" aria-label="Live microphone waveform"></canvas>
+              <span class="record-state" id="reference-record-state" aria-live="polite">Ready to record</span>
+            </div>
+            <section class="reference-audio-preview" id="reference-audio-preview" aria-live="polite"></section>
+            <div class="reference-drop-note"><i class="icon-upload"></i><span>Drop audio here to replace the current reference</span><small>WAV, MP3, FLAC, OGG, or M4A</small></div>
           </div>
-          <section class="reference-audio-preview" id="reference-audio-preview" aria-live="polite"></section>
           <div class="clone-guidance-grid">
-            <label class="field"><span>Reference transcript <small>Optional</small></span><textarea id="reference-text" rows="4" placeholder="Enter exactly what is spoken in the reference audio"></textarea></label>
+            <div class="field clone-guidance-field"><div class="clone-field-heading"><label for="reference-text">Reference transcript <small>Optional</small></label><button class="secondary-button compact-command" id="transcribe-reference" type="button"><i class="icon-message-square-text"></i><span>Transcribe</span></button></div><textarea id="reference-text" rows="4" placeholder="Enter exactly what is spoken in the reference audio"></textarea></div>
             <label class="field"><span>Clone direction <small id="clone-direction-state">Optional</small></span><textarea id="clone-control-input" rows="4" placeholder="Warm, measured delivery with a clear tone"></textarea></label>
           </div>
-          <div class="clone-command-row"><button class="secondary-button" id="transcribe-reference" type="button"><i class="icon-message-square-text"></i><span>Transcribe reference</span></button><button class="secondary-button" id="save-cloned-voice" type="button" disabled><i class="icon-check"></i><span>Save reference voice</span></button></div>
+          <div class="clone-command-row"><button class="secondary-button" id="save-cloned-voice" type="button" disabled><i class="icon-check"></i><span>Save reference voice</span></button></div>
         </section>
         <div class="generate-action-row"><button class="primary-button" id="clone-button" type="button"><i class="icon-audio-lines"></i><span>Generate cloned audio</span></button></div>
         <div class="inference-progress" id="clone-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong>Preparing request</strong><span>VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>

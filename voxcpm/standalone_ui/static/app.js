@@ -124,7 +124,8 @@ const referenceAudio = new AudioEditor($('#reference-audio-preview'), {
   labels: AUDIO_EDITOR_LABELS,
   onChange: (file) => {
     $('#reference-audio-drop').classList.toggle('has-file', Boolean(file))
-    $('#reference-audio-name').textContent = file?.name || 'WAV, MP3, FLAC, OGG, or M4A'
+    $('#reference-audio-name').textContent = file?.name || 'No audio selected'
+    $('#reference-audio-clear').hidden = !file
     updateWorkflowControls()
   },
 })
@@ -435,7 +436,7 @@ function updateCloneConditioning() {
   const guided = Boolean($('#reference-text').value.trim())
   const direction = $('#clone-control-input')
   direction.disabled = guided
-  $('#clone-direction-state').textContent = guided ? 'Transcript guided' : 'Optional'
+  $('#clone-direction-state').textContent = guided ? 'Unavailable with transcript' : 'Optional'
 }
 
 function updateSeedState() {
@@ -910,7 +911,7 @@ async function transcribeReference() {
     setStatus(errorMessage(error), 'error')
     showToast(errorMessage(error))
   } finally {
-    label.textContent = 'Transcribe reference'
+    label.textContent = 'Transcribe'
     button.disabled = !state.status.load_asr
   }
 }
@@ -1397,6 +1398,12 @@ $('#sample-button').addEventListener('click', () => {
 $('#reference-audio').addEventListener('change', (event) => {
   const file = event.target.files[0]
   if (file) referenceAudio.load(file, file.name)
+  event.target.value = ''
+})
+$('#reference-audio-choose').addEventListener('click', () => $('#reference-audio').click())
+$('#reference-audio-clear').addEventListener('click', () => referenceAudio.clear())
+$('#reference-audio-preview').addEventListener('click', (event) => {
+  if (event.target.closest('[data-role="empty"]')) $('#reference-audio').click()
 })
 for (const eventName of ['dragenter', 'dragover']) {
   $('#reference-audio-drop').addEventListener(eventName, (event) => {

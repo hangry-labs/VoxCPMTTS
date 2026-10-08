@@ -398,7 +398,7 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .normalization-preview output { display: block; margin-top: 6px; color: #d8d9dd; font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .normalization-preview p { margin: 6px 0 0; color: #f0b36f; font-size: 0.68rem; line-height: 1.4; }
 
-.conditioning-panel { margin-top: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
+.conditioning-panel { margin-top: 18px; }
 .conditioning-panel > p { margin: 7px 0 0; color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
 .design-grid, .advanced-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .file-drop { position: relative; display: grid; place-items: center; gap: 6px; min-height: 112px; margin-top: 14px; padding: 16px; border: 1px dashed #555861; border-radius: 5px; background: #17181b; color: var(--muted); text-align: center; }
@@ -408,29 +408,47 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .file-drop i { color: var(--accent); font-size: 1.35rem; }
 .file-drop span { font-size: 0.82rem; font-weight: 750; }
 .file-drop small, .field small { color: var(--muted); font-size: 0.68rem; line-height: 1.4; }
-.reference-source-grid, .profile-audio-sources { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(210px, 0.75fr); gap: 10px; margin-top: 14px; }
-.reference-source-grid .file-drop { margin-top: 0; }
-.microphone-capture { display: grid; grid-template-rows: auto minmax(42px, 1fr) auto auto; min-width: 0; padding: 13px; border: 1px solid #555861; border-radius: 5px; background: #17181b; }
-.microphone-capture > div { display: grid; grid-template-columns: auto 1fr; align-content: start; gap: 3px 8px; }
-.microphone-capture > div i { grid-row: 1 / 3; margin-top: 2px; color: var(--accent); font-size: 1.2rem; }
-.microphone-capture strong { font-size: 0.78rem; }
-.microphone-capture small { color: var(--muted); font-size: 0.67rem; line-height: 1.4; }
-.microphone-capture .record-state { min-height: 27px; padding: 6px 0 4px; }
-.microphone-capture .record-button { width: 100%; }
-.recording-wave { width: 100%; height: 48px; margin-top: 7px; border: 1px solid var(--line-soft); border-radius: 3px; background: #111214; }
-.reference-audio-preview { margin-top: 10px; }
+.profile-audio-sources { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(210px, 0.75fr); gap: 10px; margin-top: 14px; }
+.reference-audio-surface { margin-top: 14px; overflow: hidden; border: 1px solid #555861; border-radius: 5px; background: #202126; transition: border-color 120ms ease, box-shadow 120ms ease; }
+.reference-audio-surface.dragging { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 122, 26, 0.15); }
+.reference-audio-surface.has-file { border-color: #4b765f; }
+.reference-source-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); }
+.reference-source-label { display: flex; align-items: center; min-width: 0; gap: 9px; }
+.reference-source-label > i { flex: 0 0 auto; color: var(--accent); font-size: 1.2rem; }
+.reference-source-label > div { display: grid; min-width: 0; gap: 3px; }
+.reference-source-label strong { font-size: 0.78rem; }
+.reference-source-label small { overflow: hidden; color: var(--muted); font-size: 0.67rem; text-overflow: ellipsis; white-space: nowrap; }
+.reference-source-actions { display: flex; flex: 0 0 auto; gap: 7px; }
+.reference-recording-monitor { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; max-height: 0; padding: 0 12px; overflow: hidden; border-bottom: 0 solid var(--line-soft); opacity: 0; transition: max-height 160ms ease, padding 160ms ease, border-width 160ms ease, opacity 120ms ease; }
+.reference-audio-surface:has(.record-button[data-recording="true"]) .reference-recording-monitor { max-height: 76px; padding: 9px 12px; border-bottom-width: 1px; opacity: 1; }
+.reference-recording-monitor .record-state { min-width: 118px; min-height: 0; padding: 0; justify-content: flex-end; }
+.recording-wave { width: 100%; height: 46px; border: 1px solid var(--line-soft); border-radius: 3px; background: #111214; }
+.reference-audio-preview { border: 0; border-radius: 0; }
+.reference-audio-preview .audio-editor-head { display: none; }
+.reference-audio-preview .wave-stage { height: 148px; }
+.reference-audio-preview .waveform { height: 116px; }
+.reference-audio-preview .wave-empty { cursor: pointer; }
+.reference-audio-preview .wave-empty.output-empty:hover { border-color: var(--accent); color: var(--text); }
+.reference-drop-note { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 36px; padding: 7px 11px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 0.67rem; }
+.reference-drop-note i { color: var(--accent); }
+.reference-drop-note small { color: #7f828a; font-size: 0.62rem; }
 .clone-guidance-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .clone-guidance-grid .field > span { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .clone-guidance-grid textarea:disabled { color: #777a82; cursor: not-allowed; opacity: 0.62; }
+.clone-guidance-field { min-width: 0; }
+.clone-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.clone-field-heading label { color: var(--muted); font-size: 0.75rem; font-weight: 700; }
+.clone-field-heading label small { margin-left: 5px; font-weight: 500; }
+.clone-field-heading .compact-command { min-height: 30px; padding: 0 9px; font-size: 0.67rem; }
 .reference-diagnostics { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; padding: 9px 10px; border-left: 3px solid var(--green); background: #151b18; color: #bcebd2; font-size: 0.72rem; line-height: 1.45; overflow-wrap: anywhere; }
 .reference-diagnostics[hidden] { display: none; }
 .reference-diagnostics i { flex: 0 0 auto; margin-top: 2px; }
 .reference-diagnostics[data-tone="warning"] { border-color: var(--accent); background: #211912; color: #ffc59e; }
 .reference-diagnostics ul { margin: 0; padding-left: 18px; }
 .reference-diagnostics strong { color: inherit; }
-.reference-audio-preview .wave-stage, #profile-audio-preview .wave-stage { height: 132px; }
-.reference-audio-preview .waveform, #profile-audio-preview .waveform { height: 98px; }
-.reference-audio-preview .wave-empty, #profile-audio-preview .wave-empty { inset: 12px; }
+#profile-audio-preview .wave-stage { height: 132px; }
+#profile-audio-preview .waveform { height: 98px; }
+#profile-audio-preview .wave-empty { inset: 12px; }
 .settings-details { padding: 14px 16px; border: 1px solid var(--line); border-radius: 5px; background: #151619; }
 .settings-details summary { font-weight: 700; }
 .toggle-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 22px; margin-top: 12px; }
@@ -476,7 +494,7 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .generate-action-row .primary-button { margin: 0; }
 .command-row .primary-button { width: min(220px, 100%); margin: 0; }
 .stop-button { min-width: 100px; }
-.clone-command-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+.clone-command-row { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
 .inference-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; margin-top: 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 5px; background: #17181b; }
 .inference-progress[hidden] { display: none; }
 .progress-track { position: relative; grid-column: 1 / -1; height: 3px; overflow: hidden; background: #2a2c31; }
@@ -657,7 +675,11 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   .settings-panel .section-title, .settings-panel .field-grid, .settings-panel .voice-setup-grid, .settings-panel .voice-profile-note, .settings-panel .status-line, .settings-panel .compact-advanced { grid-column: 1 / -1; }
   .compact-advanced .advanced-grid, .compact-advanced .toggle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .voice-form-grid { grid-template-columns: 1fr; }
-  .reference-source-grid, .profile-audio-sources { grid-template-columns: 1fr; }
+  .profile-audio-sources { grid-template-columns: 1fr; }
+  .reference-source-toolbar { align-items: stretch; flex-direction: column; }
+  .reference-source-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reference-drop-note { grid-template-columns: auto minmax(0, 1fr); }
+  .reference-drop-note small { display: none; }
   .voice-defaults { padding: 16px 0 0; border-top: 1px solid var(--line); border-left: 0; }
   .content-panel { padding: 22px 12px 40px; }
   .panel-toolbar { align-items: stretch; flex-direction: column; gap: 14px; }
