@@ -217,3 +217,21 @@ def test_invalid_ssml_mode_does_not_infer_markup() -> None:
             f'<speak xmlns:h="{SSML_H_NAMESPACE}"><metadata><h:extensions version="1.0"/></metadata>Hello.</speak>',
             "ssml",
         )
+
+
+def test_multilingual_launch_dialogue_examples_are_valid() -> None:
+    example_dir = Path(__file__).parents[2] / "examples" / "ssml-h"
+    expected_units = {
+        "english-launch-dialogue.ssml": 23,
+        "german-launch-dialogue.ssml": 23,
+        "polish-launch-dialogue.ssml": 29,
+    }
+
+    for filename, unit_count in expected_units.items():
+        plan = compile_ssml(
+            (example_dir / filename).read_text(encoding="utf-8"),
+            "ssml-h",
+            resolve_language=runtime.resolve_ssml_language,
+        )
+        assert len(plan.units) == unit_count
+        assert len(plan.voice_definitions) == 3

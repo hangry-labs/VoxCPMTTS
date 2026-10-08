@@ -1,0 +1,137 @@
+<speak
+  version="1.1"
+  xmlns="http://www.w3.org/2001/10/synthesis"
+  xmlns:h="https://hangrylabs.app/ns/ssml-h/1.0"
+  xml:lang="pl-PL">
+
+  <metadata>
+    <h:extensions version="1.0">
+      <h:voice-definition
+        name="Kapitan"
+        gender="male"
+        age="middle-aged"
+        pitch="low"
+        style="authoritative"
+        languages="pl-PL"
+        accent="polish"
+        scope="request"
+        seed="4242">
+        <h:description>
+          Doświadczony kapitan statku o niskim, zdecydowanym głosie.
+          Mówi spokojnie i pewnie, lecz w sytuacji zagrożenia reaguje gwałtownie.
+        </h:description>
+        <h:sample xml:lang="pl-PL">
+          Tu kapitan. Za chwilę rozpoczniemy procedurę startową statku.
+        </h:sample>
+      </h:voice-definition>
+
+      <h:voice-definition
+        name="Inzynier_Anna"
+        gender="female"
+        age="adult"
+        pitch="medium"
+        style="calm and precise"
+        languages="pl-PL"
+        accent="polish"
+        scope="request"
+        seed="8241">
+        <h:description>
+          Spokojna i precyzyjna główna inżynier. Mówi wyraźnie,
+          rzeczowo i profesjonalnie, nawet pod presją.
+        </h:description>
+        <h:sample xml:lang="pl-PL">
+          Wszystkie układy zostały sprawdzone. Parametry pozostają w normie.
+        </h:sample>
+      </h:voice-definition>
+
+      <h:voice-definition
+        name="Oficer_Nowak"
+        gender="male"
+        age="young-adult"
+        pitch="medium"
+        style="alert and urgent"
+        languages="pl-PL"
+        accent="polish"
+        scope="request"
+        seed="1907">
+        <h:description>
+          Młody oficer bezpieczeństwa o szybkim, czujnym sposobie mówienia.
+          W sytuacji awaryjnej brzmi pilnie i bezpośrednio.
+        </h:description>
+        <h:sample xml:lang="pl-PL">
+          Oficer bezpieczeństwa Nowak. Monitoruję wszystkie sekcje statku.
+        </h:sample>
+      </h:voice-definition>
+    </h:extensions>
+  </metadata>
+
+  <voice name="Kapitan" h:direction="Spokojnie, pewnie i dowódczo">
+    Maszynownio, tu mostek. Anno, czy wszystkie systemy są gotowe do startu?
+  </voice>
+
+  <break time="350ms" />
+
+  <voice name="Inzynier_Anna" h:direction="Spokojnie, precyzyjnie i uspokajająco">
+    Tak, kapitanie. Napęd główny pracuje stabilnie, ciśnienie paliwa jest prawidłowe,
+    a wszystkie systemy pozostają w normie. Możemy rozpoczynać.
+  </voice>
+
+  <break time="450ms" />
+
+  <voice name="Kapitan" h:direction="Uroczyście i zdecydowanie, jak podczas procedury startowej">
+    Zrozumiałem. Rozpoczynam końcowe odliczanie.
+    <break time="250ms" />
+    Pięć...
+    <break time="500ms" />
+    cztery...
+    <break time="500ms" />
+    trzy...
+  </voice>
+
+  <break time="120ms" />
+
+  <voice name="Oficer_Nowak" h:direction="Nagle, bardzo głośno i alarmująco">
+    Przerwać start! Pożar w sekcji zasilania! Ogień rozprzestrzenia się w kierunku maszynowni!
+  </voice>
+
+  <break time="180ms" />
+
+  <voice name="Kapitan" h:direction="Krzyczy ze złością i pilnością, wydając natychmiastowy rozkaz">
+    Maszynownia! Co tam się dzieje?! Ogarnijcie się wreszcie
+    i doprowadźcie ten statek do porządku! Natychmiast opanujcie pożar
+    i zameldujcie gotowość, zanim wznowię odliczanie!
+  </voice>
+
+  <break time="400ms" />
+
+  <voice name="Inzynier_Anna" h:direction="Szybko i stanowczo, koordynując akcję awaryjną">
+    Zrozumiałam! Odcinam zasilanie sekcji trzeciej i uruchamiam system gaśniczy.
+    Zespół techniczny jest już na miejscu. Proszę utrzymać wstrzymanie startu.
+  </voice>
+
+  <break time="650ms" />
+
+  <voice name="Oficer_Nowak" h:direction="Uważnie, potem z wyraźną ulgą">
+    Temperatura spada. Ogień został opanowany, a sekcja zasilania jest odizolowana.
+    Nie wykrywam dalszego zagrożenia dla statku.
+  </voice>
+
+  <break time="350ms" />
+
+  <voice name="Inzynier_Anna" h:direction="Spokojnie, profesjonalnie i pewnie">
+    Maszynownia ponownie gotowa. Napęd działa na obwodzie zapasowym.
+    Możemy bezpiecznie wznowić odliczanie.
+  </voice>
+
+  <break time="450ms" />
+
+  <voice name="Kapitan" h:direction="Najpierw surowo, następnie triumfalnie i z energią">
+    Przyjąłem. Tym razem bez niespodzianek. Wznawiam odliczanie.
+    <break time="300ms" />
+    Dwa...
+    <break time="550ms" />
+    jeden...
+    <break time="650ms" />
+    start! Wszystkie silniki pełna moc. Ruszamy!
+  </voice>
+</speak>

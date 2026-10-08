@@ -11,6 +11,8 @@ from fastapi.responses import StreamingResponse
 
 import voxcpm.app as runtime
 
+TEST_PORTRAIT_WEBP = (Path(__file__).parents[2] / "assets" / "voxcpmtts_mascot.webp").read_bytes()
+
 
 def test_static_workspace_and_assets_are_available() -> None:
     with patch.object(runtime.GPU_MONITOR, "request_snapshot", return_value={"gpus": [], "history": {}}):
@@ -36,9 +38,21 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'src="/assets/voxcpmtts_mascot.webp"' in responses["/"].text
     assert "UI v" not in responses["/"].text
     assert 'data-tab="clone"' in responses["/"].text
-    assert 'data-tab="voices"' in responses["/"].text
+    assert '>Design</button>' in responses["/"].text
+    assert 'data-tab="voices"' not in responses["/"].text
     assert 'id="voice-mode"' not in responses["/"].text
-    assert 'id="voice-design-details"' in responses["/"].text
+    assert 'id="voice-design-details"' not in responses["/"].text
+    assert 'id="design-text-input"' in responses["/"].text
+    assert 'id="design-text-input" type="text"' in responses["/"].text
+    assert 'id="design-seed-lock"' in responses["/"].text
+    assert 'id="design-voice-name"' in responses["/"].text
+    assert 'id="design-voice-tags"' in responses["/"].text
+    assert 'id="design-portrait-input"' in responses["/"].text
+    assert 'class="portrait-placeholder"' in responses["/"].text
+    assert 'id="clone-output-section"' in responses["/"].text
+    assert 'id="quick-profile-name"' not in responses["/"].text
+    assert 'data-design-source="reference"' in responses["/"].text
+    assert 'data-design-source="direction"' in responses["/"].text
     assert 'id="reference-text"' in responses["/"].text
     assert 'id="voice-profile"' in responses["/"].text
     assert 'id="generate-progress"' in responses["/"].text
@@ -57,11 +71,14 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'data-clone-mode="reference"' in responses["/"].text
     assert 'data-clone-mode="transcript"' in responses["/"].text
     assert 'id="clone-profile-list"' in responses["/"].text
+    assert 'id="clone-profile-filter"' in responses["/"].text
     assert 'id="store-generated-voice"' in responses["/"].text
-    assert 'id="profile-audio-drop"' in responses["/"].text
+    assert 'id="cancel-voice-edit"' in responses["/"].text
+    assert 'id="update-profile-dialog"' in responses["/"].text
+    assert 'id="profile-audio-drop"' not in responses["/"].text
     assert 'data-input-type="ssml"' in responses["/"].text
     assert 'data-input-type="ssml-h"' in responses["/"].text
-    assert 'id="profile-edit-cancel"' in responses["/"].text
+    assert 'id="profile-edit-dialog"' not in responses["/"].text
     assert "gradio" not in responses["/"].text.lower()
     assert responses["/system/gpu"].json()["gpus"] == []
     assert responses["/system/gpu"].headers["cache-control"] == "no-store"
@@ -76,12 +93,20 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "function renderGpuMonitor(" in script
     assert "function stopGpuMonitor(" in script
     assert "inputDrafts: { text: null, ssml: null, 'ssml-h': null }" in script
-    assert "input_type: state.inputType" in script
+    assert "input_type: cloning ? 'text' : state.inputType" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
-    assert "openProfileEditor(profile)" in script
+    assert "useProfile(profile, 'clone', { editing: true })" in script
     assert "referenceAudio.clear()" in script
     assert "compactGeneratedReferenceText" in script
-    assert "clone_mode: cloning ? state.cloneMode : 'auto'" in script
+    assert "clone_mode: usesReference ? state.cloneMode : 'auto'" in script
+    assert "function generatedVoiceRecipe(" in script
+    assert "sample_text: payload.text" in script
+    assert "design_reference_audio" in script
+    assert "profile.tags" in script
+    assert "portraitFile" in script
+    assert "metadataOnly" in script
+    assert "Update details" in script
+    assert "async function loadProfileReference(" in script
     assert "sessionStorage.setItem(GPU_SESSION_KEY" in script
 
 
@@ -277,31 +302,68 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
                     "name": "Studio Narrator",
                     "profile_type": "cloned",
                     "description": "Warm studio reference",
+                    "tags": json.dumps(["Warm", "Narrator", "warm"]),
                     "ref_text": "This is the original recording.",
                     "language": "English",
+                    "recipe": json.dumps(
+                        {
+                            "design_source": "reference",
+                            "clone_mode": "transcript",
+                            "seed": 1234,
+                            "randomize_seed": False,
+                            "cfg_value": 2.5,
+                            "inference_timesteps": 10,
+                            "normalize": False,
+                            "normalize_loudness": True,
+                            "denoise": False,
+                            "output_format": "wav",
+                            "sample_text": "A complete voice design sample.",
+                            "reference_text": "This is the original recording.",
+                        }
+                    ),
                 },
-                files={"reference_audio": ("reference.wav", b"reference-bytes", "audio/wav")},
+                files={
+                    "reference_audio": ("reference.wav", b"reference-bytes", "audio/wav"),
+                    "design_reference_audio": ("original.wav", b"original-design-bytes", "audio/wav"),
+                    "portrait": ("portrait.webp", TEST_PORTRAIT_WEBP, "image/webp"),
+                },
             )
             listed = client.get("/tts/voice-profiles")
             audio = client.get("/tts/voice-profiles/studio-narrator/audio")
+            design_audio = client.get("/tts/voice-profiles/studio-narrator/design-audio")
+            portrait = client.get("/tts/voice-profiles/studio-narrator/portrait")
 
             payload = runtime.TTSRequest(text="A new sentence.", voice_profile="studio-narrator")
             kwargs = runtime.build_generate_kwargs(payload, object())
 
             deleted = client.delete("/tts/voice-profiles/studio-narrator")
             missing = client.get("/tts/voice-profiles/studio-narrator/audio")
+            missing_design = client.get("/tts/voice-profiles/studio-narrator/design-audio")
+            missing_portrait = client.get("/tts/voice-profiles/studio-narrator/portrait")
 
     assert created.status_code == 200
     assert created.json()["id"] == "studio-narrator"
     assert created.json()["profile_type"] == "cloned"
+    assert created.json()["recipe"]["seed"] == 1234
+    assert created.json()["recipe"]["clone_mode"] == "transcript"
+    assert created.json()["recipe"]["sample_text"] == "A complete voice design sample."
+    assert created.json()["has_design_audio"] is True
+    assert created.json()["has_portrait"] is True
+    assert created.json()["tags"] == ["Warm", "Narrator"]
     assert listed.json()["count"] == 1
+    assert listed.headers["cache-control"] == "no-store"
     assert audio.content == b"reference-bytes"
+    assert design_audio.content == b"original-design-bytes"
+    assert portrait.content.startswith(b"RIFF") and portrait.content[8:12] == b"WEBP"
+    assert portrait.headers["content-type"] == "image/webp"
     assert Path(kwargs["reference_wav_path"]).parent == tmp_path
     assert kwargs["prompt_wav_path"] == kwargs["reference_wav_path"]
     assert kwargs["prompt_text"] == "This is the original recording."
     assert 0 <= kwargs["seed"] <= runtime.MAX_RANDOM_SEED
     assert deleted.json() == {"deleted": "studio-narrator"}
     assert missing.status_code == 404
+    assert missing_design.status_code == 404
+    assert missing_portrait.status_code == 404
 
 
 def test_saved_clone_profile_can_switch_from_transcript_to_directed_reference_mode(tmp_path: Path) -> None:
@@ -340,9 +402,20 @@ def test_saved_clone_profile_can_be_edited_without_replacing_audio(tmp_path: Pat
         with TestClient(runtime.app) as client:
             created = client.post(
                 "/tts/voice-profiles",
-                data={"name": "Studio Voice", "profile_type": "cloned", "ref_text": "Original."},
-                files={"reference_audio": ("reference.wav", b"reference-bytes", "audio/wav")},
+                data={
+                    "name": "Studio Voice",
+                    "profile_type": "cloned",
+                    "ref_text": "Original.",
+                    "tags": json.dumps(["Studio", "English"]),
+                    "recipe": json.dumps({"design_source": "reference", "seed": 99}),
+                },
+                files={
+                    "reference_audio": ("reference.wav", b"reference-bytes", "audio/wav"),
+                    "design_reference_audio": ("design.wav", b"design-bytes", "audio/wav"),
+                    "portrait": ("portrait.webp", TEST_PORTRAIT_WEBP, "image/webp"),
+                },
             )
+            created_record = runtime.load_voice_profiles(tmp_path)["studio-voice"]
             updated = client.put(
                 "/tts/voice-profiles/studio-voice",
                 data={
@@ -352,12 +425,131 @@ def test_saved_clone_profile_can_be_edited_without_replacing_audio(tmp_path: Pat
                 },
             )
             audio = client.get("/tts/voice-profiles/studio-voice/audio")
+            design_audio = client.get("/tts/voice-profiles/studio-voice/design-audio")
+            portrait = client.get("/tts/voice-profiles/studio-voice/portrait")
+            tags_only = client.put(
+                "/tts/voice-profiles/studio-voice",
+                data={"tags": json.dumps(["Updated", "Metadata Only"])},
+            )
+            tags_only_record = runtime.load_voice_profiles(tmp_path)["studio-voice"]
+            cleared = client.put(
+                "/tts/voice-profiles/studio-voice",
+                data={
+                    "description": "Updated studio voice",
+                    "ref_text": "Updated transcript.",
+                    "language": "English",
+                    "tags": "[]",
+                    "clear_portrait": "true",
+                },
+            )
+            missing_portrait = client.get("/tts/voice-profiles/studio-voice/portrait")
 
     assert created.status_code == 200
     assert updated.status_code == 200
     assert updated.json()["description"] == "Updated studio voice"
     assert updated.json()["ref_text"] == "Updated transcript."
+    assert updated.json()["recipe"] == {"design_source": "reference", "seed": 99}
+    assert updated.json()["tags"] == ["Studio", "English"]
     assert audio.content == b"reference-bytes"
+    assert design_audio.content == b"design-bytes"
+    assert portrait.content.startswith(b"RIFF") and portrait.content[8:12] == b"WEBP"
+    assert tags_only.json()["tags"] == ["Updated", "Metadata Only"]
+    assert tags_only.json()["description"] == "Updated studio voice"
+    assert tags_only.json()["ref_text"] == "Updated transcript."
+    assert tags_only.json()["recipe"] == {"design_source": "reference", "seed": 99}
+    assert tags_only_record["audio_file"] == created_record["audio_file"]
+    assert tags_only_record["design_audio_file"] == created_record["design_audio_file"]
+    assert tags_only_record["portrait_file"] == created_record["portrait_file"]
+    assert tags_only_record["created_at"] == created_record["created_at"]
+    assert cleared.json()["has_portrait"] is False
+    assert cleared.json()["tags"] == []
+    assert missing_portrait.status_code == 404
+
+
+def test_saved_voice_can_be_replaced_with_a_refined_design(tmp_path: Path) -> None:
+    with patch.object(runtime, "VOICE_PROFILE_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            created = client.post(
+                "/tts/voice-profiles",
+                data={"name": "Bob", "profile_type": "cloned", "ref_text": "Old words."},
+                files={
+                    "reference_audio": ("old.wav", b"old-production", "audio/wav"),
+                    "design_reference_audio": ("old-design.wav", b"old-design", "audio/wav"),
+                },
+            )
+            updated = client.put(
+                "/tts/voice-profiles/bob",
+                data={
+                    "profile_type": "cloned",
+                    "description": "Refined Bob",
+                    "tags": json.dumps(["Captain", "Polish"]),
+                    "ref_text": "New compact words.",
+                    "control": "Warm and authoritative",
+                    "language": "English",
+                    "recipe": json.dumps(
+                        {
+                            "design_source": "reference",
+                            "clone_mode": "reference",
+                            "seed": 4242,
+                            "randomize_seed": False,
+                            "sample_text": "The exact text used to refine Bob.",
+                            "reference_text": "",
+                        }
+                    ),
+                },
+                files={
+                    "reference_audio": ("new.wav", b"new-production", "audio/wav"),
+                    "design_reference_audio": ("new-design.wav", b"new-design", "audio/wav"),
+                    "portrait": ("new.webp", TEST_PORTRAIT_WEBP, "image/webp"),
+                },
+            )
+            audio = client.get("/tts/voice-profiles/bob/audio")
+            design_audio = client.get("/tts/voice-profiles/bob/design-audio")
+            portrait = client.get("/tts/voice-profiles/bob/portrait")
+
+    assert created.status_code == 200
+    assert updated.status_code == 200
+    assert updated.json()["description"] == "Refined Bob"
+    assert updated.json()["control"] == "Warm and authoritative"
+    assert updated.json()["tags"] == ["Captain", "Polish"]
+    assert updated.json()["recipe"]["sample_text"] == "The exact text used to refine Bob."
+    assert updated.json()["recipe"]["seed"] == 4242
+    assert audio.content == b"new-production"
+    assert design_audio.content == b"new-design"
+    assert portrait.content.startswith(b"RIFF") and portrait.content[8:12] == b"WEBP"
+
+
+def test_voice_profile_rejects_spoofed_portrait(tmp_path: Path) -> None:
+    with patch.object(runtime, "VOICE_PROFILE_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/voice-profiles",
+                data={"name": "Spoofed", "profile_type": "cloned"},
+                files={
+                    "reference_audio": ("reference.wav", b"reference-bytes", "audio/wav"),
+                    "portrait": ("portrait.png", b"not-an-image", "image/png"),
+                },
+            )
+
+    assert response.status_code == 400
+    assert "contents" in response.json()["detail"].lower()
+
+
+def test_voice_profile_rejects_invalid_design_recipe(tmp_path: Path) -> None:
+    with patch.object(runtime, "VOICE_PROFILE_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/voice-profiles",
+                data={
+                    "name": "Invalid Recipe",
+                    "profile_type": "designed",
+                    "control": "A warm narrator",
+                    "recipe": json.dumps({"design_source": "unknown"}),
+                },
+            )
+
+    assert response.status_code == 400
+    assert "design source" in response.json()["detail"].lower()
 
 
 def test_saved_voice_design_applies_its_control(tmp_path: Path) -> None:

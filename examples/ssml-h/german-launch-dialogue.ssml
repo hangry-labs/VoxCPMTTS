@@ -1,0 +1,58 @@
+<speak
+  version="1.1"
+  xmlns="http://www.w3.org/2001/10/synthesis"
+  xmlns:h="https://hangrylabs.app/ns/ssml-h/1.0"
+  xml:lang="de-DE">
+
+  <metadata>
+    <h:extensions version="1.0">
+      <h:voice-definition name="Kapitaen" gender="male" age="middle-aged" pitch="low"
+        style="authoritative" languages="de-DE" accent="german" scope="request" seed="4242">
+        <h:description>Ein erfahrener Kapitän mit ruhiger, bestimmter Stimme.</h:description>
+        <h:sample xml:lang="de-DE">Brücke an Maschinenraum. Wir bereiten den Start vor.</h:sample>
+      </h:voice-definition>
+      <h:voice-definition name="Ingenieurin_Anna" gender="female" age="adult" pitch="medium"
+        style="calm and precise" languages="de-DE" accent="german" scope="request" seed="8241">
+        <h:description>Eine präzise Chefingenieurin, die auch unter Druck ruhig bleibt.</h:description>
+        <h:sample xml:lang="de-DE">Alle Systeme arbeiten stabil und innerhalb der Grenzwerte.</h:sample>
+      </h:voice-definition>
+      <h:voice-definition name="Offizier_Neumann" gender="male" age="young-adult" pitch="medium"
+        style="alert and urgent" languages="de-DE" accent="german" scope="request" seed="1907">
+        <h:description>Ein aufmerksamer Sicherheitsoffizier mit direkter, schneller Sprechweise.</h:description>
+        <h:sample xml:lang="de-DE">Sicherheitsstation meldet sich. Ich überwache alle Sektionen.</h:sample>
+      </h:voice-definition>
+    </h:extensions>
+  </metadata>
+
+  <voice name="Kapitaen" h:direction="Ruhig, selbstbewusst und befehlend">
+    Maschinenraum, hier ist die Brücke. Anna, sind alle Systeme startbereit?
+  </voice>
+  <break time="350ms" />
+  <voice name="Ingenieurin_Anna" h:direction="Ruhig, präzise und beruhigend">
+    Ja, Kapitän. Der Hauptantrieb ist stabil, der Treibstoffdruck stimmt, und alle Systeme sind bereit.
+  </voice>
+  <break time="450ms" />
+  <voice name="Kapitaen" h:direction="Feierlich und entschlossen">
+    Letzter Countdown. Fünf... <break time="450ms" /> vier... <break time="450ms" /> drei...
+  </voice>
+  <break time="120ms" />
+  <voice name="Offizier_Neumann" h:direction="Plötzlich, laut und alarmiert">
+    Start abbrechen! Feuer in der Energieversorgung! Es breitet sich zum Maschinenraum aus!
+  </voice>
+  <break time="180ms" />
+  <voice name="Kapitaen" h:direction="Wütend und äußerst dringend schreiend">
+    Maschinenraum, bringen Sie das endlich in Ordnung! Löschen Sie das Feuer und melden Sie sofort Bereitschaft!
+  </voice>
+  <break time="400ms" />
+  <voice name="Ingenieurin_Anna" h:direction="Schnell, konzentriert und bestimmt">
+    Die Sektion ist isoliert, und die Löschanlage arbeitet. Das Feuer ist unter Kontrolle.
+  </voice>
+  <break time="350ms" />
+  <voice name="Offizier_Neumann" h:direction="Aufmerksam, dann deutlich erleichtert">
+    Die Temperatur sinkt. Keine weitere Gefahr erkannt. Der Startkorridor ist frei.
+  </voice>
+  <break time="450ms" />
+  <voice name="Kapitaen" h:direction="Bestimmt, dann triumphierend und energisch">
+    Countdown wird fortgesetzt. Zwei... <break time="500ms" /> eins... <break time="600ms" /> Start! Volle Kraft!
+  </voice>
+</speak>

@@ -94,10 +94,16 @@ const state = {
   defaults: {},
   status: {},
   profiles: [],
+  designSource: 'reference',
   cloneMode: 'reference',
+  loadingProfile: false,
   lastCloneGeneration: null,
   quickSaveType: null,
   editingProfile: null,
+  portraitFile: null,
+  portraitObjectUrl: null,
+  portraitRemoved: false,
+  portraitTargetProfile: null,
   pendingDeleteProfile: null,
   activityTimer: null,
 }
@@ -115,10 +121,11 @@ const streamOutput = new AudioEditor($('#stream-output'), {
   labels: AUDIO_EDITOR_LABELS,
 })
 const cloneOutput = new AudioEditor($('#clone-output'), {
-  label: 'Cloned audio',
+  label: 'Designed voice',
   emptyTitle: 'Audio output',
-  emptyDescription: 'Ready for voice cloning',
+  emptyDescription: 'Ready for voice design',
   labels: AUDIO_EDITOR_LABELS,
+  onChange: (file) => $('#clone-output-section').classList.toggle('is-complete', Boolean(file)),
 })
 const referenceAudio = new AudioEditor($('#reference-audio-preview'), {
   label: 'Reference preview',
@@ -129,18 +136,9 @@ const referenceAudio = new AudioEditor($('#reference-audio-preview'), {
     $('#reference-audio-drop').classList.toggle('has-file', Boolean(file))
     $('#reference-audio-name').textContent = file?.name || 'No audio selected'
     $('#reference-audio-clear').hidden = !file
-    if (file && state.activeTab === 'clone' && $('#voice-profile').value) renderVoiceProfileSelect('')
+    if (file && state.activeTab === 'clone' && $('#voice-profile').value && !state.loadingProfile) renderVoiceProfileSelect('')
     updateWorkflowControls()
-  },
-})
-const profileAudio = new AudioEditor($('#profile-audio-preview'), {
-  label: 'Voice sample',
-  emptyTitle: 'No voice sample selected',
-  emptyDescription: 'Choose or drop a clean reference recording',
-  labels: AUDIO_EDITOR_LABELS,
-  onChange: (file) => {
-    $('#profile-audio-drop').classList.toggle('has-file', Boolean(file))
-    $('#profile-audio-name').textContent = file?.name || 'WAV, MP3, FLAC, OGG, or M4A'
+    updateDesignCompletion()
   },
 })
 const referenceRecorder = new AudioRecorder({
@@ -152,7 +150,7 @@ const referenceRecorder = new AudioRecorder({
   onError: (error) => showToast(errorMessage(error)),
 })
 
-for (const editor of [generateOutput, cloneOutput, streamOutput, referenceAudio, profileAudio]) {
+for (const editor of [generateOutput, cloneOutput, streamOutput, referenceAudio]) {
   editor.container.addEventListener('audio-error', (event) => showToast(errorMessage(event.detail)))
 }
 
@@ -198,6 +196,7 @@ function persistUiState() {
       headerCollapsed: state.headerCollapsed,
       gpuWindowMs: state.gpuWindowMs,
       inputType: state.inputType,
+      designSource: state.designSource,
       cloneMode: state.cloneMode,
     }))
   } catch {
@@ -223,12 +222,13 @@ function persistGpuSession() {
 
 function restoreSessionState() {
   const ui = readSessionJson(UI_SESSION_KEY)
-  if (['generate', 'clone', 'stream', 'voices', 'api', 'system'].includes(ui?.activeTab)) {
+  if (['generate', 'clone', 'stream', 'api', 'system'].includes(ui?.activeTab)) {
     state.activeTab = ui.activeTab
   }
   if (typeof ui?.headerCollapsed === 'boolean') state.headerCollapsed = ui.headerCollapsed
   if ([60 * 1000, 10 * 60 * 1000].includes(ui?.gpuWindowMs)) state.gpuWindowMs = ui.gpuWindowMs
   if (['text', 'ssml', 'ssml-h'].includes(ui?.inputType)) state.inputType = ui.inputType
+  if (['reference', 'direction'].includes(ui?.designSource)) state.designSource = ui.designSource
   if (['reference', 'transcript'].includes(ui?.cloneMode)) state.cloneMode = ui.cloneMode
 
   const cached = readSessionJson(GPU_SESSION_KEY)
@@ -256,6 +256,22 @@ function updateMetrics() {
   const text = $('#text-input').value
   const words = text.trim() ? text.trim().split(/\s+/).length : 0
   $('#text-metrics').textContent = `${text.length} characters · ${words} words`
+}
+
+function updateDesignMetrics() {
+  const text = $('#design-text-input').value
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0
+  $('#design-text-metrics').textContent = `${text.length} characters · ${words} words`
+  updateDesignCompletion()
+}
+
+function loadDesignPortrait(file) {
+  if (!file) return
+  const allowed = ['image/png', 'image/jpeg', 'image/webp']
+  if (!allowed.includes(file.type)) return showToast('Choose a PNG, JPEG, or WebP portrait.')
+  if (file.size > 5 * 1024 * 1024) return showToast('Voice portraits must be 5 MB or smaller.')
+  setDesignPortrait({ file })
+  return true
 }
 
 function inputSample(inputType) {
@@ -296,6 +312,71 @@ function normalizedProfileName(value) {
   return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^[-_]+|[-_]+$/g, '').slice(0, 48)
 }
 
+function designVoiceTags() {
+  const tags = $('#design-voice-tags').value
+    .split(',')
+    .map((tag) => tag.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+  return [...new Map(tags.map((tag) => [tag.toLowerCase(), tag])).values()].slice(0, 12)
+}
+
+function setDesignPortrait({ file = null, url = '', removed = false } = {}) {
+  if (state.portraitObjectUrl) URL.revokeObjectURL(state.portraitObjectUrl)
+  state.portraitFile = file
+  state.portraitObjectUrl = file ? URL.createObjectURL(file) : null
+  state.portraitRemoved = removed
+  const preview = $('#design-portrait-preview')
+  const source = state.portraitObjectUrl || url
+  preview.src = source || ''
+  preview.hidden = !source
+  $('.portrait-placeholder').hidden = Boolean(source)
+  $('#design-portrait-remove').hidden = !source
+  $('#design-portrait-choose').classList.toggle('has-image', Boolean(source))
+  renderVoiceSaveState()
+}
+
+function resetDesignIdentity({ preserveMetadata = false } = {}) {
+  $('#design-voice-name').disabled = false
+  if (!preserveMetadata) {
+    $('#design-voice-name').value = ''
+    $('#design-voice-tags').value = ''
+    setDesignPortrait()
+  }
+  updateDesignCompletion()
+}
+
+function updateDesignCompletion() {
+  const sampleReady = Boolean($('#design-text-input').value.trim())
+  const normalizedName = normalizedProfileName($('#design-voice-name').value)
+  const nameAvailable = Boolean(normalizedName) && (
+    state.editingProfile?.id === normalizedName || !state.profiles.some((profile) => profile.id === normalizedName)
+  )
+  const hasReference = Boolean(referenceAudio.currentFile()) || selectedProfile()?.profile_type === 'cloned'
+  const conditioningReady = state.cloneMode === 'transcript'
+    ? Boolean($('#reference-text').value.trim())
+    : Boolean($('#clone-control-input').value.trim())
+  const voiceReady = state.designSource === 'direction'
+    ? Boolean($('#clone-control-input').value.trim())
+    : hasReference && (state.cloneMode === 'reference' || conditioningReady)
+
+  $('.design-sample-field').classList.toggle('is-complete', sampleReady)
+  $('#design-identity').classList.toggle('is-complete', nameAvailable)
+  $('#reference-audio-drop').classList.toggle('is-complete', state.designSource === 'reference' && hasReference)
+  $('#clone-direction-panel').classList.toggle('is-complete', !$('#clone-direction-panel').hidden && conditioningReady)
+  $('#clone-transcript-panel').classList.toggle('is-complete', !$('#clone-transcript-panel').hidden && conditioningReady)
+  $('#clone-panel').classList.toggle('is-complete', voiceReady)
+}
+
+function profileMetadataChanged() {
+  const profile = state.editingProfile
+  if (!profile) return false
+  const currentTags = designVoiceTags()
+  const savedTags = profile.tags || []
+  const tagsChanged = currentTags.length !== savedTags.length || currentTags.some((tag, index) => tag !== savedTags[index])
+  const portraitChanged = Boolean(state.portraitFile) || (state.portraitRemoved && profile.has_portrait)
+  return tagsChanged || portraitChanged
+}
+
 function selectedProfile() {
   const id = $('#voice-profile').value
   return state.profiles.find((profile) => profile.id === id) || null
@@ -316,29 +397,109 @@ function renderVoiceProfileSelect(selected = $('#voice-profile').value) {
     { value: '', label: 'None' },
     ...state.profiles.map((profile) => ({
       value: profile.id,
-      label: `${profile.id} (${profile.profile_type === 'cloned' ? 'clone' : 'design'})`,
+      label: `${profile.id} (${profile.profile_type === 'cloned' ? 'reference' : 'direction'})`,
     })),
   ], selected)
   updateVoiceProfileState()
 }
 
-function useProfile(profile, tab) {
-  if (tab === 'clone' && profile.profile_type === 'cloned') referenceAudio.clear()
-  renderVoiceProfileSelect(profile.id)
-  if (profile.language) $('#language').value = profile.language
+function restoreProfileRecipe(profile) {
+  const recipe = profile.recipe || {}
+  $('#design-text-input').value = recipe.sample_text || profile.ref_text || $('#design-text-input').value
+  updateDesignMetrics()
+  if (profile.language && [...$('#language').options].some((option) => option.value === profile.language)) {
+    $('#language').value = profile.language
+  }
+  if (Number.isFinite(recipe.cfg_value)) {
+    $('#guidance').value = recipe.cfg_value
+    $('#guidance-slider').value = recipe.cfg_value
+  }
+  if (Number.isInteger(recipe.inference_timesteps)) {
+    $('#steps').value = recipe.inference_timesteps
+    $('#steps-slider').value = recipe.inference_timesteps
+  }
+  if (Number.isInteger(recipe.seed)) $('#seed').value = recipe.seed
+  if (typeof recipe.randomize_seed === 'boolean') $('#randomize-seed').checked = recipe.randomize_seed
+  else if (Number.isInteger(recipe.seed)) $('#randomize-seed').checked = false
+  if (typeof recipe.normalize === 'boolean') $('#normalize-text').checked = recipe.normalize
+  if (typeof recipe.normalize_loudness === 'boolean') $('#normalize-loudness').checked = recipe.normalize_loudness
+  if (typeof recipe.denoise === 'boolean') $('#denoise').checked = recipe.denoise
+  if (recipe.output_format && [...$('#output-format').options].some((option) => option.value === recipe.output_format)) {
+    $('#output-format').value = recipe.output_format
+  }
+  updateSeedState()
+}
+
+async function loadProfileReference(profile, { design = false } = {}) {
+  const audioUrl = design ? (profile.design_audio_url || profile.audio_url) : profile.audio_url
+  if (!audioUrl) {
+    referenceAudio.clear()
+    return
+  }
+  const response = await fetch(audioUrl, { cache: 'no-store' })
+  if (!response.ok) throw new Error(await responseError(response))
+  const blob = await response.blob()
+  const contentType = blob.type || 'audio/wav'
+  const extension = contentType.includes('mpeg') ? 'mp3' : contentType.split('/')[1]?.replace('x-', '') || 'wav'
+  await referenceAudio.load(new File([blob], `${profile.id}.${extension}`, { type: contentType }), profile.id)
+}
+
+async function useProfile(profile, tab, { editing = false } = {}) {
+  if (tab === 'clone') {
+    if (editing) {
+      state.editingProfile = profile
+      state.lastCloneGeneration = null
+      cloneOutput.clear()
+      $('#design-voice-name').value = profile.id
+      $('#design-voice-name').disabled = true
+      $('#design-voice-tags').value = (profile.tags || []).join(', ')
+      setDesignPortrait({ url: profile.portrait_url || '' })
+    } else {
+      cancelVoiceEdit()
+    }
+    state.loadingProfile = true
+    try {
+      const recipeSource = profile.recipe?.design_source
+      const designSource = recipeSource || (profile.profile_type === 'designed' ? 'direction' : 'reference')
+      setDesignSource(designSource)
+      $('#clone-control-input').value = profile.control || ''
+      $('#reference-text').value = Object.prototype.hasOwnProperty.call(profile.recipe || {}, 'reference_text')
+        ? profile.recipe.reference_text
+        : (profile.ref_text || '')
+      setCloneMode(profile.recipe?.clone_mode || (profile.has_transcript ? 'transcript' : 'reference'))
+      if (designSource === 'reference') await loadProfileReference(profile, { design: editing })
+      else referenceAudio.clear()
+      restoreProfileRecipe(profile)
+      renderVoiceProfileSelect(profile.id)
+      updateDesignCompletion()
+    } finally {
+      state.loadingProfile = false
+    }
+  } else {
+    renderVoiceProfileSelect(profile.id)
+    if (profile.language) $('#language').value = profile.language
+  }
   activateTab(tab)
-  setStatus(`Voice ${profile.id} selected`, 'success')
+  renderVoiceSaveState()
+  setStatus(editing ? `Refining ${profile.id}` : `Voice ${profile.id} loaded`, 'success')
 }
 
 function renderCloneProfileList() {
   const list = $('#clone-profile-list')
   if (!list) return
-  const profiles = state.profiles.filter((profile) => profile.profile_type === 'cloned')
-  $('#clone-profile-count').textContent = String(profiles.length)
+  const query = $('#clone-profile-filter').value.trim().toLowerCase()
+  const profiles = state.profiles
+    .filter((profile) => [profile.id, profile.description, profile.profile_type, profile.control, ...(profile.tags || [])].join(' ').toLowerCase().includes(query))
+    .sort((left, right) => {
+      if (left.id === state.editingProfile?.id) return -1
+      if (right.id === state.editingProfile?.id) return 1
+      return left.id.localeCompare(right.id)
+    })
+  $('#clone-profile-count').textContent = String(state.profiles.length)
   if (!profiles.length) {
     const empty = document.createElement('div')
     empty.className = 'clone-profile-empty'
-    empty.textContent = 'No saved cloned voices yet.'
+    empty.textContent = state.profiles.length ? 'No saved voices match this search.' : 'No saved voices yet.'
     list.replaceChildren(empty)
     return
   }
@@ -347,13 +508,66 @@ function renderCloneProfileList() {
     const card = document.createElement('article')
     card.className = 'clone-profile-card'
     card.classList.toggle('selected', profile.id === selected)
+    card.classList.toggle('editing', profile.id === state.editingProfile?.id)
     const copy = document.createElement('div')
     copy.className = 'clone-profile-copy'
     const name = document.createElement('strong')
     name.textContent = profile.id
+    if (profile.id === state.editingProfile?.id) {
+      const editing = document.createElement('span')
+      editing.className = 'editing-badge'
+      editing.textContent = 'Editing'
+      name.append(editing)
+    }
     const description = document.createElement('span')
-    description.textContent = profile.description || (profile.has_transcript ? 'Generated reference · transcript ready' : 'Stored reference voice')
-    copy.append(name, description)
+    description.textContent = profile.description || (profile.profile_type === 'designed' ? 'Direction-only voice design' : 'Stored reference voice')
+    const metadata = document.createElement('div')
+    metadata.className = 'clone-profile-metadata'
+    ;[
+      profile.profile_type === 'cloned' ? 'Reference' : 'Direction',
+      profile.has_transcript ? 'Transcript' : null,
+      Number.isInteger(profile.recipe?.seed) ? `Seed ${profile.recipe.seed}` : null,
+      ...(profile.tags || []).map((tag) => `#${tag}`),
+    ].filter(Boolean).forEach((label) => {
+      const badge = document.createElement('span')
+      badge.textContent = label
+      metadata.append(badge)
+    })
+    copy.append(name, description, metadata)
+    const portraitButton = document.createElement('button')
+    portraitButton.type = 'button'
+    portraitButton.className = 'clone-profile-portrait'
+    portraitButton.title = profile.portrait_url ? `Replace ${profile.id} portrait` : `Add ${profile.id} portrait`
+    portraitButton.setAttribute('aria-label', portraitButton.title)
+    if (profile.portrait_url) {
+      const portrait = document.createElement('img')
+      const version = encodeURIComponent(profile.created_at || 'current')
+      portrait.src = `${profile.portrait_url}?v=${version}`
+      portrait.alt = `${profile.id} portrait`
+      portrait.loading = 'lazy'
+      portraitButton.append(portrait)
+    } else {
+      const placeholder = document.createElement('span')
+      placeholder.className = 'portrait-placeholder'
+      placeholder.textContent = '?'
+      placeholder.setAttribute('aria-hidden', 'true')
+      portraitButton.append(placeholder)
+    }
+    portraitButton.addEventListener('click', () => {
+      state.portraitTargetProfile = profile
+      $('#design-portrait-input').click()
+    })
+    card.append(portraitButton)
+    if (profile.audio_url) {
+      const audio = document.createElement('audio')
+      audio.className = 'clone-profile-audio'
+      audio.controls = true
+      audio.preload = 'none'
+      audio.src = profile.audio_url
+      copy.append(audio)
+    }
+    const actions = document.createElement('div')
+    actions.className = 'clone-profile-actions'
     const use = document.createElement('button')
     use.type = 'button'
     use.className = 'secondary-button'
@@ -361,69 +575,14 @@ function renderCloneProfileList() {
     use.innerHTML = profile.id === selected
       ? '<i class="icon-check"></i><span>Selected</span>'
       : '<i class="icon-audio-lines"></i><span>Use voice</span>'
-    use.addEventListener('click', () => useProfile(profile, 'clone'))
-    card.append(copy, use)
-    return card
-  }))
-}
-
-function renderProfileList() {
-  const list = $('#profile-list')
-  const query = $('#profile-filter').value.trim().toLowerCase()
-  const profiles = state.profiles.filter((profile) => `${profile.id} ${profile.description} ${profile.profile_type}`.toLowerCase().includes(query))
-  if (!profiles.length) {
-    const empty = document.createElement('div')
-    empty.className = 'empty-profile-list'
-    empty.textContent = state.profiles.length ? 'No saved voices match this search.' : 'No saved voices yet.'
-    list.replaceChildren(empty)
-    return
-  }
-  list.replaceChildren(...profiles.map((profile) => {
-    const card = document.createElement('article')
-    card.className = 'profile-card'
-    const copy = document.createElement('div')
-    const title = document.createElement('strong')
-    title.textContent = profile.id
-    const description = document.createElement('p')
-    description.className = 'profile-description'
-    description.textContent = profile.description || (profile.profile_type === 'cloned' ? 'Saved reference voice' : 'Saved voice design')
-    const metadata = document.createElement('div')
-    metadata.className = 'profile-metadata'
-    ;[
-      profile.profile_type === 'cloned' ? 'Cloned' : 'Designed',
-      profile.language || 'Automatic language',
-      profile.has_transcript ? 'Transcript saved' : null,
-    ].filter(Boolean).forEach((label) => {
-      const badge = document.createElement('span')
-      badge.className = 'profile-badge'
-      badge.textContent = label
-      metadata.append(badge)
-    })
-    copy.append(title, description, metadata)
-    if (profile.audio_url) {
-      const audio = document.createElement('audio')
-      audio.className = 'profile-audio'
-      audio.controls = true
-      audio.preload = 'none'
-      audio.src = profile.audio_url
-      copy.append(audio)
-    }
-    const actions = document.createElement('div')
-    actions.className = 'profile-actions'
-    const useGenerate = document.createElement('button')
-    useGenerate.type = 'button'
-    useGenerate.className = 'secondary-button profile-use'
-    useGenerate.innerHTML = '<i class="icon-audio-lines"></i><span>Generate</span>'
-    useGenerate.addEventListener('click', () => useProfile(profile, 'generate'))
-    actions.append(useGenerate)
-    if (profile.profile_type === 'cloned') {
-      const useClone = document.createElement('button')
-      useClone.type = 'button'
-      useClone.className = 'secondary-button profile-use'
-      useClone.innerHTML = '<i class="icon-mic"></i><span>Clone</span>'
-      useClone.addEventListener('click', () => useProfile(profile, 'clone'))
-      actions.append(useClone)
-    }
+    use.addEventListener('click', () => useProfile(profile, 'clone').catch((error) => showToast(errorMessage(error))))
+    const edit = document.createElement('button')
+    edit.type = 'button'
+    edit.className = 'icon-button bordered'
+    edit.title = `Edit ${profile.id}`
+    edit.setAttribute('aria-label', `Edit ${profile.id}`)
+    edit.innerHTML = '<i class="icon-sliders-horizontal"></i>'
+    edit.addEventListener('click', () => useProfile(profile, 'clone', { editing: true }).catch((error) => showToast(errorMessage(error))))
     const remove = document.createElement('button')
     remove.type = 'button'
     remove.className = 'icon-button bordered danger-icon'
@@ -431,28 +590,17 @@ function renderProfileList() {
     remove.setAttribute('aria-label', `Delete ${profile.id}`)
     remove.innerHTML = '<i class="icon-x"></i>'
     remove.addEventListener('click', () => openDeleteProfileDialog(profile))
-    if (profile.profile_type === 'cloned') {
-      const edit = document.createElement('button')
-      edit.type = 'button'
-      edit.className = 'secondary-button profile-use'
-      edit.title = `Edit ${profile.id}`
-      edit.setAttribute('aria-label', `Edit ${profile.id}`)
-      edit.innerHTML = '<i class="icon-sliders-horizontal"></i><span>Edit</span>'
-      edit.addEventListener('click', () => openProfileEditor(profile))
-      actions.append(edit)
-    }
-    actions.append(remove)
+    actions.append(use, edit, remove)
     card.append(copy, actions)
     return card
   }))
 }
 
 async function refreshProfiles(selected) {
-  const payload = await fetchJson('/tts/voice-profiles')
+  const payload = await fetchJson('/tts/voice-profiles', { cache: 'no-store' })
   state.profiles = payload.data || []
-  $('#profile-count').textContent = String(state.profiles.length)
   renderVoiceProfileSelect(selected)
-  renderProfileList()
+  renderCloneProfileList()
 }
 
 function formatOptions(formats) {
@@ -469,12 +617,31 @@ function refreshFormatOptions() {
   populateSelect($('#output-format'), formatOptions(formats), preferred)
 }
 
-function updateVoiceDesignState() {
-  const active = Boolean($('#control-input').value.trim())
-  const indicator = $('#voice-design-state')
-  indicator.textContent = active ? 'Active' : 'Optional'
-  indicator.classList.toggle('active', active)
-  $('#save-designed-voice').disabled = !active
+function setDesignSource(source, { persist = true } = {}) {
+  if (!['reference', 'direction'].includes(source)) return
+  state.designSource = source
+  $$('.design-source-control button').forEach((button) => {
+    const active = button.dataset.designSource === source
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-pressed', String(active))
+  })
+  const usesReference = source === 'reference'
+  $('[data-design-reference]').hidden = !usesReference
+  $('.clone-mode-control').hidden = !usesReference
+  $('#reference-audio').disabled = !usesReference
+  if (usesReference) {
+    setCloneMode(state.cloneMode, { persist: false })
+  } else {
+    $('#clone-direction-panel').hidden = false
+    $('#clone-transcript-panel').hidden = true
+    $('#clone-conditioning-copy').textContent = 'Describe the voice and delivery to create'
+  }
+  $('#clone-direction-label').innerHTML = usesReference
+    ? 'Clone direction <small>Optional</small>'
+    : 'Voice direction <small>Required</small>'
+  updateWorkflowControls()
+  updateDesignCompletion()
+  if (persist) persistUiState()
 }
 
 function setCloneMode(mode, { persist = true } = {}) {
@@ -485,16 +652,27 @@ function setCloneMode(mode, { persist = true } = {}) {
     button.classList.toggle('active', active)
     button.setAttribute('aria-pressed', String(active))
   })
-  $('#clone-direction-panel').hidden = mode !== 'reference'
-  $('#clone-transcript-panel').hidden = mode !== 'transcript'
-  $('#clone-conditioning-copy').textContent = mode === 'reference'
-    ? 'Direct the delivery of the cloned voice'
-    : 'Guide cloning with the exact reference words'
+  const usesReference = state.designSource === 'reference'
+  $('#clone-direction-panel').hidden = usesReference && mode !== 'reference'
+  $('#clone-transcript-panel').hidden = !usesReference || mode !== 'transcript'
+  $('#clone-conditioning-copy').textContent = !usesReference
+    ? 'Describe the voice and delivery to create'
+    : mode === 'reference'
+      ? 'Direct the delivery of the cloned voice'
+      : 'Guide cloning with the exact reference words'
+  updateDesignCompletion()
   if (persist) persistUiState()
 }
 
 function updateSeedState() {
-  $('#seed').disabled = $('#randomize-seed').checked
+  const randomized = $('#randomize-seed').checked
+  $('#seed').disabled = randomized
+  const lockButton = $('#design-seed-lock')
+  lockButton.setAttribute('aria-pressed', String(!randomized))
+  lockButton.title = randomized ? 'Lock generation seed' : 'Unlock generation seed'
+  $('i', lockButton).className = randomized ? 'icon-square' : 'icon-check'
+  $('span', lockButton).textContent = randomized ? 'Seed unlocked' : 'Seed locked'
+  lockButton.classList.toggle('active', !randomized)
 }
 
 function updateTimestampState() {
@@ -505,34 +683,35 @@ function updateTimestampState() {
 function updateWorkflowControls() {
   const cloning = state.activeTab === 'clone'
   const profile = selectedProfile()
-  $('#voice-design-details').hidden = cloning
-  $('#reference-audio').disabled = !cloning
-  $('#denoise').disabled = !cloning || !state.status.load_denoiser
+  $('#reference-audio').disabled = !cloning || state.designSource !== 'reference'
+  $('#denoise').disabled = !cloning || state.designSource !== 'reference' || !state.status.load_denoiser
   $('#voice-profile-note').classList.toggle('active', Boolean(profile))
+  updateDesignCompletion()
 }
 
 function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
   const cloning = workflow === 'clone'
+  const usesReference = cloning && state.designSource === 'reference'
   const outputFormat = streaming ? 'mp3' : $('#output-format').value
-  const referenceText = cloning && state.cloneMode === 'transcript'
+  const referenceText = usesReference && state.cloneMode === 'transcript'
     ? ($('#reference-text').value.trim() || null)
     : null
   const payload = {
-    text: $('#text-input').value.trim(),
-    input_type: state.inputType,
+    text: $(cloning ? '#design-text-input' : '#text-input').value.trim(),
+    input_type: cloning ? 'text' : state.inputType,
     language: $('#language').value || 'English',
-    voice: cloning ? 'reference' : 'auto',
-    voice_profile: $('#voice-profile').value || null,
-    clone_mode: cloning ? state.cloneMode : 'auto',
+    voice: usesReference ? 'reference' : 'auto',
+    voice_profile: usesReference ? ($('#voice-profile').value || null) : null,
+    clone_mode: usesReference ? state.cloneMode : 'auto',
     control: cloning
-      ? (state.cloneMode === 'reference' ? ($('#clone-control-input').value.trim() || null) : null)
-      : ($('#control-input').value.trim() || null),
+      ? (!usesReference || state.cloneMode === 'reference' ? ($('#clone-control-input').value.trim() || null) : null)
+      : null,
     ref_text: referenceText,
     cfg_value: Number($('#guidance').value),
     inference_timesteps: Number($('#steps').value),
     normalize: $('#normalize-text').checked,
     normalize_loudness: $('#normalize-loudness').checked,
-    denoise: cloning && $('#denoise').checked,
+    denoise: usesReference && $('#denoise').checked,
     seed: Number($('#seed').value || 42),
     randomize_seed: $('#randomize-seed').checked,
     device: $('#device').value,
@@ -546,7 +725,7 @@ async function requestAudioResponse(options = {}) {
   const { workflow = state.activeTab, streaming = false, signal, payloadOverride = null } = options
   const payload = payloadOverride || buildPayload({ workflow, streaming })
   if (!payload.text) throw new Error('Enter text to synthesize.')
-  const needsReference = workflow === 'clone'
+  const needsReference = workflow === 'clone' && payload.voice === 'reference'
   const reference = Object.prototype.hasOwnProperty.call(options, 'referenceOverride')
     ? options.referenceOverride
     : referenceAudio.currentFile()
@@ -556,6 +735,9 @@ async function requestAudioResponse(options = {}) {
   }
   if (needsReference && payload.clone_mode === 'transcript' && !payload.ref_text && !profile?.has_transcript) {
     throw new Error('Enter or transcribe the reference words for transcript-guided cloning.')
+  }
+  if (workflow === 'clone' && !needsReference && !payload.control) {
+    throw new Error('Describe the voice you want to design.')
   }
 
   const route = streaming ? '/tts/stream' : '/tts/generate'
@@ -696,7 +878,7 @@ async function generateAudio(workflow = 'generate') {
   const output = workflow === 'clone' ? cloneOutput : generateOutput
   if (workflow === 'clone') {
     state.lastCloneGeneration = null
-    $('#clone-store-row').hidden = true
+    renderVoiceSaveState()
   }
   setGenerationBusy(true, workflow)
   startActivityPolling(workflow)
@@ -704,9 +886,17 @@ async function generateAudio(workflow = 'generate') {
   try {
     const { blob, extension, seed, payload, reference } = await requestAudio({ workflow })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
-    if (workflow === 'clone' && payload.input_type === 'text') {
+    if (workflow === 'clone') {
       state.lastCloneGeneration = { blob, extension, seed, payload, reference }
-      $('#clone-store-row').hidden = false
+      const generatedReference = new File(
+        [blob],
+        `designed-voice.${extension}`,
+        { type: blob.type || 'application/octet-stream' },
+      )
+      await referenceAudio.load(generatedReference, generatedReference.name)
+      $('#reference-text').value = payload.text
+      renderVoiceSaveState()
+      updateDesignCompletion()
     }
     if (seed !== null) {
       $('#last-generated-seed').value = seed
@@ -987,17 +1177,58 @@ async function transcribeReference() {
   }
 }
 
-async function saveProfileRequest({ name, profileType, description = '', file = null, refText = '', control = '', editing = false }) {
+async function saveProfileRequest({
+  name,
+  profileType,
+  description = '',
+  tags = [],
+  file = null,
+  designFile = null,
+  portraitFile = null,
+  clearDesignAudio = false,
+  clearPortrait = false,
+  refText = '',
+  control = '',
+  recipe = null,
+  editing = false,
+  metadataOnly = false,
+}) {
   const form = new FormData()
-  form.append('name', name)
-  form.append('profile_type', profileType)
-  form.append('description', description)
-  form.append('ref_text', refText)
-  form.append('control', control)
-  form.append('language', $('#language').value || 'English')
-  if (file) form.append('reference_audio', file, file.name)
+  if (!metadataOnly) {
+    form.append('name', name)
+    form.append('profile_type', profileType)
+    form.append('description', description)
+    form.append('ref_text', refText)
+    form.append('control', control)
+    form.append('language', $('#language').value || 'English')
+    if (recipe) form.append('recipe', JSON.stringify(recipe))
+    if (file) form.append('reference_audio', file, file.name)
+    if (designFile) form.append('design_reference_audio', designFile, designFile.name)
+    if (editing) form.append('clear_design_audio', String(clearDesignAudio))
+  }
+  form.append('tags', JSON.stringify(tags))
+  if (portraitFile) form.append('portrait', portraitFile, portraitFile.name)
+  if (editing) form.append('clear_portrait', String(clearPortrait))
   const path = editing ? `/tts/voice-profiles/${encodeURIComponent(name)}` : '/tts/voice-profiles'
   return fetchJson(path, { method: editing ? 'PUT' : 'POST', body: form })
+}
+
+function generatedVoiceRecipe(generated) {
+  const payload = generated.payload
+  return {
+    design_source: payload.voice === 'reference' ? 'reference' : 'direction',
+    clone_mode: payload.voice === 'reference' ? payload.clone_mode : 'reference',
+    seed: Number(generated.seed ?? payload.seed ?? 42),
+    randomize_seed: false,
+    cfg_value: Number(payload.cfg_value),
+    inference_timesteps: Number(payload.inference_timesteps),
+    normalize: Boolean(payload.normalize),
+    normalize_loudness: Boolean(payload.normalize_loudness),
+    denoise: Boolean(payload.denoise),
+    output_format: payload.output_format,
+    sample_text: payload.text,
+    reference_text: payload.ref_text || '',
+  }
 }
 
 function compactGeneratedReferenceText(value) {
@@ -1061,21 +1292,18 @@ async function prepareGeneratedVoiceReference() {
 }
 
 function openQuickSaveDialog(profileType) {
-  if (profileType === 'designed' && !$('#control-input').value.trim()) {
-    return showToast('Enter a voice description before saving this design.')
-  }
   if (profileType === 'clone-generated' && !state.lastCloneGeneration) {
-    return showToast('Generate cloned audio before storing this voice.')
+    return showToast('Generate a designed voice before storing it.')
   }
+  const name = normalizedProfileName($('#design-voice-name').value)
+  if (!name) return showToast('Name this voice before storing it.')
+  if (state.profiles.some((profile) => profile.id === name)) return showToast(`Voice ${name} already exists. Use Edit to refine it.`)
   state.quickSaveType = profileType
-  $('#save-profile-title').textContent = profileType === 'designed' ? 'Save designed voice' : 'Store generated voice'
-  $('#save-profile-copy').textContent = profileType === 'designed'
-    ? 'Reuse this voice description from Generate or Stream.'
-    : 'Store a generated reference and its matching words for consistent future dialogue.'
-  $('#quick-profile-name').value = ''
+  $('#save-profile-title').textContent = `Store ${name}`
+  $('#save-profile-copy').textContent = 'Add an optional description, then store the voice, portrait, tags, and complete design recipe.'
   $('#quick-profile-description').value = ''
   $('#save-profile-dialog').showModal()
-  $('#quick-profile-name').focus()
+  $('#quick-profile-description').focus()
 }
 
 function closeQuickSaveDialog() {
@@ -1094,54 +1322,52 @@ function closeDeleteProfileDialog() {
   $('#delete-profile-dialog').close()
 }
 
-function resetProfileEditor() {
+function renderVoiceSaveState() {
+  const row = $('#clone-store-row')
+  const editing = state.editingProfile
+  const hasGeneration = Boolean(state.lastCloneGeneration)
+  const metadataChanged = profileMetadataChanged()
+  row.hidden = !editing && !hasGeneration
+  $('#clone-store-title').textContent = editing ? `Refine ${editing.id}` : 'Keep this voice'
+  $('#clone-store-copy').textContent = editing
+    ? (hasGeneration
+        ? `Replace ${editing.id} with this refined voice`
+        : metadataChanged
+          ? 'Update tags or portrait without replacing the saved audio'
+          : 'Generate a refined voice or change its tags or portrait')
+    : 'Store a compact generated reference and its design recipe'
+  $('#cancel-voice-edit').hidden = !editing
+  const button = $('#store-generated-voice')
+  $('span', button).textContent = editing && !hasGeneration ? 'Update details' : editing ? 'Update voice' : 'Store voice'
+  button.disabled = !hasGeneration && !metadataChanged
+}
+
+function cancelVoiceEdit() {
   state.editingProfile = null
-  $('#voice-form').reset()
-  $('#profile-name').disabled = false
-  $('#voice-form-title').textContent = 'Add a reference voice'
-  $('#voice-form-copy').textContent = 'Drop a clean voice sample here, then use it from Generate, Clone, or Stream.'
-  $('#profile-submit-label').textContent = 'Save voice'
-  $('#profile-edit-cancel').hidden = true
-  profileAudio.clear()
-  updateProfileNamePreview()
+  resetDesignIdentity()
+  renderCloneProfileList()
+  renderVoiceSaveState()
 }
 
-function openProfileEditor(profile) {
-  state.editingProfile = profile
-  $('#profile-name').value = profile.id
-  $('#profile-name').disabled = true
-  $('#profile-description').value = profile.description || ''
-  $('#profile-transcript').value = profile.ref_text || ''
-  if (profile.language) $('#language').value = profile.language
-  $('#voice-form-title').textContent = `Edit ${profile.id}`
-  $('#voice-form-copy').textContent = 'Update its details or choose a new sample. The current sample is retained when none is selected.'
-  $('#profile-submit-label').textContent = 'Update voice'
-  $('#profile-edit-cancel').hidden = false
-  profileAudio.clear()
-  updateProfileNamePreview()
-  activateTab('voices')
-  $('#profile-description').focus()
+function openUpdateProfileDialog() {
+  if (!state.editingProfile || (!state.lastCloneGeneration && !profileMetadataChanged())) return
+  const replacingVoice = Boolean(state.lastCloneGeneration)
+  $('#update-profile-title').textContent = replacingVoice ? 'Replace saved voice?' : 'Update saved voice?'
+  const copy = $('#update-profile-copy')
+  const name = document.createElement('strong')
+  name.id = 'update-profile-name'
+  name.textContent = state.editingProfile.id
+  copy.replaceChildren(
+    replacingVoice ? 'Replace ' : 'Update tags or portrait for ',
+    name,
+    replacingVoice ? ' with this newly refined voice?' : ' without replacing its audio or design recipe?',
+  )
+  $('span', $('#update-profile-confirm')).textContent = replacingVoice ? 'Update voice' : 'Update details'
+  $('#update-profile-dialog').showModal()
 }
 
-async function loadProfileAudio(file) {
-  if (!file) return
-  try {
-    await profileAudio.load(file, file.name)
-    if (!$('#profile-name').value.trim()) $('#profile-name').value = normalizedProfileName(file.name.replace(/\.[^.]+$/, ''))
-    updateProfileNamePreview()
-  } catch (error) {
-    profileAudio.clear()
-    showToast(errorMessage(error))
-  }
-}
-
-function updateProfileNamePreview() {
-  const normalized = normalizedProfileName($('#profile-name').value)
-  const preview = $('#profile-name-preview')
-  if (state.editingProfile) preview.textContent = `Editing ${state.editingProfile.id}`
-  else if (!normalized) preview.textContent = 'Letters, numbers, hyphens, and underscores'
-  else if (state.profiles.some((profile) => profile.id === normalized)) preview.textContent = `${normalized} already exists`
-  else preview.textContent = `Saved as ${normalized}`
+function closeUpdateProfileDialog() {
+  if ($('#update-profile-dialog').open) $('#update-profile-dialog').close()
 }
 
 async function refreshApi() {
@@ -1423,7 +1649,7 @@ function activateTab(tab) {
   })
   $$('.tab-panel').forEach((panel) => { panel.hidden = panel.dataset.panel !== tab })
   $('#inference-settings').hidden = !workflowActive
-  $('#composer').hidden = !workflowActive
+  $('#composer').hidden = !['generate', 'stream'].includes(tab)
   updateWorkflowControls()
   if (tab !== 'clone') referenceRecorder.stop()
   else requestAnimationFrame(() => referenceRecorder.refresh())
@@ -1490,9 +1716,8 @@ async function initialize() {
 
   populateSelect($('#language'), languages.languages.map((language) => ({ value: language, label: language })), defaults.language)
   populateSelect($('#device'), status.hardware || [{ value: 'auto', label: 'Auto' }, { value: 'cpu', label: 'CPU' }], defaults.device)
-  $('#profile-count').textContent = String(state.profiles.length)
   renderVoiceProfileSelect()
-  renderProfileList()
+  renderCloneProfileList()
   resetControls()
   $('#denoise').disabled = !status.load_denoiser
   $('#transcribe-reference').disabled = !status.load_asr
@@ -1505,8 +1730,9 @@ async function initialize() {
   $('#runtime-state').textContent = `${status.backend === 'nano' ? 'Nano' : 'Native'} backend ready`
   $('#runtime-model').textContent = `${status.model_id} · ${status.runtime}`
   setStatus('Ready', 'success')
-  updateVoiceDesignState()
+  setDesignSource(state.designSource, { persist: false })
   setCloneMode(state.cloneMode, { persist: false })
+  updateDesignMetrics()
   refreshFormatOptions()
 
   setHeaderCollapsed(state.headerCollapsed)
@@ -1514,17 +1740,74 @@ async function initialize() {
 }
 
 $('#text-input').addEventListener('input', updateMetrics)
+$('#design-text-input').addEventListener('input', updateDesignMetrics)
+$('#design-voice-name').addEventListener('input', updateDesignCompletion)
+$('#design-voice-tags').addEventListener('input', renderVoiceSaveState)
+$('#clone-control-input').addEventListener('input', updateDesignCompletion)
+$('#reference-text').addEventListener('input', updateDesignCompletion)
 $$('.input-type-control button').forEach((button) => button.addEventListener('click', () => setInputType(button.dataset.inputType)))
+$$('.design-source-control button').forEach((button) => button.addEventListener('click', () => setDesignSource(button.dataset.designSource)))
 $$('.clone-mode-control button').forEach((button) => button.addEventListener('click', () => setCloneMode(button.dataset.cloneMode)))
-$('#control-input').addEventListener('input', updateVoiceDesignState)
 $('#voice-profile').addEventListener('change', updateVoiceProfileState)
 $('#randomize-seed').addEventListener('change', updateSeedState)
+$('#design-seed-lock').addEventListener('click', () => {
+  $('#randomize-seed').checked = !$('#randomize-seed').checked
+  updateSeedState()
+})
 $('#generate-timestamps').addEventListener('change', updateTimestampState)
 $('#sample-button').addEventListener('click', () => {
   if (state.inputType === 'text') state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
   $('#text-input').value = inputSample(state.inputType)
   state.inputDrafts[state.inputType] = $('#text-input').value
   updateMetrics()
+})
+$('#design-sample-button').addEventListener('click', () => {
+  state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
+  $('#design-text-input').value = SAMPLE_TEXTS[state.sampleIndex]
+  updateDesignMetrics()
+})
+$('#design-portrait-choose').addEventListener('click', () => {
+  state.portraitTargetProfile = null
+  $('#design-portrait-input').click()
+})
+$('#design-portrait-input').addEventListener('change', async (event) => {
+  const file = event.target.files[0]
+  const targetProfile = state.portraitTargetProfile
+  state.portraitTargetProfile = null
+  event.target.value = ''
+  if (!file) return
+  if (!targetProfile) {
+    loadDesignPortrait(file)
+    return
+  }
+  const allowed = ['image/png', 'image/jpeg', 'image/webp']
+  if (!allowed.includes(file.type)) return showToast('Choose a PNG, JPEG, or WebP portrait.')
+  if (file.size > 5 * 1024 * 1024) return showToast('Voice portraits must be 5 MB or smaller.')
+  try {
+    setStatus(`Updating ${targetProfile.id} portrait`)
+    const saved = await saveProfileRequest({
+      name: targetProfile.id,
+      profileType: targetProfile.profile_type,
+      tags: state.editingProfile?.id === targetProfile.id ? designVoiceTags() : (targetProfile.tags || []),
+      portraitFile: file,
+      editing: true,
+      metadataOnly: true,
+    })
+    await refreshProfiles(saved.id)
+    if (state.editingProfile?.id === saved.id) {
+      state.editingProfile = state.profiles.find((profile) => profile.id === saved.id) || saved
+      setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
+    }
+    renderCloneProfileList()
+    showToast(`Updated ${saved.id} portrait.`, 'success')
+    setStatus(`Voice ${saved.id} portrait updated`, 'success')
+  } catch (error) {
+    showToast(errorMessage(error))
+  }
+})
+$('#design-portrait-remove').addEventListener('click', (event) => {
+  event.stopPropagation()
+  setDesignPortrait({ removed: true })
 })
 $('#reference-audio').addEventListener('change', (event) => {
   const file = event.target.files[0]
@@ -1536,7 +1819,6 @@ $('#reference-audio-clear').addEventListener('click', () => referenceAudio.clear
 $('#reference-audio-preview').addEventListener('click', (event) => {
   if (event.target.closest('[data-role="empty"]')) $('#reference-audio').click()
 })
-$('#manage-clone-voices').addEventListener('click', () => activateTab('voices'))
 for (const eventName of ['dragenter', 'dragover']) {
   $('#reference-audio-drop').addEventListener(eventName, (event) => {
     event.preventDefault()
@@ -1553,57 +1835,17 @@ $('#reference-audio-drop').addEventListener('drop', (event) => {
   const file = event.dataTransfer.files[0]
   if (file) referenceAudio.load(file, file.name)
 })
-$('#profile-name').addEventListener('input', updateProfileNamePreview)
-$('#profile-filter').addEventListener('input', renderProfileList)
-$('#profile-audio').addEventListener('change', (event) => loadProfileAudio(event.target.files[0]))
-for (const eventName of ['dragenter', 'dragover']) {
-  $('#profile-audio-drop').addEventListener(eventName, (event) => {
-    event.preventDefault()
-    event.currentTarget.classList.add('dragging')
-  })
-}
-for (const eventName of ['dragleave', 'drop']) {
-  $('#profile-audio-drop').addEventListener(eventName, (event) => {
-    event.preventDefault()
-    event.currentTarget.classList.remove('dragging')
-  })
-}
-$('#profile-audio-drop').addEventListener('drop', (event) => loadProfileAudio(event.dataTransfer.files[0]))
-$('#voice-form').addEventListener('submit', async (event) => {
-  event.preventDefault()
-  const formElement = event.currentTarget
-  const button = $('button[type="submit"]', formElement)
-  const name = normalizedProfileName($('#profile-name').value)
-  const file = profileAudio.currentFile()
-  if (!name) return showToast('Enter a voice name.')
-  if (!file && !state.editingProfile) return showToast('Choose or drop a reference audio sample.')
-  button.disabled = true
-  try {
-    const saved = await saveProfileRequest({
-      name,
-      profileType: 'cloned',
-      description: $('#profile-description').value.trim(),
-      file,
-      refText: $('#profile-transcript').value.trim(),
-      editing: Boolean(state.editingProfile),
-    })
-    resetProfileEditor()
-    await refreshProfiles(saved.id)
-    showToast(`Saved ${saved.id}.`, 'success')
-  } catch (error) {
-    showToast(errorMessage(error))
-  } finally {
-    button.disabled = false
-  }
+$('#clone-profile-filter').addEventListener('input', renderCloneProfileList)
+$('#cancel-voice-edit').addEventListener('click', cancelVoiceEdit)
+$('#store-generated-voice').addEventListener('click', () => {
+  if (state.editingProfile) openUpdateProfileDialog()
+  else openQuickSaveDialog('clone-generated')
 })
-$('#profile-edit-cancel').addEventListener('click', resetProfileEditor)
-$('#save-designed-voice').addEventListener('click', () => openQuickSaveDialog('designed'))
-$('#store-generated-voice').addEventListener('click', () => openQuickSaveDialog('clone-generated'))
 $('#quick-save-form').addEventListener('submit', async (event) => {
   event.preventDefault()
   const profileType = state.quickSaveType
-  const name = normalizedProfileName($('#quick-profile-name').value)
-  if (!profileType || !name) return showToast('Enter a voice name.')
+  const name = normalizedProfileName($('#design-voice-name').value)
+  if (!profileType || !name) return showToast('Name this voice before storing it.')
   const button = $('button[type="submit"]', event.currentTarget)
   button.disabled = true
   try {
@@ -1614,13 +1856,23 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
       name,
       profileType: profileType === 'clone-generated' ? 'cloned' : profileType,
       description: $('#quick-profile-description').value.trim(),
+      tags: designVoiceTags(),
       file: generatedReference?.file || null,
+      designFile: state.lastCloneGeneration?.payload.voice === 'reference' ? state.lastCloneGeneration.reference : null,
+      portraitFile: state.portraitFile,
       refText: generatedReference?.refText || '',
-      control: profileType === 'designed' ? $('#control-input').value.trim() : '',
+      control: state.lastCloneGeneration?.payload.control || '',
+      recipe: generatedVoiceRecipe(state.lastCloneGeneration),
     })
     closeQuickSaveDialog()
     await refreshProfiles(saved.id)
-    if (profileType === 'clone-generated') renderCloneProfileList()
+    state.editingProfile = state.profiles.find((profile) => profile.id === saved.id) || saved
+    state.lastCloneGeneration = null
+    $('#design-voice-name').value = saved.id
+    $('#design-voice-name').disabled = true
+    setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
+    renderVoiceSaveState()
+    renderCloneProfileList()
     showToast(`Saved ${saved.id}.`, 'success')
     setStatus(`Voice ${saved.id} stored`, 'success')
   } catch (error) {
@@ -1632,6 +1884,60 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
 $('#save-profile-close').addEventListener('click', closeQuickSaveDialog)
 $('#save-profile-cancel').addEventListener('click', closeQuickSaveDialog)
 $('#save-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeQuickSaveDialog() })
+$('#update-profile-close').addEventListener('click', closeUpdateProfileDialog)
+$('#update-profile-cancel').addEventListener('click', closeUpdateProfileDialog)
+$('#update-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeUpdateProfileDialog() })
+$('#update-profile-confirm').addEventListener('click', async (event) => {
+  const profile = state.editingProfile
+  const generated = state.lastCloneGeneration
+  if (!profile || (!generated && !profileMetadataChanged())) return
+  const button = event.currentTarget
+  button.disabled = true
+  try {
+    let saved
+    if (generated) {
+      const generatedReference = await prepareGeneratedVoiceReference()
+      saved = await saveProfileRequest({
+        name: profile.id,
+        profileType: 'cloned',
+        description: profile.description || '',
+        tags: designVoiceTags(),
+        file: generatedReference.file,
+        designFile: generated.payload.voice === 'reference' ? generated.reference : null,
+        portraitFile: state.portraitFile,
+        clearDesignAudio: generated.payload.voice !== 'reference',
+        clearPortrait: state.portraitRemoved,
+        refText: generatedReference.refText,
+        control: generated.payload.control || '',
+        recipe: generatedVoiceRecipe(generated),
+        editing: true,
+      })
+    } else {
+      saved = await saveProfileRequest({
+        name: profile.id,
+        profileType: profile.profile_type,
+        tags: designVoiceTags(),
+        portraitFile: state.portraitFile,
+        clearPortrait: state.portraitRemoved,
+        editing: true,
+        metadataOnly: true,
+      })
+    }
+    closeUpdateProfileDialog()
+    state.lastCloneGeneration = null
+    await refreshProfiles(saved.id)
+    state.editingProfile = state.profiles.find((item) => item.id === saved.id) || saved
+    setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
+    renderVoiceSaveState()
+    renderCloneProfileList()
+    showToast(generated ? `Updated ${saved.id}.` : `Updated ${saved.id} details.`, 'success')
+    setStatus(generated ? `Voice ${saved.id} updated` : `Voice ${saved.id} details updated`, 'success')
+  } catch (error) {
+    showToast(errorMessage(error))
+  } finally {
+    button.disabled = false
+  }
+})
 $('#delete-profile-close').addEventListener('click', closeDeleteProfileDialog)
 $('#delete-profile-cancel').addEventListener('click', closeDeleteProfileDialog)
 $('#delete-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeDeleteProfileDialog() })
@@ -1643,6 +1949,7 @@ $('#delete-profile-confirm').addEventListener('click', async (event) => {
   try {
     await fetchJson(`/tts/voice-profiles/${encodeURIComponent(profile.id)}`, { method: 'DELETE' })
     closeDeleteProfileDialog()
+    if (state.editingProfile?.id === profile.id) cancelVoiceEdit()
     await refreshProfiles()
     showToast(`Deleted ${profile.id}.`, 'success')
   } catch (error) {
@@ -1701,5 +2008,4 @@ window.addEventListener('beforeunload', () => {
   cloneOutput.destroy()
   streamOutput.destroy()
   referenceAudio.destroy()
-  profileAudio.destroy()
 })

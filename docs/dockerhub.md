@@ -60,7 +60,7 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 
 ## What You Get
 
-- Offline browser workspace for voice design, controllable cloning, transcript-guided cloning, local reference transcription, recording, upload, waveform trimming, and reusable saved voices
+- Offline browser Design workspace for direction-only creation, controllable cloning, transcript-guided cloning, local reference transcription, recording, upload, waveform trimming, restorable design recipes, and reusable saved voices
 - HTTP API for applications and automation
 - SSML and SSML-H for multi-speaker discussions, plays, saved clone voices, and designed speakers
 - VoxCPM2 multilingual generation across 30 officially supported languages

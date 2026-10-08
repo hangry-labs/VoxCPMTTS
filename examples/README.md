@@ -17,6 +17,11 @@ This directory contains the static project page and browser-side examples for Ha
 - `assets/<language>/intro/` contains 3 translated project intro samples.
 - `assets/<language>/clone/` contains 1 translated clone sample using `original_clone.mp3`.
 
+## SSML-H Documents
+
+- `ssml-h/polish-launch-dialogue.ssml` is an extended fixed-seed Polish launch sequence covering the countdown, emergency response, recovery, and launch.
+- `ssml-h/english-launch-dialogue.ssml` and `ssml-h/german-launch-dialogue.ssml` provide matching three-speaker launch scenarios for multilingual testing.
+
 Regenerate and validate samples with the project maintenance scripts.
 After regeneration, rebuild `voices.js` from `assets/manifest.json` so the static page uses the latest sample metadata.
 

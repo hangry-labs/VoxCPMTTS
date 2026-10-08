@@ -20,7 +20,7 @@ from typing import Any, Literal, Optional
 import numpy as np
 import torch
 import uvicorn
-from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,6 +44,8 @@ from voxcpm.voice_profiles import (
     delete_voice_profile,
     load_voice_profiles,
     normalize_profile_name,
+    normalize_profile_recipe,
+    normalize_profile_tags,
     resolve_voice_profile,
     save_voice_profile,
     update_voice_profile,
@@ -77,6 +79,8 @@ BUILD_DATE = os.getenv("VOXCPMTTS_BUILD_DATE", "unknown")
 VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
 MAX_REFERENCE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_REFERENCE_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 REFERENCE_AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".webm"}
+MAX_PORTRAIT_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_PORTRAIT_UPLOAD_BYTES", str(5 * 1024 * 1024)))
+PORTRAIT_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 VOICE_PROFILE_DIR = Path(os.getenv("VOXCPM_VOICE_PROFILE_DIR", "/app/persistent/voices"))
 SSML_STAGING_DIR = Path(os.getenv("VOXCPM_SSML_STAGING_DIR", "/tmp/voxcpmtts-ssml"))
 MAX_RANDOM_SEED = 2**32 - 1
@@ -1306,14 +1310,20 @@ def voice_profile_payloads() -> list[dict[str, Any]]:
             "id": name,
             "profile_type": profile["profile_type"],
             "description": profile["description"],
+            "tags": profile["tags"],
             "language": profile["language"],
             "has_audio": bool(profile["audio_file"]),
+            "has_design_audio": bool(profile["design_audio_file"]),
+            "has_portrait": bool(profile["portrait_file"]),
             "has_transcript": bool(profile["ref_text"]),
             "has_control": bool(profile["control"]),
             "ref_text": profile["ref_text"],
             "control": profile["control"],
+            "recipe": profile["recipe"],
             "created_at": profile["created_at"],
             "audio_url": f"/tts/voice-profiles/{name}/audio" if profile["audio_file"] else None,
+            "design_audio_url": f"/tts/voice-profiles/{name}/design-audio" if profile["design_audio_file"] else None,
+            "portrait_url": f"/tts/voice-profiles/{name}/portrait" if profile["portrait_file"] else None,
         }
         for name, profile in sorted(load_voice_profiles(VOICE_PROFILE_DIR).items())
     ]
@@ -1341,6 +1351,82 @@ async def save_reference_upload(upload: UploadFile) -> str:
     finally:
         await upload.close()
     return path
+
+
+async def save_portrait_upload(upload: UploadFile) -> str:
+    suffix = Path(upload.filename or "portrait.webp").suffix.lower()
+    if suffix not in PORTRAIT_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Unsupported voice portrait file type")
+
+    total = 0
+    header = b""
+    path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as output:
+            path = output.name
+            while chunk := await upload.read(1024 * 1024):
+                if len(header) < 12:
+                    header = (header + chunk)[:12]
+                total += len(chunk)
+                if total > MAX_PORTRAIT_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Voice portrait exceeds the 5 MB upload limit")
+                output.write(chunk)
+        is_png = header.startswith(b"\x89PNG\r\n\x1a\n")
+        is_jpeg = header.startswith(b"\xff\xd8\xff")
+        is_webp = header.startswith(b"RIFF") and header[8:12] == b"WEBP"
+        valid_signature = is_png or is_jpeg or is_webp
+        valid_suffix = (is_png and suffix == ".png") or (is_jpeg and suffix in {".jpg", ".jpeg"}) or (is_webp and suffix == ".webp")
+        if not valid_signature or not valid_suffix:
+            raise HTTPException(status_code=400, detail="Voice portrait contents do not match its image type")
+        normalized_path = await asyncio.to_thread(normalize_portrait_image, path)
+        Path(path).unlink(missing_ok=True)
+        path = normalized_path
+    except Exception:
+        if path:
+            Path(path).unlink(missing_ok=True)
+        raise
+    finally:
+        await upload.close()
+    return path
+
+
+def normalize_portrait_image(source_path: str) -> str:
+    output = tempfile.NamedTemporaryFile(delete=False, suffix=".webp")
+    output_path = output.name
+    output.close()
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        source_path,
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=100:100:force_original_aspect_ratio=increase,crop=100:100,format=bgra",
+        "-c:v",
+        "libwebp",
+        "-lossless",
+        "1",
+        "-compression_level",
+        "6",
+        "-preset",
+        "picture",
+        "-threads",
+        "1",
+        output_path,
+    ]
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+        if not Path(output_path).is_file() or Path(output_path).stat().st_size == 0:
+            raise ValueError("Voice portrait conversion produced no image.")
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as exc:
+        Path(output_path).unlink(missing_ok=True)
+        detail = exc.stderr.decode("utf-8", errors="replace").strip() if isinstance(exc, subprocess.CalledProcessError) else str(exc)
+        raise HTTPException(status_code=400, detail=f"Unable to process voice portrait: {detail}") from exc
+    return output_path
 
 
 def parse_uploaded_payload(payload: str, *, streaming: bool = False) -> TTSRequest:
@@ -1470,7 +1556,8 @@ def voices() -> dict:
 
 
 @api.get("/tts/voice-profiles")
-def voice_profiles() -> dict:
+def voice_profiles(response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
     profiles = voice_profile_payloads()
     return {"object": "list", "data": profiles, "count": len(profiles)}
 
@@ -1480,63 +1567,109 @@ async def create_voice_profile(
     name: str = Form(...),
     profile_type: str = Form(...),
     description: str = Form(""),
+    tags: str = Form(""),
     ref_text: str = Form(""),
     control: str = Form(""),
     language: str = Form(""),
+    recipe: str = Form(""),
     reference_audio: UploadFile | None = File(None),
+    design_reference_audio: UploadFile | None = File(None),
+    portrait: UploadFile | None = File(None),
 ) -> dict:
     temporary_path: str | None = None
+    design_temporary_path: str | None = None
+    portrait_temporary_path: str | None = None
     try:
         if reference_audio is not None:
             temporary_path = await save_reference_upload(reference_audio)
+        if design_reference_audio is not None:
+            design_temporary_path = await save_reference_upload(design_reference_audio)
+        if portrait is not None:
+            portrait_temporary_path = await save_portrait_upload(portrait)
+        parsed_recipe = normalize_profile_recipe(json.loads(recipe)) if recipe.strip() else {}
+        parsed_tags = normalize_profile_tags(json.loads(tags)) if tags.strip() else []
         profile_name, _ = await asyncio.to_thread(
             save_voice_profile,
             VOICE_PROFILE_DIR,
             name=name,
             profile_type=profile_type,
             source_audio=temporary_path,
+            design_source_audio=design_temporary_path,
+            portrait_source=portrait_temporary_path,
             ref_text=ref_text,
             control=control,
             description=description,
+            tags=parsed_tags,
             language=language,
+            recipe=parsed_recipe,
             overwrite=False,
         )
-    except ValueError as exc:
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         if temporary_path:
             Path(temporary_path).unlink(missing_ok=True)
+        if design_temporary_path:
+            Path(design_temporary_path).unlink(missing_ok=True)
+        if portrait_temporary_path:
+            Path(portrait_temporary_path).unlink(missing_ok=True)
     return next(profile for profile in voice_profile_payloads() if profile["id"] == profile_name)
 
 
 @api.put("/tts/voice-profiles/{profile_name}")
 async def edit_voice_profile(
     profile_name: str,
-    description: str = Form(""),
-    ref_text: str = Form(""),
-    control: str = Form(""),
-    language: str = Form(""),
+    profile_type: str | None = Form(None),
+    description: str | None = Form(None),
+    tags: str = Form(""),
+    ref_text: str | None = Form(None),
+    control: str | None = Form(None),
+    language: str | None = Form(None),
+    recipe: str = Form(""),
+    clear_design_audio: bool = Form(False),
+    clear_portrait: bool = Form(False),
     reference_audio: UploadFile | None = File(None),
+    design_reference_audio: UploadFile | None = File(None),
+    portrait: UploadFile | None = File(None),
 ) -> dict:
     temporary_path: str | None = None
+    design_temporary_path: str | None = None
+    portrait_temporary_path: str | None = None
     try:
         if reference_audio is not None:
             temporary_path = await save_reference_upload(reference_audio)
+        if design_reference_audio is not None:
+            design_temporary_path = await save_reference_upload(design_reference_audio)
+        if portrait is not None:
+            portrait_temporary_path = await save_portrait_upload(portrait)
+        parsed_recipe = normalize_profile_recipe(json.loads(recipe)) if recipe.strip() else None
+        parsed_tags = normalize_profile_tags(json.loads(tags)) if tags.strip() else None
         normalized_name, _ = await asyncio.to_thread(
             update_voice_profile,
             VOICE_PROFILE_DIR,
             name=profile_name,
             source_audio=temporary_path,
+            design_source_audio=design_temporary_path,
+            clear_design_audio=clear_design_audio,
+            portrait_source=portrait_temporary_path,
+            clear_portrait=clear_portrait,
+            profile_type=profile_type,
             ref_text=ref_text,
             control=control,
             description=description,
+            tags=parsed_tags,
             language=language,
+            recipe=parsed_recipe,
         )
-    except ValueError as exc:
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     finally:
         if temporary_path:
             Path(temporary_path).unlink(missing_ok=True)
+        if design_temporary_path:
+            Path(design_temporary_path).unlink(missing_ok=True)
+        if portrait_temporary_path:
+            Path(portrait_temporary_path).unlink(missing_ok=True)
     return next(profile for profile in voice_profile_payloads() if profile["id"] == normalized_name)
 
 
@@ -1550,6 +1683,30 @@ def voice_profile_audio(profile_name: str) -> FileResponse:
     if not audio_path:
         raise HTTPException(status_code=404, detail="Designed voice profiles do not contain reference audio.")
     return FileResponse(audio_path, filename=Path(audio_path).name)
+
+
+@api.get("/tts/voice-profiles/{profile_name}/design-audio")
+def voice_profile_design_audio(profile_name: str) -> FileResponse:
+    try:
+        _, profile = resolve_voice_profile(VOICE_PROFILE_DIR, profile_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    audio_path = profile.get("design_ref_audio")
+    if not audio_path:
+        raise HTTPException(status_code=404, detail="Voice profile has no stored design reference audio.")
+    return FileResponse(audio_path, filename=Path(audio_path).name)
+
+
+@api.get("/tts/voice-profiles/{profile_name}/portrait")
+def voice_profile_portrait(profile_name: str) -> FileResponse:
+    try:
+        _, profile = resolve_voice_profile(VOICE_PROFILE_DIR, profile_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    portrait_path = profile.get("portrait_path")
+    if not portrait_path:
+        raise HTTPException(status_code=404, detail="Voice profile has no portrait.")
+    return FileResponse(portrait_path, headers={"Cache-Control": "no-store"})
 
 
 @api.delete("/tts/voice-profiles/{profile_name}")

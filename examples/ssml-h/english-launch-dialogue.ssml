@@ -1,0 +1,58 @@
+<speak
+  version="1.1"
+  xmlns="http://www.w3.org/2001/10/synthesis"
+  xmlns:h="https://hangrylabs.app/ns/ssml-h/1.0"
+  xml:lang="en-US">
+
+  <metadata>
+    <h:extensions version="1.0">
+      <h:voice-definition name="Captain" gender="male" age="middle-aged" pitch="low"
+        style="authoritative" languages="en-US" accent="american" scope="request" seed="4242">
+        <h:description>A seasoned ship captain with a controlled, commanding delivery.</h:description>
+        <h:sample xml:lang="en-US">Bridge to engineering. We are preparing to launch.</h:sample>
+      </h:voice-definition>
+      <h:voice-definition name="Engineer_Maya" gender="female" age="adult" pitch="medium"
+        style="calm and precise" languages="en-US" accent="american" scope="request" seed="8241">
+        <h:description>A composed chief engineer who remains precise under pressure.</h:description>
+        <h:sample xml:lang="en-US">All systems are stable and operating within normal limits.</h:sample>
+      </h:voice-definition>
+      <h:voice-definition name="Officer_Reed" gender="male" age="young-adult" pitch="medium"
+        style="alert and urgent" languages="en-US" accent="american" scope="request" seed="1907">
+        <h:description>A vigilant safety officer with a quick, direct speaking style.</h:description>
+        <h:sample xml:lang="en-US">Safety station reporting. I am monitoring every deck.</h:sample>
+      </h:voice-definition>
+    </h:extensions>
+  </metadata>
+
+  <voice name="Captain" h:direction="Calm, confident, and commanding">
+    Engineering, this is the bridge. Maya, are all systems ready for launch?
+  </voice>
+  <break time="350ms" />
+  <voice name="Engineer_Maya" h:direction="Calm, precise, and reassuring">
+    Yes, Captain. Main propulsion is stable, fuel pressure is nominal, and every system is ready.
+  </voice>
+  <break time="450ms" />
+  <voice name="Captain" h:direction="Ceremonial and decisive">
+    Final countdown. Five... <break time="450ms" /> four... <break time="450ms" /> three...
+  </voice>
+  <break time="120ms" />
+  <voice name="Officer_Reed" h:direction="Sudden, loud, and alarmed">
+    Abort launch! Fire in the power section! It is spreading toward engineering!
+  </voice>
+  <break time="180ms" />
+  <voice name="Captain" h:direction="Shouting with anger and urgency">
+    Engineering, get it together down there! Contain that fire and report readiness immediately!
+  </voice>
+  <break time="400ms" />
+  <voice name="Engineer_Maya" h:direction="Fast, focused, and authoritative">
+    Power is isolated and suppression is active. The fire is contained. Backup propulsion is stable.
+  </voice>
+  <break time="350ms" />
+  <voice name="Officer_Reed" h:direction="Careful, then visibly relieved">
+    Temperature is falling. No further threat detected. The launch corridor is clear.
+  </voice>
+  <break time="450ms" />
+  <voice name="Captain" h:direction="Firm, then triumphant and energetic">
+    Countdown resumed. Two... <break time="500ms" /> one... <break time="600ms" /> launch! Full power!
+  </voice>
+</speak>
