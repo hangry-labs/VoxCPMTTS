@@ -18,6 +18,8 @@ from huggingface_hub import snapshot_download
 
 
 MAX_GENERATION_SEED = 0xFFFFFFFF
+NANO_BADCASE_RATIO_THRESHOLD = 4.5
+NANO_GENERATION_LIMIT_RATIO = 6.0
 
 
 def _bounded_generation_length(
@@ -25,18 +27,15 @@ def _bounded_generation_length(
     tokenizer: Callable[[str], Sequence[int]],
     requested_max: int,
     ratio_threshold: float,
-    patch_size: int,
 ) -> tuple[int, float]:
     if requested_max < 1:
         raise ValueError("max_len must be greater than zero")
     if ratio_threshold <= 0:
         raise ValueError("retry_badcase_ratio_threshold must be greater than zero")
-    if patch_size < 1:
-        raise ValueError("patch_size must be greater than zero")
     token_count = max(1, len(tokenizer(text)))
     badcase_threshold = token_count * ratio_threshold
-    latent_limit = min(requested_max, int(badcase_threshold + 10))
-    return max(1, (latent_limit + patch_size - 1) // patch_size), badcase_threshold
+    generation_limit = min(requested_max, int(token_count * NANO_GENERATION_LIMIT_RATIO + 10))
+    return generation_limit, badcase_threshold
 
 
 def _materialize_seed(seed: int | None) -> int:
@@ -109,7 +108,6 @@ class NanoVoxCPM:
         )
         model_info = self._server.get_model_info()
         self.tts_model = SimpleNamespace(sample_rate=int(model_info["sample_rate"]))
-        self._patch_size = int(model_info["patch_size"])
         self._text_tokenizer = mask_multichar_chinese_tokens(LlamaTokenizerFast.from_pretrained(model_path))
         self.last_successful_seed: int | None = None
         self.text_normalizer = None
@@ -170,7 +168,7 @@ class NanoVoxCPM:
         denoise: bool = False,
         retry_badcase: bool = True,
         retry_badcase_max_times: int = 3,
-        retry_badcase_ratio_threshold: float = 6.0,
+        retry_badcase_ratio_threshold: float = NANO_BADCASE_RATIO_THRESHOLD,
         seed: int | None = None,
         **_: object,
     ) -> Generator[np.ndarray, None, None]:
@@ -196,7 +194,6 @@ class NanoVoxCPM:
             self._text_tokenizer,
             max_len,
             retry_badcase_ratio_threshold,
-            self._patch_size,
         )
         if retry_badcase_max_times < 1:
             raise ValueError("retry_badcase_max_times must be greater than zero")
@@ -240,7 +237,7 @@ class NanoVoxCPM:
                         np.asarray(chunk, dtype=np.float32).reshape(-1)
                         for chunk in self._server.generate(**generation_kwargs, seed=current_seed)
                     ]
-                    is_badcase = len(chunks) * self._patch_size >= badcase_threshold
+                    is_badcase = len(chunks) >= badcase_threshold
                     if is_badcase and attempt + 1 < retry_badcase_max_times:
                         current_seed = (current_seed + 1) & MAX_GENERATION_SEED
                         continue

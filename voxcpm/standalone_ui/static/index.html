@@ -63,8 +63,9 @@
         <label class="field"><span>Output format</span><select id="output-format"><option value="mp3">MP3</option></select></label>
       </div>
 
-      <div class="settings-section compact-settings">
-        <div class="section-heading-row"><div class="section-title"><i class="icon-audio-lines"></i><span>Generation controls</span></div><button class="icon-button reset-controls" id="reset-controls" type="button" title="Reset controls" aria-label="Reset controls"><i class="icon-rotate-ccw"></i></button></div>
+      <details class="settings-details compact-advanced" id="generation-settings">
+        <summary><span><i class="icon-sliders-horizontal"></i>Generation settings</span><i class="icon-chevron-down disclosure-icon"></i></summary>
+        <div class="section-heading-row settings-actions"><span>Model and output controls</span><button class="icon-button reset-controls" id="reset-controls" type="button" title="Reset controls" aria-label="Reset controls"><i class="icon-rotate-ccw"></i></button></div>
         <div class="range-stack">
           <label class="range-control"><span class="range-heading"><span>Guidance</span></span><span class="range-input-row"><input id="guidance-slider" type="range" min="0.1" max="10" step="0.1" value="2" data-value-input="guidance"><input id="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" data-range-input="guidance-slider"></span></label>
           <label class="range-control"><span class="range-heading"><span>Inference steps</span></span><span class="range-input-row"><input id="steps-slider" type="range" min="1" max="100" step="1" value="10" data-value-input="steps"><input id="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" data-range-input="steps-slider"></span></label>
@@ -80,9 +81,11 @@
           <select id="timestamp-level" aria-label="Timestamp level"><option value="word">Words</option><option value="segment">Segments</option><option value="char">Characters</option></select>
           <small id="timestamp-state" data-state="unavailable">Checking</small>
         </div>
-      </div>
-      <label class="toggle-field"><span>Normalize text</span><input id="normalize" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
-      <label class="toggle-field"><span>Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+        <div class="toggle-grid">
+          <label class="toggle-field"><span>Normalize text</span><input id="normalize" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+          <label class="toggle-field"><span>Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+        </div>
+      </details>
       <div class="status-line" id="global-status" data-tone="neutral">Connecting to inference</div>
     </aside>
 

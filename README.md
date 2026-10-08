@@ -285,7 +285,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
 - Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
 - Added persistent voice profiles shared by generation and cloning, drag-and-drop reference audio, truthful generation stages, live streaming output, recording waveforms, and persistent playback volume.
-- Restored VoxCPM's bounded-length bad-case retry behavior in the Nano adapter, preventing seed-sensitive repetition and stray speech in short SSML units.
+- Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.
 - Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, progressive unit streaming, explicit breaks, prosody, and profile editing.
 - Unified model caches, saved voices, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
 - Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.
@@ -294,7 +294,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Restored saved LoRA adapter configuration automatically, made CLI model/audio imports lazy, and added checkpoint-loading regression guards.
 - Added a lightweight live-API smoke suite for natural speech, contrasting voice designs, reference cloning, deterministic seed headers, WAV validation, and optional Qwen3-ASR transcript judging.
 - Added one-instance model caching, serialized generation, compile-worker limits, and reference-latent allocator cleanup to prevent duplicate weights and repeated-request RAM/VRAM growth.
-- Added 30-language public examples with voice-variety, translated introduction, and cross-language clone samples.
+- Added 30-language public examples with voice-variety, translated introduction, and cross-language clone samples based on the KokoroTTS-generated project seed voice.
 - Added the controlled native-versus-Nano baseline suite covering generation speed, VRAM, container RAM, and Qwen3-ASR transcript fidelity across 24 common languages.
 - Added Docker Hub and GHCR publishing, build identity labels, offline baked-asset validation, release tooling, license notices, and third-party attribution.
 - Removed upstream training workflows and inherited project material unrelated to the inference-focused fork.
@@ -322,7 +322,6 @@ Deferred v1.0 work belongs in this list so release scope does not disappear betw
 
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
 - Recheck Nano-vLLM-VoxCPM upstream after the planned v1.0 product work. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
-- Confirm redistribution rights and consent for `examples/original_clone.mp3` before publication.
 - Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
 - Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.
 

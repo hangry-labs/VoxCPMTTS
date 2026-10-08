@@ -11,7 +11,7 @@ This directory contains the static project page and browser-side examples for Ha
 
 ## Generated Audio
 
-- `original_clone.mp3` is the local reference voice used for clone examples.
+- `original_clone.mp3` is the project seed voice, generated from a randomized KokoroTTS voice and used consistently for clone examples.
 - `assets/manifest.json` indexes the generated samples.
 - `assets/<language>/random/` contains 10 native-language voice-design samples.
 - `assets/<language>/intro/` contains 3 translated project intro samples.

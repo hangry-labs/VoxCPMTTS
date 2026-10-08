@@ -42,6 +42,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="voice-profile"' in responses["/"].text
     assert 'id="generate-progress"' in responses["/"].text
     assert 'id="randomize-seed"' in responses["/"].text
+    assert 'id="generation-settings"' in responses["/"].text
     assert 'id="generate-timestamps"' in responses["/"].text
     assert 'id="stream-live-wave"' in responses["/"].text
     assert 'id="reference-record-wave"' in responses["/"].text
@@ -56,6 +57,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     script = responses["/static/app.js"].text
     assert "IncrementalAudioPlayback" in script
     assert "response.body.getReader()" in script
+    assert "await playback.append(value)" in script
     assert "class StreamWaveform" in script
     assert "fetchJson('/tts/activity'" in script
     assert "GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000" in script

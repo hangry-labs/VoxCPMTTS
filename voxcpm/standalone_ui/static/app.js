@@ -838,7 +838,16 @@ async function streamAudio() {
       if (done) break
       chunks.push(value)
       totalBytes += value.byteLength
-      if (playback) playback.append(value).catch((error) => showToast(errorMessage(error)))
+      if (playback) {
+        try {
+          await playback.append(value)
+        } catch (error) {
+          playback.stop()
+          playback = null
+          state.streamPlayback = null
+          showToast(errorMessage(error))
+        }
+      }
       streamWaveform.update(totalBytes, playback?.currentTime() || 0)
       setStatus(`Streaming audio · ${(totalBytes / 1024).toFixed(0)} KiB`)
     }

@@ -245,7 +245,7 @@ function renderSelectedLanguage() {
           eyebrow: "Cross-language clone demo",
           title: "Same English reference voice, different language",
           description:
-            "Cloned from examples/original_clone.mp3. The reference is English, and this sample shows how the voice identity carries into the selected language.",
+            "Cloned from the project seed voice in examples/original_clone.mp3. The reference is English, and this sample shows how its identity carries into the selected language.",
           file: clone.file,
           label: `${meta.nativeName} cloned voice demo`,
           badge: "Clone",
