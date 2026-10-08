@@ -1,8 +1,9 @@
+# syntax=docker/dockerfile:1
+
 FROM python:3.13-slim AS dependencies
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
     HF_HOME=/app/.cache/huggingface \
     MODELSCOPE_CACHE=/app/.cache/modelscope \
@@ -19,7 +20,8 @@ RUN apt-get update \
 
 COPY requirements.txt /app/requirements.txt
 
-RUN python -m pip install --upgrade pip setuptools wheel \
+RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install -r /app/requirements.txt
 
 FROM dependencies AS app-builder
@@ -28,19 +30,26 @@ COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION /app
 COPY voxcpm /app/voxcpm
 COPY assets /app/assets
 
-RUN python -m pip install -e . --no-deps
+RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
+    python -m pip install -e . --no-deps
 
 FROM dependencies AS asset-builder
 
 COPY voxcpm/prefetch_assets.py /tmp/prefetch_assets.py
 
-RUN python -u /tmp/prefetch_assets.py
+RUN --mount=type=cache,id=hangrylabs-huggingface,target=/root/.cache/huggingface,sharing=locked \
+    --mount=type=cache,id=hangrylabs-modelscope,target=/root/.cache/modelscope,sharing=locked \
+    HF_HOME=/root/.cache/huggingface \
+    MODELSCOPE_CACHE=/root/.cache/modelscope \
+    python -u /tmp/prefetch_assets.py \
+    && mkdir -p /app/.cache/huggingface /app/.cache/modelscope \
+    && cp -a /root/.cache/huggingface/. /app/.cache/huggingface/ \
+    && cp -a /root/.cache/modelscope/. /app/.cache/modelscope/
 
 FROM python:3.13-slim AS nano-dependencies
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
     HF_HOME=/app/.cache/huggingface \
     MODELSCOPE_CACHE=/app/.cache/modelscope \
@@ -61,13 +70,16 @@ ARG NANO_VLLM_VERSION=2.0.4
 ARG FLASH_ATTN_WHEEL_URL=https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu12torch2.8cxx11abiTRUE-cp313-cp313-linux_x86_64.whl
 ARG FLASH_ATTN_WHEEL_SHA256=7dd8c64a414130c82d83a472f5498c1b899fba37a30e2a793a7a4dc5dd61a062
 
-RUN python -m pip install --upgrade --only-binary=:all: pip setuptools wheel
+RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --upgrade --only-binary=:all: pip setuptools wheel
 
-RUN python -m pip install --only-binary=:all: \
+RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --only-binary=:all: \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch==2.8.0 torchaudio==2.8.0 triton==3.4.0
 
-RUN python -m pip install --only-binary=:all: -r /app/requirements.nano.txt \
+RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --only-binary=:all: -r /app/requirements.nano.txt \
     && python -m pip install --only-binary=:all: --no-deps "${FLASH_ATTN_WHEEL_URL}#sha256=${FLASH_ATTN_WHEEL_SHA256}" \
     && python -m pip install --only-binary=:all: --no-deps --ignore-requires-python "nano-vllm-voxcpm==${NANO_VLLM_VERSION}"
 
@@ -81,19 +93,20 @@ COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md VERSION /app
 COPY voxcpm /app/voxcpm
 COPY assets /app/assets
 
-RUN python -m pip install -e . --no-deps
+RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
+    python -m pip install -e . --no-deps
 
 FROM python:3.13-slim AS nano-asset-dependencies
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
     HF_HOME=/app/.cache/huggingface
 
 WORKDIR /app
 
-RUN python -m pip install --upgrade --only-binary=:all: pip setuptools wheel \
+RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --upgrade --only-binary=:all: pip setuptools wheel \
     && python -m pip install --only-binary=:all: huggingface-hub==1.7.1
 
 FROM nano-asset-dependencies AS nano-asset-builder
@@ -105,7 +118,11 @@ ENV VOXCPM_PREFETCH_DENOISER=0 \
 
 COPY voxcpm/prefetch_assets.py /tmp/prefetch_assets.py
 
-RUN python -u /tmp/prefetch_assets.py
+RUN --mount=type=cache,id=hangrylabs-huggingface,target=/root/.cache/huggingface,sharing=locked \
+    HF_HOME=/root/.cache/huggingface \
+    python -u /tmp/prefetch_assets.py \
+    && mkdir -p /app/.cache/huggingface \
+    && cp -a /root/.cache/huggingface/. /app/.cache/huggingface/
 
 FROM python:3.13-slim AS runtime-base
 

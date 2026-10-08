@@ -92,6 +92,12 @@ tasks:
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-image.ps1 -Target tiny -Image "{{.TINY_IMAGE}}"
 
+  cache-status:
+    desc: Show Docker image, volume, and BuildKit cache usage
+    cmds:
+      - docker system df
+      - docker buildx du
+
   cache-init:
     desc: Seed the persistent Hugging Face cache volume from the baked image
     cmds:
