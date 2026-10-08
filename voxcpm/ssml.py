@@ -12,6 +12,7 @@ from ssml_h import (
     MAX_SSML_UNITS,
     MAX_SSML_VOICE_DEFINITIONS,
     MAX_TOTAL_BREAK_MS,
+    MAX_TURN_DIRECTION_CHARACTERS,
     MAX_VOICE_DESCRIPTION_CHARACTERS,
     MAX_VOICE_SAMPLE_CHARACTERS,
     SSML_H_NAMESPACE,
@@ -21,8 +22,8 @@ from ssml_h import (
     SSMLUnit,
     SSMLValidationError,
     SSMLVoiceDefinition,
-    compile_ssml as compile_ssml_document,
-    ssml_capabilities as base_ssml_capabilities,
+    compile_ssml as compile_shared_ssml,
+    ssml_capabilities as shared_ssml_capabilities,
 )
 
 
@@ -44,24 +45,26 @@ def compile_ssml(
     resolve_language: LanguageResolver | None = None,
     validate_voice: VoiceValidator | None = None,
 ) -> SSMLPlan:
-    """Compile a complete SSML document with the shared hardened parser."""
+    """Compile a complete document using the shared hardened SSML-H parser."""
 
-    return compile_ssml_document(
+    return compile_shared_ssml(
         document,
         input_type,
         default_language=default_language,
         default_voice=default_voice,
         resolve_language=resolve_language,
         validate_voice=validate_voice,
+        allow_turn_direction=input_type == "ssml-h",
     )
 
 
 def ssml_capabilities() -> dict:
     """Return the shared profile with VoxCPM-specific feature support."""
 
-    capabilities = base_ssml_capabilities(
+    capabilities = shared_ssml_capabilities(
         phoneme_alphabets=(),
         description_supported=True,
+        turn_direction_supported=True,
     )
     capabilities["ssml_h"]["default_voice_sample"] = {
         "language": DEFAULT_DYNAMIC_VOICE_SAMPLE_LANGUAGE,
@@ -85,6 +88,7 @@ __all__ = [
     "MAX_SSML_UNITS",
     "MAX_SSML_VOICE_DEFINITIONS",
     "MAX_TOTAL_BREAK_MS",
+    "MAX_TURN_DIRECTION_CHARACTERS",
     "MAX_VOICE_DESCRIPTION_CHARACTERS",
     "MAX_VOICE_SAMPLE_CHARACTERS",
     "DEFAULT_DYNAMIC_VOICE_SAMPLE_LANGUAGE",

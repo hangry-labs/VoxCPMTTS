@@ -144,6 +144,8 @@ curl -X POST "http://localhost:8808/tts/generate" \
   -o guided.mp3
 ```
 
+Clone conditioning is explicit when an application needs predictable behavior. Use `clone_mode: "reference"` with `control` to direct delivery from the reference audio, or use `clone_mode: "transcript"` with the exact `ref_text` spoken in that audio. The browser Clone workspace presents these as mutually exclusive Direction and Transcript modes. After generation, **Store voice** saves the generated result and its matching words as a compact reusable reference; saved clones are available directly from the Clone workspace and the other voice selectors.
+
 Transcribe an uploaded or browser-recorded reference locally before cloning:
 
 ```bash
@@ -152,16 +154,16 @@ curl -X POST "http://localhost:8808/tts/transcribe-upload" \
   -F "language=auto"
 ```
 
-SSML and SSML-H are explicit input modes. Saved clone names can be selected with `<voice name="...">`; SSML-H can also design request-scoped speakers for complete discussions or publish them to the voice library with `scope="profile"`:
+SSML and SSML-H are explicit input modes. Saved clone names can be selected with `<voice name="...">`; SSML-H can also design request-scoped speakers for complete discussions, publish them to the voice library with `scope="profile"`, and apply a free-form delivery direction to an individual turn with `h:direction`:
 
 ```bash
 curl -X POST "http://localhost:8808/tts/generate" \
   -H "Content-Type: application/json" \
-  -d '{"input_type":"ssml-h","output_format":"mp3","text":"<speak version=\"1.1\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:h=\"https://hangrylabs.app/ns/ssml-h/1.0\" xml:lang=\"en-US\"><metadata><h:extensions version=\"1.0\"><h:voice-definition name=\"Host\" style=\"warm and confident\"/><h:voice-definition name=\"Guest\"><h:description>A thoughtful guest with a relaxed delivery.</h:description></h:voice-definition></h:extensions></metadata><voice name=\"Host\">Welcome to the show.</voice><break time=\"250ms\"/><voice name=\"Guest\">Thank you. It is good to be here.</voice></speak>"}' \
+  -d '{"input_type":"ssml-h","output_format":"mp3","text":"<speak version=\"1.1\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:h=\"https://hangrylabs.app/ns/ssml-h/1.0\" xml:lang=\"en-US\"><metadata><h:extensions version=\"1.0\"><h:voice-definition name=\"Host\" style=\"warm and confident\"/><h:voice-definition name=\"Guest\"><h:description>A thoughtful guest with a relaxed delivery.</h:description></h:voice-definition></h:extensions></metadata><voice name=\"Host\" h:direction=\"Energetic\">Welcome to the show.</voice><break time=\"250ms\"/><voice name=\"Guest\" h:direction=\"Calm and authoritative\">Thank you. It is good to be here.</voice></speak>"}' \
   -o discussion.mp3
 ```
 
-Use `input_type: "ssml"` for standard SSML without Hangry Labs voice definitions. Capabilities and limits are available from `GET /tts/ssml/capabilities`. Markup is never inferred when `input_type` is omitted.
+Use `input_type: "ssml"` for standard SSML without Hangry Labs voice definitions or free-form directions. Use the supported standard `<prosody>` controls for portable rate, pitch, and volume changes; natural-language turn direction is intentionally namespaced as `h:direction` and requires `input_type: "ssml-h"`. Capabilities and limits are available from `GET /tts/ssml/capabilities`. Markup is never inferred when `input_type` is omitted.
 
 Progressive MP3 streaming begins returning encoded model chunks before synthesis finishes:
 
@@ -287,9 +289,9 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Promoted the VoxCPM2 Nano-vLLM backend to the standard runtime with CUDA graph acceleration and ten-step generation.
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
 - Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
-- Added persistent voice profiles shared by generation and cloning, drag-and-drop reference audio, truthful generation stages, live streaming output, recording waveforms, and persistent playback volume.
+- Added persistent voice profiles shared by generation and cloning, an integrated Clone voice library, generated-reference storage with exact matching transcripts, explicit Direction/Transcript conditioning, drag-and-drop reference audio, truthful generation stages, live streaming output, recording waveforms, and persistent playback volume.
 - Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.
-- Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, progressive unit streaming, explicit breaks, prosody, and profile editing.
+- Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, per-turn `h:direction` control, progressive unit streaming, explicit breaks, prosody, and profile editing.
 - Added optional `-16 LUFS` output normalization for complete and progressive generation, plus a compact grouped settings panel with clearer model, seed, output-processing, and speech-timing controls.
 - Unified model caches, saved voices, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
 - Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.

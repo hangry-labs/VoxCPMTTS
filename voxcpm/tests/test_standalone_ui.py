@@ -54,6 +54,10 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="reference-audio-choose"' in responses["/"].text
     assert 'id="reference-audio-clear"' in responses["/"].text
     assert responses["/"].text.count('id="transcribe-reference"') == 1
+    assert 'data-clone-mode="reference"' in responses["/"].text
+    assert 'data-clone-mode="transcript"' in responses["/"].text
+    assert 'id="clone-profile-list"' in responses["/"].text
+    assert 'id="store-generated-voice"' in responses["/"].text
     assert 'id="profile-audio-drop"' in responses["/"].text
     assert 'data-input-type="ssml"' in responses["/"].text
     assert 'data-input-type="ssml-h"' in responses["/"].text
@@ -76,7 +80,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
     assert "openProfileEditor(profile)" in script
     assert "referenceAudio.clear()" in script
-    assert "Unavailable with transcript" in script
+    assert "compactGeneratedReferenceText" in script
+    assert "clone_mode: cloning ? state.cloneMode : 'auto'" in script
     assert "sessionStorage.setItem(GPU_SESSION_KEY" in script
 
 
@@ -297,6 +302,37 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
     assert 0 <= kwargs["seed"] <= runtime.MAX_RANDOM_SEED
     assert deleted.json() == {"deleted": "studio-narrator"}
     assert missing.status_code == 404
+
+
+def test_saved_clone_profile_can_switch_from_transcript_to_directed_reference_mode(tmp_path: Path) -> None:
+    with patch.object(runtime, "VOICE_PROFILE_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            created = client.post(
+                "/tts/voice-profiles",
+                data={"name": "Dialogue Voice", "profile_type": "cloned", "ref_text": "Original words."},
+                files={"reference_audio": ("reference.wav", b"reference-bytes", "audio/wav")},
+            )
+
+        transcript_kwargs = runtime.build_generate_kwargs(
+            runtime.TTSRequest(text="A new sentence.", voice_profile="dialogue-voice"),
+            object(),
+        )
+        directed_kwargs = runtime.build_generate_kwargs(
+            runtime.TTSRequest(
+                text="A new sentence.",
+                voice_profile="dialogue-voice",
+                clone_mode="reference",
+                control="Calm but authoritative",
+            ),
+            object(),
+        )
+
+    assert created.status_code == 200
+    assert transcript_kwargs["prompt_text"] == "Original words."
+    assert transcript_kwargs["prompt_wav_path"] == transcript_kwargs["reference_wav_path"]
+    assert directed_kwargs["prompt_text"] is None
+    assert directed_kwargs["prompt_wav_path"] is None
+    assert directed_kwargs["text"] == "(Calm but authoritative)A new sentence."
 
 
 def test_saved_clone_profile_can_be_edited_without_replacing_audio(tmp_path: Path) -> None:

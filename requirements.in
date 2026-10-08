@@ -23,4 +23,4 @@ sortedcontainers
 matplotlib
 spaces
 safetensors
-ssml-h-tools==0.1.0
+ssml-h-tools==0.2.0

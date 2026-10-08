@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -232,6 +232,8 @@ class SSMLExecutionSession:
         if not 0.0 <= volume <= 2.0:
             raise SSMLValidationError(f"Effective volume for SSML unit {index + 1} must be between 0 and 2.0.")
         binding = self._binding_for_unit(unit)
+        if unit.direction:
+            binding = replace(binding, ref_text=None, control=unit.direction)
         seed = binding.generation_seed
         if seed is None:
             seed = (self.request_seed + len(self.plan.voice_definitions) + index) % (2**32)

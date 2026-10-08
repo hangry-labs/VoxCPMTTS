@@ -57,8 +57,42 @@ def test_capabilities_match_voxcpm_support() -> None:
 
     assert capabilities["ssml_h"]["namespace"] == SSML_H_NAMESPACE
     assert capabilities["ssml_h"]["description_supported"] is True
+    assert capabilities["ssml_h"]["turn_direction"]["attribute"] == "h:direction"
     assert capabilities["ssml"]["phoneme_alphabets"] == []
     assert capabilities["processor"]["remote_audio"] is False
+
+
+def test_ssml_h_compiles_namespaced_turn_direction() -> None:
+    document = f'''<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+      xmlns:h="{SSML_H_NAMESPACE}" xml:lang="en-US">
+      <voice name="host" h:direction="Energetic and delighted">Welcome back.</voice>
+    </speak>'''
+
+    plan = compile_ssml(
+        document,
+        "ssml-h",
+        resolve_language=runtime.resolve_ssml_language,
+        validate_voice=lambda name, _definitions: None,
+    )
+
+    assert plan.voices == ("host",)
+    assert plan.units[0].direction == "Energetic and delighted"
+
+
+def test_turn_direction_requires_the_ssml_h_namespace() -> None:
+    document = '<speak><voice name="host" direction="Calm">Welcome back.</voice></speak>'
+
+    with np.testing.assert_raises_regex(SSMLValidationError, "Unsupported attribute"):
+        compile_ssml(document, "ssml-h", validate_voice=lambda name, _definitions: None)
+
+
+def test_turn_direction_requires_ssml_h_input_mode() -> None:
+    document = f'''<speak xmlns:h="{SSML_H_NAMESPACE}">
+      <voice name="host" h:direction="Calm">Welcome back.</voice>
+    </speak>'''
+
+    with np.testing.assert_raises_regex(SSMLValidationError, "requires input_type='ssml-h'"):
+        compile_ssml(document, "ssml", validate_voice=lambda name, _definitions: None)
 
 
 def test_unknown_saved_voice_is_rejected_before_model_loading() -> None:
@@ -139,6 +173,38 @@ def test_ssml_h_profile_is_published_only_after_success() -> None:
     assert "already exists" in duplicate.json()["detail"]
     assert len(model.calls) == 2
     assert staging == []
+
+
+def test_ssml_h_direction_uses_generated_voice_reference_without_prompt_transcript() -> None:
+    model = _FakeModel()
+    document = f'''<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+      xmlns:h="{SSML_H_NAMESPACE}" xml:lang="en-US">
+      <metadata><h:extensions version="1.0">
+        <h:voice-definition name="Host" style="warm and confident" seed="7">
+          <h:sample xml:lang="en-US">Welcome. I will guide our conversation today.</h:sample>
+        </h:voice-definition>
+      </h:extensions></metadata>
+      <voice name="Host" h:direction="Energetic">Welcome to the show.</voice>
+    </speak>'''
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        with (
+            patch.object(runtime, "SSML_STAGING_DIR", root / "staging"),
+            patch.object(runtime, "get_model", return_value=model),
+        ):
+            with TestClient(runtime.app) as client:
+                response = client.post(
+                    "/tts/generate",
+                    json={"text": document, "input_type": "ssml-h", "output_format": "wav"},
+                )
+
+    assert response.status_code == 200, response.text
+    assert len(model.calls) == 2
+    assert model.calls[0]["text"].startswith("(warm and confident style)")
+    assert model.calls[1]["text"] == "(Energetic)Welcome to the show."
+    assert model.calls[1]["prompt_text"] is None
+    assert model.calls[1]["reference_wav_path"]
 
 
 def test_invalid_ssml_mode_does_not_infer_markup() -> None:

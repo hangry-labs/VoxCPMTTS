@@ -643,7 +643,7 @@ def build_generate_kwargs(payload: "TTSRequest", model: Any, *, seed: int | None
         _, profile = resolve_voice_profile(VOICE_PROFILE_DIR, payload.voice_profile)
         if not ref_audio and not prompt_audio:
             ref_audio = profile.get("ref_audio") or None
-        if not prompt_text and not payload.ref_text:
+        if payload.clone_mode != "reference" and not prompt_text and not payload.ref_text:
             prompt_text = profile.get("ref_text") or None
         if not control:
             control = profile.get("control") or None
@@ -651,6 +651,11 @@ def build_generate_kwargs(payload: "TTSRequest", model: Any, *, seed: int | None
         prompt_text = payload.ref_text
     if ref_audio and prompt_text and not prompt_audio:
         prompt_audio = ref_audio
+    if payload.clone_mode == "reference":
+        prompt_audio = None
+        prompt_text = None
+    elif payload.clone_mode == "transcript" and not prompt_text:
+        raise ValueError("Transcript-guided cloning requires a reference transcript.")
 
     final_text = build_final_text(payload.text, control, prompt_text)
     kwargs = {
@@ -682,6 +687,10 @@ class TTSRequest(BaseModel):
     language: str = Field("English", description="Compatibility hint; VoxCPM2 auto-detects supported languages.")
     voice: str = Field("auto", description="Compatibility field. Use instruct/control or reference audio for VoxCPM voices.")
     voice_profile: Optional[str] = Field(None, description="Saved local voice profile name.")
+    clone_mode: Literal["auto", "reference", "transcript"] = Field(
+        "auto",
+        description="Clone conditioning: automatic, reference-only direction, or transcript-guided.",
+    )
     control: Optional[str] = Field(None, description="VoxCPM voice design/control instruction.")
     instruct: Optional[str] = Field(None, description="Alias for control.")
     reference_audio: Optional[str] = Field(None, description="Container-visible reference audio path.")

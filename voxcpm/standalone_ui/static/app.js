@@ -8,6 +8,7 @@ const UI_SESSION_KEY = 'voxcpmtts-ui-state-v1'
 const GPU_SESSION_KEY = 'voxcpmtts-gpu-history-v1'
 const GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000
 const GPU_POLL_INTERVAL_MS = 1000
+const MAX_GENERATED_REFERENCE_CHARACTERS = 320
 const SAMPLE_TEXTS = [
   'VoxCPM2 generates natural multilingual speech with voice design and cloning.',
   'A steady voice can make technical information easier to understand.',
@@ -32,8 +33,8 @@ const INPUT_SAMPLES = {
       <h:description>A thoughtful male guest with a relaxed, conversational delivery.</h:description>
     </h:voice-definition>
   </h:extensions></metadata>
-  <voice name="Host">Welcome to the show. What are we exploring today?</voice>
-  <voice name="Guest">We are testing a complete multi-speaker discussion from one document.</voice>
+  <voice name="Host" h:direction="Energetic">Welcome to the show. What are we exploring today?</voice>
+  <voice name="Guest" h:direction="Calm and authoritative">We are testing a complete multi-speaker discussion from one document.</voice>
 </speak>`,
   ],
 }
@@ -93,6 +94,8 @@ const state = {
   defaults: {},
   status: {},
   profiles: [],
+  cloneMode: 'reference',
+  lastCloneGeneration: null,
   quickSaveType: null,
   editingProfile: null,
   pendingDeleteProfile: null,
@@ -126,6 +129,7 @@ const referenceAudio = new AudioEditor($('#reference-audio-preview'), {
     $('#reference-audio-drop').classList.toggle('has-file', Boolean(file))
     $('#reference-audio-name').textContent = file?.name || 'No audio selected'
     $('#reference-audio-clear').hidden = !file
+    if (file && state.activeTab === 'clone' && $('#voice-profile').value) renderVoiceProfileSelect('')
     updateWorkflowControls()
   },
 })
@@ -194,6 +198,7 @@ function persistUiState() {
       headerCollapsed: state.headerCollapsed,
       gpuWindowMs: state.gpuWindowMs,
       inputType: state.inputType,
+      cloneMode: state.cloneMode,
     }))
   } catch {
     // Browser storage may be unavailable in privacy-restricted sessions.
@@ -224,6 +229,7 @@ function restoreSessionState() {
   if (typeof ui?.headerCollapsed === 'boolean') state.headerCollapsed = ui.headerCollapsed
   if ([60 * 1000, 10 * 60 * 1000].includes(ui?.gpuWindowMs)) state.gpuWindowMs = ui.gpuWindowMs
   if (['text', 'ssml', 'ssml-h'].includes(ui?.inputType)) state.inputType = ui.inputType
+  if (['reference', 'transcript'].includes(ui?.cloneMode)) state.cloneMode = ui.cloneMode
 
   const cached = readSessionJson(GPU_SESSION_KEY)
   const cutoff = Date.now() - GPU_HISTORY_RETENTION_MS
@@ -302,6 +308,7 @@ function updateVoiceProfileState() {
   else if (profile.profile_type === 'cloned') note.textContent = `${profile.id} · stored reference audio${profile.has_transcript ? ' · transcript' : ''}`
   else note.textContent = `${profile.id} · saved voice design`
   updateWorkflowControls()
+  renderCloneProfileList()
 }
 
 function renderVoiceProfileSelect(selected = $('#voice-profile').value) {
@@ -316,10 +323,48 @@ function renderVoiceProfileSelect(selected = $('#voice-profile').value) {
 }
 
 function useProfile(profile, tab) {
+  if (tab === 'clone' && profile.profile_type === 'cloned') referenceAudio.clear()
   renderVoiceProfileSelect(profile.id)
   if (profile.language) $('#language').value = profile.language
   activateTab(tab)
   setStatus(`Voice ${profile.id} selected`, 'success')
+}
+
+function renderCloneProfileList() {
+  const list = $('#clone-profile-list')
+  if (!list) return
+  const profiles = state.profiles.filter((profile) => profile.profile_type === 'cloned')
+  $('#clone-profile-count').textContent = String(profiles.length)
+  if (!profiles.length) {
+    const empty = document.createElement('div')
+    empty.className = 'clone-profile-empty'
+    empty.textContent = 'No saved cloned voices yet.'
+    list.replaceChildren(empty)
+    return
+  }
+  const selected = $('#voice-profile').value
+  list.replaceChildren(...profiles.map((profile) => {
+    const card = document.createElement('article')
+    card.className = 'clone-profile-card'
+    card.classList.toggle('selected', profile.id === selected)
+    const copy = document.createElement('div')
+    copy.className = 'clone-profile-copy'
+    const name = document.createElement('strong')
+    name.textContent = profile.id
+    const description = document.createElement('span')
+    description.textContent = profile.description || (profile.has_transcript ? 'Generated reference · transcript ready' : 'Stored reference voice')
+    copy.append(name, description)
+    const use = document.createElement('button')
+    use.type = 'button'
+    use.className = 'secondary-button'
+    use.disabled = profile.id === selected
+    use.innerHTML = profile.id === selected
+      ? '<i class="icon-check"></i><span>Selected</span>'
+      : '<i class="icon-audio-lines"></i><span>Use voice</span>'
+    use.addEventListener('click', () => useProfile(profile, 'clone'))
+    card.append(copy, use)
+    return card
+  }))
 }
 
 function renderProfileList() {
@@ -432,11 +477,20 @@ function updateVoiceDesignState() {
   $('#save-designed-voice').disabled = !active
 }
 
-function updateCloneConditioning() {
-  const guided = Boolean($('#reference-text').value.trim())
-  const direction = $('#clone-control-input')
-  direction.disabled = guided
-  $('#clone-direction-state').textContent = guided ? 'Unavailable with transcript' : 'Optional'
+function setCloneMode(mode, { persist = true } = {}) {
+  if (!['reference', 'transcript'].includes(mode)) return
+  state.cloneMode = mode
+  $$('.clone-mode-control button').forEach((button) => {
+    const active = button.dataset.cloneMode === mode
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-pressed', String(active))
+  })
+  $('#clone-direction-panel').hidden = mode !== 'reference'
+  $('#clone-transcript-panel').hidden = mode !== 'transcript'
+  $('#clone-conditioning-copy').textContent = mode === 'reference'
+    ? 'Direct the delivery of the cloned voice'
+    : 'Guide cloning with the exact reference words'
+  if (persist) persistUiState()
 }
 
 function updateSeedState() {
@@ -454,22 +508,24 @@ function updateWorkflowControls() {
   $('#voice-design-details').hidden = cloning
   $('#reference-audio').disabled = !cloning
   $('#denoise').disabled = !cloning || !state.status.load_denoiser
-  $('#save-cloned-voice').disabled = !referenceAudio.currentFile()
   $('#voice-profile-note').classList.toggle('active', Boolean(profile))
 }
 
 function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
   const cloning = workflow === 'clone'
   const outputFormat = streaming ? 'mp3' : $('#output-format').value
-  const referenceText = cloning ? ($('#reference-text').value.trim() || null) : null
+  const referenceText = cloning && state.cloneMode === 'transcript'
+    ? ($('#reference-text').value.trim() || null)
+    : null
   const payload = {
     text: $('#text-input').value.trim(),
     input_type: state.inputType,
     language: $('#language').value || 'English',
     voice: cloning ? 'reference' : 'auto',
     voice_profile: $('#voice-profile').value || null,
+    clone_mode: cloning ? state.cloneMode : 'auto',
     control: cloning
-      ? (referenceText ? null : ($('#clone-control-input').value.trim() || null))
+      ? (state.cloneMode === 'reference' ? ($('#clone-control-input').value.trim() || null) : null)
       : ($('#control-input').value.trim() || null),
     ref_text: referenceText,
     cfg_value: Number($('#guidance').value),
@@ -486,14 +542,20 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
   return payload
 }
 
-async function requestAudioResponse({ workflow = state.activeTab, streaming = false, signal } = {}) {
-  const payload = buildPayload({ workflow, streaming })
+async function requestAudioResponse(options = {}) {
+  const { workflow = state.activeTab, streaming = false, signal, payloadOverride = null } = options
+  const payload = payloadOverride || buildPayload({ workflow, streaming })
   if (!payload.text) throw new Error('Enter text to synthesize.')
   const needsReference = workflow === 'clone'
-  const reference = referenceAudio.currentFile()
-  const profile = selectedProfile()
+  const reference = Object.prototype.hasOwnProperty.call(options, 'referenceOverride')
+    ? options.referenceOverride
+    : referenceAudio.currentFile()
+  const profile = state.profiles.find((item) => item.id === payload.voice_profile) || null
   if (needsReference && !reference && profile?.profile_type !== 'cloned') {
     throw new Error('Choose or record reference audio, or select a saved cloned voice.')
+  }
+  if (needsReference && payload.clone_mode === 'transcript' && !payload.ref_text && !profile?.has_transcript) {
+    throw new Error('Enter or transcribe the reference words for transcript-guided cloning.')
   }
 
   const route = streaming ? '/tts/stream' : '/tts/generate'
@@ -512,16 +574,17 @@ async function requestAudioResponse({ workflow = state.activeTab, streaming = fa
     })
   }
   if (!response.ok) throw new Error(await responseError(response))
-  return { response, payload }
+  return { response, payload, reference }
 }
 
 async function requestAudio(options = {}) {
-  const { response, payload } = await requestAudioResponse(options)
+  const { response, payload, reference } = await requestAudioResponse(options)
   return {
     blob: await response.blob(),
     extension: response.headers.get('X-VoxCPM-Format') || payload.output_format,
     seed: response.headers.get('X-VoxCPM-Seed'),
     payload,
+    reference,
   }
 }
 
@@ -631,12 +694,20 @@ function setGenerationBusy(active, workflow = 'generate') {
 
 async function generateAudio(workflow = 'generate') {
   const output = workflow === 'clone' ? cloneOutput : generateOutput
+  if (workflow === 'clone') {
+    state.lastCloneGeneration = null
+    $('#clone-store-row').hidden = true
+  }
   setGenerationBusy(true, workflow)
   startActivityPolling(workflow)
   setStatus('Generating audio')
   try {
-    const { blob, extension, seed, payload } = await requestAudio({ workflow })
+    const { blob, extension, seed, payload, reference } = await requestAudio({ workflow })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
+    if (workflow === 'clone' && payload.input_type === 'text') {
+      state.lastCloneGeneration = { blob, extension, seed, payload, reference }
+      $('#clone-store-row').hidden = false
+    }
     if (seed !== null) {
       $('#last-generated-seed').value = seed
       $('#seed').value = seed
@@ -905,7 +976,7 @@ async function transcribeReference() {
     const result = await fetchJson('/tts/transcribe-upload', { method: 'POST', body: form })
     $('#reference-text').value = result.text || ''
     state.status.asr_loaded = true
-    updateCloneConditioning()
+    setCloneMode('transcript')
     setStatus('Reference transcript ready', 'success')
   } catch (error) {
     setStatus(errorMessage(error), 'error')
@@ -929,18 +1000,78 @@ async function saveProfileRequest({ name, profileType, description = '', file = 
   return fetchJson(path, { method: editing ? 'PUT' : 'POST', body: form })
 }
 
+function compactGeneratedReferenceText(value) {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+  let sentences = []
+  if (Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: 'sentence' })
+    sentences = [...segmenter.segment(normalized)].map((item) => item.segment.trim()).filter(Boolean)
+  } else {
+    sentences = normalized.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()) || [normalized]
+  }
+  const selected = []
+  for (const sentence of sentences.slice(0, 2)) {
+    const candidate = [...selected, sentence].join(' ')
+    if (candidate.length > MAX_GENERATED_REFERENCE_CHARACTERS) break
+    selected.push(sentence)
+  }
+  if (selected.length) return selected.join(' ')
+  const bounded = normalized.slice(0, MAX_GENERATED_REFERENCE_CHARACTERS + 1)
+  const lastSpace = bounded.lastIndexOf(' ')
+  return bounded.slice(0, lastSpace > 80 ? lastSpace : MAX_GENERATED_REFERENCE_CHARACTERS).trim()
+}
+
+async function prepareGeneratedVoiceReference() {
+  const generated = state.lastCloneGeneration
+  if (!generated) throw new Error('Generate cloned audio before storing this voice.')
+  const referenceText = compactGeneratedReferenceText(generated.payload.text)
+  if (!referenceText) throw new Error('The generated input does not contain usable reference text.')
+  const originalText = generated.payload.text.replace(/\s+/g, ' ').trim()
+  if (referenceText === originalText) {
+    return {
+      file: new File(
+        [generated.blob],
+        `voxcpmtts-voice-reference.${generated.extension}`,
+        { type: generated.blob.type || 'application/octet-stream' },
+      ),
+      refText: referenceText,
+    }
+  }
+
+  setStatus('Generating a compact voice reference')
+  const payload = {
+    ...generated.payload,
+    text: referenceText,
+    input_type: 'text',
+    output_format: 'wav',
+    normalize_loudness: false,
+    seed: Number(generated.seed ?? generated.payload.seed ?? 42),
+    randomize_seed: false,
+  }
+  const compact = await requestAudio({
+    workflow: 'clone',
+    payloadOverride: payload,
+    referenceOverride: generated.reference,
+  })
+  return {
+    file: new File([compact.blob], 'voxcpmtts-voice-reference.wav', { type: compact.blob.type || 'audio/wav' }),
+    refText: referenceText,
+  }
+}
+
 function openQuickSaveDialog(profileType) {
   if (profileType === 'designed' && !$('#control-input').value.trim()) {
     return showToast('Enter a voice description before saving this design.')
   }
-  if (profileType === 'cloned' && !referenceAudio.currentFile()) {
-    return showToast('Choose or record reference audio before saving this voice.')
+  if (profileType === 'clone-generated' && !state.lastCloneGeneration) {
+    return showToast('Generate cloned audio before storing this voice.')
   }
   state.quickSaveType = profileType
-  $('#save-profile-title').textContent = profileType === 'designed' ? 'Save designed voice' : 'Save reference voice'
+  $('#save-profile-title').textContent = profileType === 'designed' ? 'Save designed voice' : 'Store generated voice'
   $('#save-profile-copy').textContent = profileType === 'designed'
     ? 'Reuse this voice description from Generate or Stream.'
-    : 'Store this sample for one-click cloning from any generation screen.'
+    : 'Store a generated reference and its matching words for consistent future dialogue.'
   $('#quick-profile-name').value = ''
   $('#quick-profile-description').value = ''
   $('#save-profile-dialog').showModal()
@@ -1375,7 +1506,7 @@ async function initialize() {
   $('#runtime-model').textContent = `${status.model_id} · ${status.runtime}`
   setStatus('Ready', 'success')
   updateVoiceDesignState()
-  updateCloneConditioning()
+  setCloneMode(state.cloneMode, { persist: false })
   refreshFormatOptions()
 
   setHeaderCollapsed(state.headerCollapsed)
@@ -1384,8 +1515,8 @@ async function initialize() {
 
 $('#text-input').addEventListener('input', updateMetrics)
 $$('.input-type-control button').forEach((button) => button.addEventListener('click', () => setInputType(button.dataset.inputType)))
+$$('.clone-mode-control button').forEach((button) => button.addEventListener('click', () => setCloneMode(button.dataset.cloneMode)))
 $('#control-input').addEventListener('input', updateVoiceDesignState)
-$('#reference-text').addEventListener('input', updateCloneConditioning)
 $('#voice-profile').addEventListener('change', updateVoiceProfileState)
 $('#randomize-seed').addEventListener('change', updateSeedState)
 $('#generate-timestamps').addEventListener('change', updateTimestampState)
@@ -1405,6 +1536,7 @@ $('#reference-audio-clear').addEventListener('click', () => referenceAudio.clear
 $('#reference-audio-preview').addEventListener('click', (event) => {
   if (event.target.closest('[data-role="empty"]')) $('#reference-audio').click()
 })
+$('#manage-clone-voices').addEventListener('click', () => activateTab('voices'))
 for (const eventName of ['dragenter', 'dragover']) {
   $('#reference-audio-drop').addEventListener(eventName, (event) => {
     event.preventDefault()
@@ -1466,7 +1598,7 @@ $('#voice-form').addEventListener('submit', async (event) => {
 })
 $('#profile-edit-cancel').addEventListener('click', resetProfileEditor)
 $('#save-designed-voice').addEventListener('click', () => openQuickSaveDialog('designed'))
-$('#save-cloned-voice').addEventListener('click', () => openQuickSaveDialog('cloned'))
+$('#store-generated-voice').addEventListener('click', () => openQuickSaveDialog('clone-generated'))
 $('#quick-save-form').addEventListener('submit', async (event) => {
   event.preventDefault()
   const profileType = state.quickSaveType
@@ -1475,20 +1607,22 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
   const button = $('button[type="submit"]', event.currentTarget)
   button.disabled = true
   try {
-    const refText = profileType === 'cloned' ? $('#reference-text').value.trim() : ''
+    const generatedReference = profileType === 'clone-generated'
+      ? await prepareGeneratedVoiceReference()
+      : null
     const saved = await saveProfileRequest({
       name,
-      profileType,
+      profileType: profileType === 'clone-generated' ? 'cloned' : profileType,
       description: $('#quick-profile-description').value.trim(),
-      file: profileType === 'cloned' ? referenceAudio.currentFile() : null,
-      refText,
-      control: profileType === 'designed'
-        ? $('#control-input').value.trim()
-        : (refText ? '' : $('#clone-control-input').value.trim()),
+      file: generatedReference?.file || null,
+      refText: generatedReference?.refText || '',
+      control: profileType === 'designed' ? $('#control-input').value.trim() : '',
     })
     closeQuickSaveDialog()
     await refreshProfiles(saved.id)
+    if (profileType === 'clone-generated') renderCloneProfileList()
     showToast(`Saved ${saved.id}.`, 'success')
+    setStatus(`Voice ${saved.id} stored`, 'success')
   } catch (error) {
     showToast(errorMessage(error))
   } finally {
