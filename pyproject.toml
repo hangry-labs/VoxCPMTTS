@@ -45,6 +45,7 @@ dependencies = [
     "matplotlib",
     "spaces",
     "safetensors",
+    "ssml-h-tools==0.1.0",
 ]
 
 [project.optional-dependencies]

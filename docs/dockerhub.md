@@ -42,7 +42,7 @@ http://localhost:8808
 
 The standard full image (`latest` or a fixed `vX.Y` release) includes the VoxCPM2 and multilingual Whisper Base model assets for offline use after the image is pulled.
 
-The `voxcpmtts_data` volume stores saved voice profiles and reference samples across container replacement.
+The unified `voxcpmtts_data` volume stores model caches, saved voice profiles, reference samples, and future application settings across container replacement. Full images seed baked assets into it; tiny images download into it on first online use.
 
 The runtime uses Nano-vLLM on Python 3.13 with CUDA 12.8 and a prebuilt FlashAttention wheel. Triton performs normal first-use kernel JIT compilation inside the container. Image builds install binary Python wheels only.
 
@@ -55,13 +55,14 @@ The UI can transcribe uploaded or freshly recorded reference samples before tran
 The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face cache is warmed on first online use:
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
 ```
 
 ## What You Get
 
 - Offline browser workspace for voice design, controllable cloning, transcript-guided cloning, local reference transcription, recording, upload, waveform trimming, and reusable saved voices
 - HTTP API for applications and automation
+- SSML and SSML-H for multi-speaker discussions, plays, saved clone voices, and designed speakers
 - VoxCPM2 multilingual generation across 30 officially supported languages
 - 48 kHz output when using the VoxCPM2 AudioVAE V2 model
 - WAV, MP3, FLAC, and OGG output support
@@ -125,6 +126,8 @@ curl --no-buffer -X POST "http://localhost:8808/tts/stream" \
   -d '{"text":"This audio is generated and played progressively.","stream_format":"mp3"}' \
   -o streamed.mp3
 ```
+
+SSML and SSML-H use the same generation and streaming endpoints with an explicit `input_type` of `ssml` or `ssml-h`. Discover supported elements, limits, voice scopes, and processor behavior at `GET /tts/ssml/capabilities`. Saved voice profile names work in `<voice name="...">`, and SSML-H definitions can create consistent speakers for a complete document.
 
 Health check:
 

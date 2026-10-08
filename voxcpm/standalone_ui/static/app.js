@@ -14,6 +14,29 @@ const SAMPLE_TEXTS = [
   'Good morning. The latest build is ready for a careful listening test.',
   'This reference voice can speak new text while preserving its character and pacing.',
 ]
+const INPUT_SAMPLES = {
+  ssml: [
+    `<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+  Welcome to VoxCPMTTS.<break time="350ms"/>
+  <prosody rate="90%" pitch="+1st">This line is slower and slightly brighter.</prosody>
+</speak>`,
+  ],
+  'ssml-h': [
+    `<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+  xmlns:h="https://hangrylabs.app/ns/ssml-h/1.0" xml:lang="en-US">
+  <metadata><h:extensions version="1.0">
+    <h:voice-definition name="Host" gender="female" style="warm and confident">
+      <h:sample xml:lang="en-US">Welcome. I will guide our conversation today.</h:sample>
+    </h:voice-definition>
+    <h:voice-definition name="Guest">
+      <h:description>A thoughtful male guest with a relaxed, conversational delivery.</h:description>
+    </h:voice-definition>
+  </h:extensions></metadata>
+  <voice name="Host">Welcome to the show. What are we exploring today?</voice>
+  <voice name="Guest">We are testing a complete multi-speaker discussion from one document.</voice>
+</speak>`,
+  ],
+}
 const AUDIO_EDITOR_LABELS = {
   noAudio: 'No audio selected',
   download: 'Download audio',
@@ -53,6 +76,8 @@ const GPU_METRICS = [
 
 const state = {
   activeTab: 'generate',
+  inputType: 'text',
+  inputDrafts: { text: null, ssml: null, 'ssml-h': null },
   headerCollapsed: document.documentElement.dataset.headerCollapsed === 'true',
   streamAbort: null,
   streamPlayback: null,
@@ -69,6 +94,7 @@ const state = {
   status: {},
   profiles: [],
   quickSaveType: null,
+  editingProfile: null,
   pendingDeleteProfile: null,
   activityTimer: null,
 }
@@ -166,6 +192,7 @@ function persistUiState() {
       activeTab: state.activeTab,
       headerCollapsed: state.headerCollapsed,
       gpuWindowMs: state.gpuWindowMs,
+      inputType: state.inputType,
     }))
   } catch {
     // Browser storage may be unavailable in privacy-restricted sessions.
@@ -195,6 +222,7 @@ function restoreSessionState() {
   }
   if (typeof ui?.headerCollapsed === 'boolean') state.headerCollapsed = ui.headerCollapsed
   if ([60 * 1000, 10 * 60 * 1000].includes(ui?.gpuWindowMs)) state.gpuWindowMs = ui.gpuWindowMs
+  if (['text', 'ssml', 'ssml-h'].includes(ui?.inputType)) state.inputType = ui.inputType
 
   const cached = readSessionJson(GPU_SESSION_KEY)
   const cutoff = Date.now() - GPU_HISTORY_RETENTION_MS
@@ -221,6 +249,30 @@ function updateMetrics() {
   const text = $('#text-input').value
   const words = text.trim() ? text.trim().split(/\s+/).length : 0
   $('#text-metrics').textContent = `${text.length} characters · ${words} words`
+}
+
+function inputSample(inputType) {
+  if (inputType === 'text') return SAMPLE_TEXTS[state.sampleIndex]
+  return INPUT_SAMPLES[inputType][0]
+}
+
+function setInputType(inputType) {
+  if (!['text', 'ssml', 'ssml-h'].includes(inputType)) return
+  const editor = $('#text-input')
+  const currentType = editor.dataset.inputType || state.inputType
+  state.inputDrafts[currentType] = editor.value
+  if (state.inputDrafts[inputType] == null) state.inputDrafts[inputType] = inputSample(inputType)
+  editor.value = state.inputDrafts[inputType]
+  editor.dataset.inputType = inputType
+  editor.spellcheck = inputType === 'text'
+  state.inputType = inputType
+  $$('.input-type-control button').forEach((button) => {
+    const active = button.dataset.inputType === inputType
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-pressed', String(active))
+  })
+  updateMetrics()
+  persistUiState()
 }
 
 function populateSelect(select, options, selected) {
@@ -333,6 +385,16 @@ function renderProfileList() {
     remove.setAttribute('aria-label', `Delete ${profile.id}`)
     remove.innerHTML = '<i class="icon-x"></i>'
     remove.addEventListener('click', () => openDeleteProfileDialog(profile))
+    if (profile.profile_type === 'cloned') {
+      const edit = document.createElement('button')
+      edit.type = 'button'
+      edit.className = 'secondary-button profile-use'
+      edit.title = `Edit ${profile.id}`
+      edit.setAttribute('aria-label', `Edit ${profile.id}`)
+      edit.innerHTML = '<i class="icon-sliders-horizontal"></i><span>Edit</span>'
+      edit.addEventListener('click', () => openProfileEditor(profile))
+      actions.append(edit)
+    }
     actions.append(remove)
     card.append(copy, actions)
     return card
@@ -396,6 +458,7 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
   const referenceText = cloning ? ($('#reference-text').value.trim() || null) : null
   const payload = {
     text: $('#text-input').value.trim(),
+    input_type: state.inputType,
     language: $('#language').value || 'English',
     voice: cloning ? 'reference' : 'auto',
     voice_profile: $('#voice-profile').value || null,
@@ -837,7 +900,7 @@ async function transcribeReference() {
   }
 }
 
-async function saveProfileRequest({ name, profileType, description = '', file = null, refText = '', control = '' }) {
+async function saveProfileRequest({ name, profileType, description = '', file = null, refText = '', control = '', editing = false }) {
   const form = new FormData()
   form.append('name', name)
   form.append('profile_type', profileType)
@@ -846,7 +909,8 @@ async function saveProfileRequest({ name, profileType, description = '', file = 
   form.append('control', control)
   form.append('language', $('#language').value || 'English')
   if (file) form.append('reference_audio', file, file.name)
-  return fetchJson('/tts/voice-profiles', { method: 'POST', body: form })
+  const path = editing ? `/tts/voice-profiles/${encodeURIComponent(name)}` : '/tts/voice-profiles'
+  return fetchJson(path, { method: editing ? 'PUT' : 'POST', body: form })
 }
 
 function openQuickSaveDialog(profileType) {
@@ -883,6 +947,35 @@ function closeDeleteProfileDialog() {
   $('#delete-profile-dialog').close()
 }
 
+function resetProfileEditor() {
+  state.editingProfile = null
+  $('#voice-form').reset()
+  $('#profile-name').disabled = false
+  $('#voice-form-title').textContent = 'Add a reference voice'
+  $('#voice-form-copy').textContent = 'Drop a clean voice sample here, then use it from Generate, Clone, or Stream.'
+  $('#profile-submit-label').textContent = 'Save voice'
+  $('#profile-edit-cancel').hidden = true
+  profileAudio.clear()
+  updateProfileNamePreview()
+}
+
+function openProfileEditor(profile) {
+  state.editingProfile = profile
+  $('#profile-name').value = profile.id
+  $('#profile-name').disabled = true
+  $('#profile-description').value = profile.description || ''
+  $('#profile-transcript').value = profile.ref_text || ''
+  if (profile.language) $('#language').value = profile.language
+  $('#voice-form-title').textContent = `Edit ${profile.id}`
+  $('#voice-form-copy').textContent = 'Update its details or choose a new sample. The current sample is retained when none is selected.'
+  $('#profile-submit-label').textContent = 'Update voice'
+  $('#profile-edit-cancel').hidden = false
+  profileAudio.clear()
+  updateProfileNamePreview()
+  activateTab('voices')
+  $('#profile-description').focus()
+}
+
 async function loadProfileAudio(file) {
   if (!file) return
   try {
@@ -898,8 +991,9 @@ async function loadProfileAudio(file) {
 function updateProfileNamePreview() {
   const normalized = normalizedProfileName($('#profile-name').value)
   const preview = $('#profile-name-preview')
-  if (!normalized) preview.textContent = 'Letters, numbers, hyphens, and underscores'
-  else if (state.profiles.some((profile) => profile.id === normalized)) preview.textContent = `Saving will replace ${normalized}`
+  if (state.editingProfile) preview.textContent = `Editing ${state.editingProfile.id}`
+  else if (!normalized) preview.textContent = 'Letters, numbers, hyphens, and underscores'
+  else if (state.profiles.some((profile) => profile.id === normalized)) preview.textContent = `${normalized} already exists`
   else preview.textContent = `Saved as ${normalized}`
 }
 
@@ -1272,13 +1366,15 @@ async function initialize() {
 }
 
 $('#text-input').addEventListener('input', updateMetrics)
+$$('.input-type-control button').forEach((button) => button.addEventListener('click', () => setInputType(button.dataset.inputType)))
 $('#control-input').addEventListener('input', updateVoiceDesignState)
 $('#reference-text').addEventListener('input', updateCloneConditioning)
 $('#voice-profile').addEventListener('change', updateVoiceProfileState)
 $('#randomize-seed').addEventListener('change', updateSeedState)
 $('#sample-button').addEventListener('click', () => {
-  state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
-  $('#text-input').value = SAMPLE_TEXTS[state.sampleIndex]
+  if (state.inputType === 'text') state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
+  $('#text-input').value = inputSample(state.inputType)
+  state.inputDrafts[state.inputType] = $('#text-input').value
   updateMetrics()
 })
 $('#reference-audio').addEventListener('change', (event) => {
@@ -1324,7 +1420,7 @@ $('#voice-form').addEventListener('submit', async (event) => {
   const name = normalizedProfileName($('#profile-name').value)
   const file = profileAudio.currentFile()
   if (!name) return showToast('Enter a voice name.')
-  if (!file) return showToast('Choose or drop a reference audio sample.')
+  if (!file && !state.editingProfile) return showToast('Choose or drop a reference audio sample.')
   button.disabled = true
   try {
     const saved = await saveProfileRequest({
@@ -1333,10 +1429,9 @@ $('#voice-form').addEventListener('submit', async (event) => {
       description: $('#profile-description').value.trim(),
       file,
       refText: $('#profile-transcript').value.trim(),
+      editing: Boolean(state.editingProfile),
     })
-    formElement.reset()
-    profileAudio.clear()
-    updateProfileNamePreview()
+    resetProfileEditor()
     await refreshProfiles(saved.id)
     showToast(`Saved ${saved.id}.`, 'success')
   } catch (error) {
@@ -1345,6 +1440,7 @@ $('#voice-form').addEventListener('submit', async (event) => {
     button.disabled = false
   }
 })
+$('#profile-edit-cancel').addEventListener('click', resetProfileEditor)
 $('#save-designed-voice').addEventListener('click', () => openQuickSaveDialog('designed'))
 $('#save-cloned-voice').addEventListener('click', () => openQuickSaveDialog('cloned'))
 $('#quick-save-form').addEventListener('submit', async (event) => {
@@ -1421,8 +1517,10 @@ $('#hero-toggle').addEventListener('click', () => setHeaderCollapsed(!state.head
 $$('.tab-button').forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.tab)))
 
 bindRangeInputs()
-updateMetrics()
 restoreSessionState()
+$('#text-input').dataset.inputType = 'text'
+state.inputDrafts.text = $('#text-input').value
+setInputType(state.inputType)
 initialize().catch((error) => {
   $('#runtime-badge').dataset.state = 'error'
   $('#runtime-state').textContent = 'Service unavailable'

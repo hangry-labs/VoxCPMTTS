@@ -106,6 +106,7 @@ def save_voice_profile(
     control: str | None = None,
     description: str | None = None,
     language: str | None = None,
+    overwrite: bool = True,
 ) -> tuple[str, dict[str, Any]]:
     profile_name = normalize_profile_name(name)
     normalized_type = (profile_type or "").strip().lower()
@@ -124,6 +125,8 @@ def save_voice_profile(
     with PROFILE_LOCK:
         profile_dir.mkdir(parents=True, exist_ok=True)
         profiles = load_voice_profiles(profile_dir)
+        if not overwrite and profile_name in profiles:
+            raise ValueError(f"Voice profile '{profile_name}' already exists.")
         previous_audio = (profiles.get(profile_name) or {}).get("audio_file")
         destination: Path | None = None
         try:
@@ -150,6 +153,37 @@ def save_voice_profile(
         if previous_audio and previous_audio != profile["audio_file"]:
             (profile_dir / Path(previous_audio).name).unlink(missing_ok=True)
         return profile_name, profile
+
+
+def update_voice_profile(
+    profile_dir: Path,
+    *,
+    name: str,
+    description: str | None = None,
+    ref_text: str | None = None,
+    control: str | None = None,
+    language: str | None = None,
+    source_audio: str | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """Update a profile while retaining an existing clone sample when omitted."""
+
+    profile_name = normalize_profile_name(name)
+    with PROFILE_LOCK:
+        _, existing = resolve_voice_profile(profile_dir, profile_name)
+        retained_audio = source_audio
+        if existing["profile_type"] == "cloned" and not retained_audio:
+            retained_audio = existing.get("ref_audio") or None
+        return save_voice_profile(
+            profile_dir,
+            name=profile_name,
+            profile_type=existing["profile_type"],
+            source_audio=retained_audio,
+            ref_text=ref_text,
+            control=control,
+            description=description,
+            language=language,
+            overwrite=True,
+        )
 
 
 def delete_voice_profile(profile_dir: Path, name: str) -> str:

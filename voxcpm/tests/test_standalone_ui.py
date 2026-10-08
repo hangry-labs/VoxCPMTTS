@@ -46,6 +46,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="stream-live-wave"' in responses["/"].text
     assert 'id="reference-record-wave"' in responses["/"].text
     assert 'id="profile-audio-drop"' in responses["/"].text
+    assert 'data-input-type="ssml"' in responses["/"].text
+    assert 'data-input-type="ssml-h"' in responses["/"].text
+    assert 'id="profile-edit-cancel"' in responses["/"].text
     assert "gradio" not in responses["/"].text.lower()
     assert responses["/system/gpu"].json()["gpus"] == []
     assert responses["/system/gpu"].headers["cache-control"] == "no-store"
@@ -58,6 +61,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000" in script
     assert "function renderGpuMonitor(" in script
     assert "function stopGpuMonitor(" in script
+    assert "inputDrafts: { text: null, ssml: null, 'ssml-h': null }" in script
+    assert "input_type: state.inputType" in script
+    assert "openProfileEditor(profile)" in script
     assert "sessionStorage.setItem(GPU_SESSION_KEY" in script
 
 
@@ -249,6 +255,31 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
     assert 0 <= kwargs["seed"] <= runtime.MAX_RANDOM_SEED
     assert deleted.json() == {"deleted": "studio-narrator"}
     assert missing.status_code == 404
+
+
+def test_saved_clone_profile_can_be_edited_without_replacing_audio(tmp_path: Path) -> None:
+    with patch.object(runtime, "VOICE_PROFILE_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            created = client.post(
+                "/tts/voice-profiles",
+                data={"name": "Studio Voice", "profile_type": "cloned", "ref_text": "Original."},
+                files={"reference_audio": ("reference.wav", b"reference-bytes", "audio/wav")},
+            )
+            updated = client.put(
+                "/tts/voice-profiles/studio-voice",
+                data={
+                    "description": "Updated studio voice",
+                    "ref_text": "Updated transcript.",
+                    "language": "English",
+                },
+            )
+            audio = client.get("/tts/voice-profiles/studio-voice/audio")
+
+    assert created.status_code == 200
+    assert updated.status_code == 200
+    assert updated.json()["description"] == "Updated studio voice"
+    assert updated.json()["ref_text"] == "Updated transcript."
+    assert audio.content == b"reference-bytes"
 
 
 def test_saved_voice_design_applies_its_control(tmp_path: Path) -> None:

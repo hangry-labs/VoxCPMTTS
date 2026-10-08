@@ -15,7 +15,7 @@ from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import numpy as np
 import torch
@@ -26,12 +26,27 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from voxcpm.standalone_ui.gpu import GPU_MONITOR
 from voxcpm.standalone_ui.server import attach_ui
+from voxcpm.ssml import (
+    SSMLPlan,
+    SSMLUnit,
+    SSMLValidationError,
+    SSMLVoiceDefinition,
+    compile_ssml,
+    ssml_capabilities,
+)
+from voxcpm.ssml_execution import (
+    PreparedSSMLVoice,
+    SSMLExecutionSession,
+    SSMLVoiceBinding,
+)
 from voxcpm.timestamps import align_audio_file, timestamp_backend_available
 from voxcpm.voice_profiles import (
     delete_voice_profile,
     load_voice_profiles,
+    normalize_profile_name,
     resolve_voice_profile,
     save_voice_profile,
+    update_voice_profile,
 )
 
 def _read_version() -> str:
@@ -63,6 +78,7 @@ VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
 MAX_REFERENCE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_REFERENCE_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 REFERENCE_AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".webm"}
 VOICE_PROFILE_DIR = Path(os.getenv("VOXCPM_VOICE_PROFILE_DIR", "/app/persistent/voices"))
+SSML_STAGING_DIR = Path(os.getenv("VOXCPM_SSML_STAGING_DIR", "/tmp/voxcpmtts-ssml"))
 MAX_RANDOM_SEED = 2**32 - 1
 TIMESTAMP_MODEL = os.getenv("VOXCPM_TIMESTAMP_MODEL", "base")
 TIMESTAMP_DEVICE = os.getenv("VOXCPM_TIMESTAMP_DEVICE", "cpu")
@@ -99,6 +115,43 @@ SUPPORTED_LANGUAGES = [
     "Turkish",
     "Vietnamese",
 ]
+
+SSML_LANGUAGE_CODES = {
+    "ar": "Arabic",
+    "my": "Burmese",
+    "zh": "Chinese",
+    "yue": "Chinese",
+    "da": "Danish",
+    "nl": "Dutch",
+    "en": "English",
+    "fi": "Finnish",
+    "fr": "French",
+    "de": "German",
+    "el": "Greek",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "km": "Khmer",
+    "ko": "Korean",
+    "lo": "Lao",
+    "ms": "Malay",
+    "nb": "Norwegian",
+    "nn": "Norwegian",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "es": "Spanish",
+    "sw": "Swahili",
+    "sv": "Swedish",
+    "tl": "Tagalog",
+    "fil": "Tagalog",
+    "th": "Thai",
+    "tr": "Turkish",
+    "vi": "Vietnamese",
+}
 
 OUTPUT_FORMATS = {
     "wav": {
@@ -577,6 +630,10 @@ class TTSRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     text: str = Field(..., min_length=1, description="Text to synthesize.")
+    input_type: Literal["text", "ssml", "ssml-h"] = Field(
+        "text",
+        description="Explicit input format. Markup is parsed only for ssml or ssml-h.",
+    )
     language: str = Field("English", description="Compatibility hint; VoxCPM2 auto-detects supported languages.")
     voice: str = Field("auto", description="Compatibility field. Use instruct/control or reference audio for VoxCPM voices.")
     voice_profile: Optional[str] = Field(None, description="Saved local voice profile name.")
@@ -614,6 +671,8 @@ class StreamingTTSRequest(TTSRequest):
 
 class MetricsRequest(BaseModel):
     text: str = Field("", description="Text to inspect.")
+    input_type: Literal["text", "ssml", "ssml-h"] = "text"
+    language: str = "English"
 
 
 class PurgeRequest(BaseModel):
@@ -623,6 +682,234 @@ class PurgeRequest(BaseModel):
 class TranscriptionRequest(BaseModel):
     audio_path: str = Field(..., description="Container-visible audio path to transcribe.")
     language: str = Field("auto", description="ASR language hint. Use auto for detection.")
+
+
+def resolve_ssml_language(value: str) -> str:
+    normalized = (value or "").strip()
+    if not normalized:
+        raise ValueError("SSML language must not be empty.")
+    for language in SUPPORTED_LANGUAGES:
+        if normalized.casefold() == language.casefold():
+            return language
+    code = normalized.replace("_", "-").split("-", 1)[0].lower()
+    language = SSML_LANGUAGE_CODES.get(code)
+    if language is None:
+        raise ValueError(f"Unsupported SSML language '{value}'.")
+    return language
+
+
+def build_ssml_h_voice_control(definition: SSMLVoiceDefinition) -> str:
+    values: list[str] = []
+    if definition.description:
+        values.append(definition.description.strip())
+    for label, value in (
+        ("gender", definition.gender),
+        ("age", definition.age),
+        ("pitch", definition.pitch),
+        ("style", definition.style),
+        ("accent", definition.accent),
+        ("dialect", definition.dialect),
+    ):
+        if value:
+            values.append(f"{value.replace('-', ' ')} {label}")
+    if definition.languages:
+        languages = [resolve_ssml_language(value) for value in definition.languages]
+        values.append(f"speaking {', '.join(languages)}")
+    if not values:
+        raise SSMLValidationError(
+            f"SSML-H voice '{definition.name}' needs h:description or at least one voice-design attribute."
+        )
+    return ", ".join(dict.fromkeys(values))
+
+
+def compile_ssml_request(payload: TTSRequest) -> tuple[SSMLPlan, dict[str, dict[str, Any]]]:
+    if payload.normalize_text:
+        raise SSMLValidationError("normalize_text is available only when input_type='text'.")
+    profiles = load_voice_profiles(VOICE_PROFILE_DIR)
+    default_language = None
+    if (payload.language or "").strip().lower() != "auto":
+        default_language = resolve_ssml_language(payload.language)
+
+    def validate_voice(name: str, _definitions: frozenset[str]) -> None:
+        resolve_voice_profile(VOICE_PROFILE_DIR, name)
+
+    plan = compile_ssml(
+        payload.text,
+        payload.input_type,
+        default_language=default_language,
+        resolve_language=resolve_ssml_language,
+        validate_voice=validate_voice,
+    )
+    for index, unit in enumerate(plan.units):
+        if unit.kind != "speech":
+            continue
+        effective_rate = payload.speed * unit.prosody.rate
+        if not 0.25 <= effective_rate <= 4.0:
+            raise SSMLValidationError(
+                f"Effective rate for SSML unit {index + 1} must be between 0.25 and 4.0."
+            )
+        if not -12.0 <= unit.prosody.pitch_semitones <= 12.0:
+            raise SSMLValidationError(
+                f"Effective pitch for SSML unit {index + 1} must be between -12st and +12st."
+            )
+        if not 0.0 <= unit.prosody.volume <= 2.0:
+            raise SSMLValidationError(
+                f"Effective volume for SSML unit {index + 1} must be between 0 and 2.0."
+            )
+    for definition in plan.voice_definitions:
+        profile_name = normalize_profile_name(definition.name)
+        if profile_name in profiles and not (definition.scope == "profile" and definition.replace):
+            raise SSMLValidationError(
+                f"Voice profile '{profile_name}' already exists. Use scope='profile' replace='true' to replace it."
+            )
+        if definition.sample_language:
+            resolve_ssml_language(definition.sample_language)
+        build_ssml_h_voice_control(definition)
+    return plan, profiles
+
+
+def _binding_from_profile(name: str, profiles: dict[str, dict[str, Any]]) -> SSMLVoiceBinding:
+    profile_name = normalize_profile_name(name)
+    if profile_name not in profiles:
+        raise ValueError(f"Voice profile '{profile_name}' does not exist.")
+    _, profile = resolve_voice_profile(VOICE_PROFILE_DIR, profile_name)
+    return SSMLVoiceBinding(
+        name=profile_name,
+        ref_audio=profile.get("ref_audio") or None,
+        ref_text=profile.get("ref_text") or None,
+        control=profile.get("control") or None,
+        language=profile.get("language") or None,
+    )
+
+
+def _default_ssml_binding(payload: TTSRequest, profiles: dict[str, dict[str, Any]]) -> SSMLVoiceBinding:
+    if payload.voice_profile:
+        return _binding_from_profile(payload.voice_profile, profiles)
+    ref_audio = payload.ref_audio or payload.reference_audio or payload.prompt_audio
+    ref_text = payload.ref_text or payload.prompt_text
+    return SSMLVoiceBinding(
+        ref_audio=ref_audio,
+        ref_text=ref_text,
+        control=payload.control or payload.instruct,
+        language=payload.language,
+    )
+
+
+def create_ssml_execution_session(payload: TTSRequest, used_seed: int) -> SSMLExecutionSession:
+    plan, profiles = compile_ssml_request(payload)
+    requested_device = resolve_requested_device(payload.device, payload.use_gpu)
+    canonical_device = canonical_model_device(requested_device)
+    cache_key = (DEFAULT_BACKEND, DEFAULT_MODEL_ID, canonical_device)
+    with MODEL_LOCK:
+        model_loaded = cache_key in MODEL_CACHE
+    set_generation_activity(
+        "preparing" if model_loaded else "loading_model",
+        "Preparing the loaded model" if model_loaded else "Loading VoxCPM2 weights",
+        active=True,
+    )
+    model = get_model(requested_device, load_denoiser=payload.denoise)
+    sample_rate = int(model.tts_model.sample_rate)
+
+    def resolve_voice(name: str) -> SSMLVoiceBinding:
+        return _binding_from_profile(name, profiles)
+
+    def generate(
+        text: str,
+        binding: SSMLVoiceBinding,
+        language: str | None,
+        seed: int,
+    ) -> np.ndarray:
+        unit_payload = TTSRequest(
+            text=text,
+            input_type="text",
+            language=language or binding.language or payload.language,
+            control=binding.control,
+            ref_audio=binding.ref_audio,
+            ref_text=binding.ref_text,
+            cfg_value=payload.cfg_value,
+            inference_timesteps=payload.inference_timesteps,
+            normalize_text=False,
+            denoise=payload.denoise,
+            seed=seed,
+            randomize_seed=False,
+            device=payload.device,
+            use_gpu=payload.use_gpu,
+            output_format="wav",
+        )
+        return to_float32_audio(model.generate(**build_generate_kwargs(unit_payload, model, seed=seed)))
+
+    def prepare_voice(
+        definition: SSMLVoiceDefinition,
+        sample_text: str,
+        sample_language: str | None,
+        seed: int,
+        staging_dir: Path,
+    ) -> SSMLVoiceBinding:
+        set_generation_activity("generating", f"Designing SSML-H voice {definition.name}", active=True)
+        control = build_ssml_h_voice_control(definition)
+        waveform = generate(
+            sample_text,
+            SSMLVoiceBinding(control=control, language=sample_language),
+            sample_language,
+            seed,
+        )
+        audio_path = staging_dir / f"{normalize_profile_name(definition.name)}.wav"
+        audio_path.write_bytes(audio_to_wav_bytes(waveform, sample_rate))
+        return SSMLVoiceBinding(
+            name=definition.name,
+            ref_audio=str(audio_path),
+            ref_text=sample_text,
+            language=sample_language,
+            generation_seed=seed,
+        )
+
+    def generate_speech(
+        unit: SSMLUnit,
+        binding: SSMLVoiceBinding,
+        seed: int,
+    ) -> tuple[int, np.ndarray]:
+        set_generation_activity("generating", "Generating SSML speech", active=True)
+        language = unit.language
+        if not unit.language_explicit and binding.language:
+            language = binding.language
+        return sample_rate, generate(unit.text, binding, language, seed)
+
+    def commit_profiles(prepared: list[PreparedSSMLVoice], _staging_dir: Path) -> dict[str, str]:
+        committed: dict[str, str] = {}
+        for item in prepared:
+            profile_name, _ = save_voice_profile(
+                VOICE_PROFILE_DIR,
+                name=item.definition.name,
+                profile_type="cloned",
+                source_audio=item.binding.ref_audio,
+                ref_text=item.sample_text,
+                control=build_ssml_h_voice_control(item.definition),
+                description=(item.definition.description or f"SSML-H designed voice {item.definition.name}")[:240],
+                language=item.sample_language or item.binding.language or "",
+                overwrite=item.definition.replace,
+            )
+            committed[item.definition.name] = profile_name
+        return committed
+
+    session = SSMLExecutionSession(
+        plan=plan,
+        default_binding=_default_ssml_binding(payload, profiles),
+        request_seed=used_seed,
+        request_speed=payload.speed,
+        default_sample_rate=sample_rate,
+        staging_parent=SSML_STAGING_DIR,
+        resolve_voice=resolve_voice,
+        resolve_language=resolve_ssml_language,
+        prepare_voice=prepare_voice,
+        generate_speech=generate_speech,
+        commit_profiles=commit_profiles,
+    )
+    try:
+        session.prepare()
+    except Exception:
+        session.close()
+        raise
+    return session
 
 
 def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int]:
@@ -694,7 +981,129 @@ def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, I
     return output_format, int(model.tts_model.sample_rate), chunks, seed
 
 
+def _ssml_headers(
+    payload: TTSRequest,
+    route_name: str,
+    output_format: str,
+    sample_rate: int,
+    seed: int,
+    *,
+    streaming: bool,
+    duration: float | None = None,
+) -> dict[str, str]:
+    extension = (STREAM_FORMATS if streaming else OUTPUT_FORMATS)[output_format]["extension"]
+    headers = {
+        "Content-Disposition": (
+            f"inline; filename=voxcpm-ssml.{extension}"
+            if streaming
+            else f"attachment; filename=voxcpm-ssml.{extension}"
+        ),
+        "X-VoxCPM-Model": DEFAULT_MODEL_ID,
+        "X-VoxCPM-Sample-Rate": str(sample_rate),
+        "X-VoxCPM-Route": route_name,
+        "X-VoxCPM-Format": output_format,
+        "X-VoxCPM-Seed": str(seed),
+        "X-VoxCPM-Input-Type": payload.input_type,
+    }
+    if streaming:
+        headers["X-VoxCPM-Streaming"] = "ssml-units"
+    if duration is not None:
+        headers["X-VoxCPM-Duration"] = f"{duration:.3f}"
+    return headers
+
+
+def ssml_audio_response(payload: TTSRequest, route_name: str) -> StreamingResponse:
+    session: SSMLExecutionSession | None = None
+    try:
+        output_format = normalize_output_format(payload.output_format)
+        seed = resolve_generation_seed(payload)
+        session = create_ssml_execution_session(payload, seed)
+        sample_rate, waveform = session.render_array()
+        set_generation_activity("encoding", f"Encoding {output_format.upper()} audio", active=True)
+        audio_bytes = encode_audio_bytes(waveform, output_format, sample_rate)
+        session.commit_profiles()
+        set_generation_activity("complete", "Audio is ready", active=False)
+        return StreamingResponse(
+            io.BytesIO(audio_bytes),
+            media_type=OUTPUT_FORMATS[output_format]["media_type"],
+            headers=_ssml_headers(
+                payload,
+                route_name,
+                output_format,
+                sample_rate,
+                seed,
+                streaming=False,
+                duration=len(waveform) / sample_rate if sample_rate else 0,
+            ),
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=500, detail=f"SSML generation failed: {exc}") from exc
+    finally:
+        if session is not None:
+            session.close()
+
+
+def ssml_progressive_audio_response(
+    payload: StreamingTTSRequest,
+    route_name: str,
+    *,
+    cleanup_paths: tuple[str, ...] = (),
+) -> StreamingResponse:
+    try:
+        output_format = normalize_stream_format(payload.stream_format)
+        seed = resolve_generation_seed(payload)
+        session = create_ssml_execution_session(payload, seed)
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        for path in cleanup_paths:
+            Path(path).unlink(missing_ok=True)
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        for path in cleanup_paths:
+            Path(path).unlink(missing_ok=True)
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=500, detail=f"SSML streaming failed: {exc}") from exc
+
+    sample_rate = session.default_sample_rate
+
+    def body() -> Iterator[bytes]:
+        completed = False
+        try:
+            yield from encode_audio_stream(session.iter_chunks(), output_format, sample_rate)
+            session.commit_profiles()
+            completed = True
+            set_generation_activity("complete", "Stream is ready", active=False)
+        except Exception as exc:
+            set_generation_activity("failed", str(exc), active=False)
+            raise
+        finally:
+            if not completed:
+                set_generation_activity("failed", "SSML stream ended before completion", active=False)
+            session.close()
+            for path in cleanup_paths:
+                Path(path).unlink(missing_ok=True)
+
+    return StreamingResponse(
+        body(),
+        media_type=STREAM_FORMATS[output_format]["media_type"],
+        headers=_ssml_headers(
+            payload,
+            route_name,
+            output_format,
+            sample_rate,
+            seed,
+            streaming=True,
+        ),
+    )
+
+
 def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResponse:
+    if payload.input_type != "text":
+        return ssml_audio_response(payload, route_name)
     output_format, sample_rate, waveform, seed = synthesize_payload(payload)
     try:
         set_generation_activity("encoding", f"Encoding {output_format.upper()} audio", active=True)
@@ -715,6 +1124,7 @@ def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResp
         "X-VoxCPM-Route": route_name,
         "X-VoxCPM-Format": output_format,
         "X-VoxCPM-Seed": str(seed),
+        "X-VoxCPM-Input-Type": payload.input_type,
     }
     return StreamingResponse(io.BytesIO(audio_bytes), media_type=media_type, headers=headers)
 
@@ -725,6 +1135,8 @@ def progressive_audio_response(
     *,
     cleanup_paths: tuple[str, ...] = (),
 ) -> StreamingResponse:
+    if payload.input_type != "text":
+        return ssml_progressive_audio_response(payload, route_name, cleanup_paths=cleanup_paths)
     try:
         output_format, sample_rate, chunks, seed = synthesize_payload_chunks(payload)
     except Exception:
@@ -757,6 +1169,7 @@ def progressive_audio_response(
         "X-VoxCPM-Format": output_format,
         "X-VoxCPM-Streaming": "progressive-chunks",
         "X-VoxCPM-Seed": str(seed),
+        "X-VoxCPM-Input-Type": payload.input_type,
     }
     return StreamingResponse(body(), media_type=media_type, headers=headers)
 
@@ -796,6 +1209,8 @@ def get_status_payload() -> dict:
         "loaded_model_devices": loaded_devices,
         "output_formats": get_supported_output_formats(),
         "stream_formats": STREAM_FORMATS,
+        "input_types": ["text", "ssml", "ssml-h"],
+        "ssml": ssml_capabilities(),
         "timestamps": {
             "available": timestamp_backend_available(),
             "backend": "stable-ts",
@@ -820,6 +1235,8 @@ def voice_profile_payloads() -> list[dict[str, Any]]:
             "has_audio": bool(profile["audio_file"]),
             "has_transcript": bool(profile["ref_text"]),
             "has_control": bool(profile["control"]),
+            "ref_text": profile["ref_text"],
+            "control": profile["control"],
             "created_at": profile["created_at"],
             "audio_url": f"/tts/voice-profiles/{name}/audio" if profile["audio_file"] else None,
         }
@@ -1006,6 +1423,7 @@ async def create_voice_profile(
             control=control,
             description=description,
             language=language,
+            overwrite=False,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1013,6 +1431,37 @@ async def create_voice_profile(
         if temporary_path:
             Path(temporary_path).unlink(missing_ok=True)
     return next(profile for profile in voice_profile_payloads() if profile["id"] == profile_name)
+
+
+@api.put("/tts/voice-profiles/{profile_name}")
+async def edit_voice_profile(
+    profile_name: str,
+    description: str = Form(""),
+    ref_text: str = Form(""),
+    control: str = Form(""),
+    language: str = Form(""),
+    reference_audio: UploadFile | None = File(None),
+) -> dict:
+    temporary_path: str | None = None
+    try:
+        if reference_audio is not None:
+            temporary_path = await save_reference_upload(reference_audio)
+        normalized_name, _ = await asyncio.to_thread(
+            update_voice_profile,
+            VOICE_PROFILE_DIR,
+            name=profile_name,
+            source_audio=temporary_path,
+            ref_text=ref_text,
+            control=control,
+            description=description,
+            language=language,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    finally:
+        if temporary_path:
+            Path(temporary_path).unlink(missing_ok=True)
+    return next(profile for profile in voice_profile_payloads() if profile["id"] == normalized_name)
 
 
 @api.get("/tts/voice-profiles/{profile_name}/audio")
@@ -1044,7 +1493,24 @@ def speakers(language: str = Query("auto", description="Compatibility parameter.
 @api.post("/tts/metrics")
 def metrics(payload: MetricsRequest = Body(...)) -> dict:
     text = payload.text or ""
-    return {"metrics": {"characters": len(text), "words": len(text.split())}}
+    metrics_payload: dict[str, Any] = {"characters": len(text), "words": len(text.split())}
+    if payload.input_type != "text":
+        request = TTSRequest(text=text, input_type=payload.input_type, language=payload.language)
+        plan, _ = compile_ssml_request(request)
+        metrics_payload.update(
+            units=len(plan.units),
+            speech_units=sum(unit.kind == "speech" for unit in plan.units),
+            break_ms=sum(unit.duration_ms for unit in plan.units if unit.kind == "break"),
+            voices=list(plan.voices),
+            languages=list(plan.languages),
+            voice_definitions=len(plan.voice_definitions),
+        )
+    return {"input_type": payload.input_type, "metrics": metrics_payload}
+
+
+@api.get("/tts/ssml/capabilities")
+def get_ssml_capabilities() -> dict:
+    return ssml_capabilities()
 
 
 @api.post("/tts/transcribe")

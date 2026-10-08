@@ -18,8 +18,8 @@ vars:
   BENCHMARK_PORT: '8811'
   BENCHMARK_ASR_URL: 'http://127.0.0.1:8000'
   HF_TOKEN: ''
-  HF_CACHE_VOLUME: voxcpmtts_hf_cache
-  VOICE_DATA_VOLUME: voxcpmtts_data
+  BENCHMARK_CACHE_VOLUME: voxcpmtts_hf_cache
+  DATA_VOLUME: voxcpmtts_data
   HF_HUB_OFFLINE: '1'
   TRANSFORMERS_OFFLINE: '1'
   CONTAINER: voxcpmtts
@@ -98,11 +98,10 @@ tasks:
       - docker system df
       - docker buildx du
 
-  cache-init:
-    desc: Seed the persistent Hugging Face cache volume from the baked image
+  data-init:
+    desc: Create the unified persistent product volume
     cmds:
-      - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker run --rm -v {{.HF_CACHE_VOLUME}}:/hf-cache {{.IMAGE}} sh -c "mkdir -p /hf-cache && cp -an /app/.cache/huggingface/. /hf-cache/ || true"
+      - cmd /c docker volume create {{.DATA_VOLUME}} >nul
 
   release:
     desc: Release current VERSION snapshot, tag it, and prepare next snapshot
@@ -137,7 +136,7 @@ tasks:
         --container {{.BENCHMARK_CONTAINER}}
         --port {{.BENCHMARK_PORT}}
         --gpu-index {{.GPU_DEVICE}}
-        --cache-volume {{.HF_CACHE_VOLUME}}
+        --cache-volume {{.BENCHMARK_CACHE_VOLUME}}
         --stop-container {{.CONTAINER_LOCAL}}
         --stop-container {{.CONTAINER}}
         {{.CLI_ARGS}}
@@ -152,7 +151,7 @@ tasks:
         --container {{.BENCHMARK_CONTAINER}}
         --port {{.BENCHMARK_PORT}}
         --gpu-index {{.GPU_DEVICE}}
-        --cache-volume {{.HF_CACHE_VOLUME}}
+        --cache-volume {{.BENCHMARK_CACHE_VOLUME}}
         --stop-container {{.CONTAINER_LOCAL}}
         --stop-container {{.CONTAINER}}
         --calls 1
@@ -171,7 +170,7 @@ tasks:
         --container {{.BENCHMARK_CONTAINER}}
         --port {{.BENCHMARK_PORT}}
         --gpu-index {{.GPU_DEVICE}}
-        --cache-volume {{.HF_CACHE_VOLUME}}
+        --cache-volume {{.BENCHMARK_CACHE_VOLUME}}
         --asr-url {{.BENCHMARK_ASR_URL}}
         --stop-container {{.CONTAINER_LOCAL}}
         --stop-container {{.CONTAINER}}
@@ -187,7 +186,7 @@ tasks:
         --container {{.BENCHMARK_CONTAINER}}
         --port {{.BENCHMARK_PORT}}
         --gpu-index {{.GPU_DEVICE}}
-        --cache-volume {{.HF_CACHE_VOLUME}}
+        --cache-volume {{.BENCHMARK_CACHE_VOLUME}}
         --asr-url {{.BENCHMARK_ASR_URL}}
         --stop-container {{.CONTAINER_LOCAL}}
         --stop-container {{.CONTAINER}}
@@ -203,18 +202,17 @@ tasks:
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - cmd /c docker volume create {{.VOICE_DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.VOICE_DATA_VOLUME}}:/app/persistent {{.IMAGE}}
+      - cmd /c docker volume create {{.DATA_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   imagerun-tiny:
-    desc: Run tiny image online on first use, using a persistent Hugging Face cache volume
+    desc: Run tiny image online on first use with the unified persistent product volume
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker volume create {{.VOICE_DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.VOICE_DATA_VOLUME}}:/app/persistent {{.TINY_IMAGE}}
+      - cmd /c docker volume create {{.DATA_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.DATA_VOLUME}}:/app/persistent {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   localrun:
@@ -222,18 +220,17 @@ tasks:
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - cmd /c docker volume create {{.VOICE_DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.VOICE_DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.IMAGE}}
+      - cmd /c docker volume create {{.DATA_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   localrun-tiny:
-    desc: Run tiny image with local voxcpm/ bind-mounted and persistent model caches
+    desc: Run tiny image with local code and the unified persistent product volume
     cmds:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
-      - cmd /c docker volume create {{.HF_CACHE_VOLUME}} >nul
-      - cmd /c docker volume create {{.VOICE_DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.HF_CACHE_VOLUME}}:/app/.cache/huggingface -v {{.VOICE_DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.TINY_IMAGE}}
+      - cmd /c docker volume create {{.DATA_VOLUME}} >nul
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   imageweb:
@@ -289,5 +286,5 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker rmi -f {{.IMAGE}} >nul 2>&1
       - cmd /c docker rmi -f {{.TINY_IMAGE}} >nul 2>&1
-      - cmd /c docker volume rm -f {{.HF_CACHE_VOLUME}} >nul 2>&1
-      - cmd /c docker volume rm -f {{.VOICE_DATA_VOLUME}} >nul 2>&1
+      - cmd /c docker volume rm -f {{.BENCHMARK_CACHE_VOLUME}} >nul 2>&1
+      - cmd /c docker volume rm -f {{.DATA_VOLUME}} >nul 2>&1

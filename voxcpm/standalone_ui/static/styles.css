@@ -485,6 +485,9 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .voice-defaults > .field { margin-top: 14px; }
 .voice-defaults > .toggle-field { margin-top: 12px; }
 .voice-save-button { width: 100%; margin-top: 14px; }
+.voice-form-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 9px; margin-top: 14px; }
+.voice-form-actions .voice-save-button { margin-top: 0; }
+.voice-form-actions:has(#profile-edit-cancel[hidden]) .voice-save-button { grid-column: 1 / -1; }
 .profile-name-preview { min-height: 1em; }
 .profile-audio-field > span { color: var(--muted); font-size: 0.75rem; font-weight: 700; }
 .profile-audio-drop { position: relative; display: grid; place-items: center; gap: 5px; min-height: 116px; padding: 14px; border: 1px dashed #555861; border-radius: 5px; background: #151619; color: var(--muted); text-align: center; cursor: pointer; transition: border-color 120ms ease, background 120ms ease, color 120ms ease; }

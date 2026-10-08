@@ -13,7 +13,8 @@ This Hangry Labs fork is made for local use without the usual Python environment
 ## What This Project Provides
 
 - A browser UI for voice design, voice cloning, transcript-guided cloning, and local reference transcription
-- Persistent saved voices that can be reused across Generate, Clone, and Stream
+- Persistent saved voices that can be reused across Generate, Clone, Stream, and SSML documents
+- SSML and SSML-H documents for timed narration, multi-speaker discussions, and plays
 - An HTTP API for applications and local integrations
 - Multilingual generation across 30 VoxCPM2 languages
 - WAV, MP3, FLAC, and OGG output
@@ -47,7 +48,7 @@ docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e 
 
 Then open **[http://localhost:8808](http://localhost:8808)**. Interactive API documentation is available at **[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)**.
 
-The `voxcpmtts_data` volume stores saved voice profiles and their reference audio across container replacement.
+The unified `voxcpmtts_data` volume stores model caches, saved voice profiles, reference audio, and future application settings across container replacement. The full image seeds its baked model assets into this volume on startup; the tiny image downloads into the same volume on first online use.
 
 To select another physical GPU, change `CUDA_VISIBLE_DEVICES`. Keep one VoxCPMTTS model-serving container per GPU.
 
@@ -58,10 +59,10 @@ The full image contains its pinned VoxCPM2 model assets. After the image is pull
 Use `latest_tiny` when you want the runtime dependencies in the image but prefer the model to download into a persistent volume on first online use:
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
 ```
 
-Later tiny-image versions can reuse the same `voxcpmtts_hf_cache` volume. The full image does not require this volume.
+Later tiny and full image versions reuse the same `voxcpmtts_data` volume. No separate Hugging Face cache volume is required.
 
 ## Image Tags
 
@@ -151,6 +152,17 @@ curl -X POST "http://localhost:8808/tts/transcribe-upload" \
   -F "language=auto"
 ```
 
+SSML and SSML-H are explicit input modes. Saved clone names can be selected with `<voice name="...">`; SSML-H can also design request-scoped speakers for complete discussions or publish them to the voice library with `scope="profile"`:
+
+```bash
+curl -X POST "http://localhost:8808/tts/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"input_type":"ssml-h","output_format":"mp3","text":"<speak version=\"1.1\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:h=\"https://hangrylabs.app/ns/ssml-h/1.0\" xml:lang=\"en-US\"><metadata><h:extensions version=\"1.0\"><h:voice-definition name=\"Host\" style=\"warm and confident\"/><h:voice-definition name=\"Guest\"><h:description>A thoughtful guest with a relaxed delivery.</h:description></h:voice-definition></h:extensions></metadata><voice name=\"Host\">Welcome to the show.</voice><break time=\"250ms\"/><voice name=\"Guest\">Thank you. It is good to be here.</voice></speak>"}' \
+  -o discussion.mp3
+```
+
+Use `input_type: "ssml"` for standard SSML without Hangry Labs voice definitions. Capabilities and limits are available from `GET /tts/ssml/capabilities`. Markup is never inferred when `input_type` is omitted.
+
 Progressive MP3 streaming begins returning encoded model chunks before synthesis finishes:
 
 ```bash
@@ -172,7 +184,8 @@ Runtime discovery is available from the local API:
 
 - Status and loaded backend: `GET /tts/status`
 - Current generation stage: `GET /tts/activity`
-- Saved voices: `GET`, `POST`, and `DELETE /tts/voice-profiles`
+- Saved voices: `GET` and `POST /tts/voice-profiles`; `PUT` and `DELETE /tts/voice-profiles/{name}`
+- SSML and SSML-H capabilities: `GET /tts/ssml/capabilities`
 - Lazy local reference transcription with the baked multilingual Whisper Base model: `POST /tts/transcribe-upload`
 - Generated-audio alignment when `/tts/status` reports it available: `POST /tts/timestamps-upload`
 - Supported languages: `GET /tts/languages`
@@ -272,6 +285,8 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
 - Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
 - Added persistent voice profiles shared by generation and cloning, drag-and-drop reference audio, truthful generation stages, live streaming output, recording waveforms, and persistent playback volume.
+- Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, progressive unit streaming, explicit breaks, prosody, and profile editing.
+- Unified model caches, saved voices, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
 - Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.
 - Added generated timestamp sidecars and API/UI integration behind runtime capability discovery; standard Python 3.13 images keep alignment disabled until its backend publishes binary wheels. Reference transcription remains a separate cloning workflow.
 - Added lazy multilingual reference transcription with a pinned Whisper Base model. The baked image works offline; the tiny image downloads the same pinned assets on first use.
@@ -295,7 +310,7 @@ docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e 
 **Tiny image**
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_hf_cache:/app/.cache/huggingface -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
 ```
 
 No immutable `v1.0` image has been published yet. After publication and validation, this section must be updated with the exact `v1.0@sha256:...` and `v1.0_tiny@sha256:...` Docker Hub references before the GitHub Release is announced.

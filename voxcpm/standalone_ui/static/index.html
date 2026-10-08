@@ -90,7 +90,7 @@
       <section class="composer workflow-only" id="composer">
         <div class="composer-heading">
           <div class="section-title"><i class="icon-message-square-text"></i><span>Input text</span></div>
-          <div class="composer-actions"><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span>New sample</span></button></div>
+          <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format"><button class="active" type="button" data-input-type="text" aria-pressed="true">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span>New sample</span></button></div>
         </div>
         <textarea id="text-input" rows="7" spellcheck="true" aria-label="Text to synthesize">VoxCPM2 generates natural multilingual speech with voice design and cloning.</textarea>
         <details class="voice-design-details" id="voice-design-details">
@@ -135,13 +135,13 @@
         <div class="view-heading"><div><h2>Voices</h2><p>Reusable designs and reference voices stored in the persistent product volume</p></div></div>
         <div class="voices-grid">
           <form class="voice-form" id="voice-form">
-            <div class="voice-form-intro"><div class="section-title"><i class="icon-upload"></i><span>Add a reference voice</span></div><p>Drop a clean voice sample here, then use it from Generate, Clone, or Stream.</p></div>
+            <div class="voice-form-intro"><div class="section-title"><i class="icon-upload"></i><span id="voice-form-title">Add a reference voice</span></div><p id="voice-form-copy">Drop a clean voice sample here, then use it from Generate, Clone, or Stream.</p></div>
             <label class="field"><span>Voice name</span><input id="profile-name" type="text" maxlength="48" placeholder="studio-narrator" required><small id="profile-name-preview">Letters, numbers, hyphens, and underscores</small></label>
             <label class="field"><span>Description <small>Optional</small></span><input id="profile-description" type="text" maxlength="240" placeholder="Warm narrator recorded in the studio"></label>
             <label class="profile-audio-drop" id="profile-audio-drop"><input id="profile-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"><i class="icon-file-audio"></i><strong>Choose or drop voice audio</strong><small id="profile-audio-name">WAV, MP3, FLAC, OGG, or M4A</small></label>
             <section id="profile-audio-preview" aria-live="polite"></section>
             <label class="field"><span>Reference transcript <small>Optional</small></span><textarea id="profile-transcript" rows="3" placeholder="Enter exactly what is spoken in the sample"></textarea></label>
-            <button class="primary-button voice-save-button" type="submit"><i class="icon-check"></i><span>Save voice</span></button>
+            <div class="voice-form-actions"><button class="secondary-button" id="profile-edit-cancel" type="button" hidden>Cancel edit</button><button class="primary-button voice-save-button" type="submit"><i class="icon-check"></i><span id="profile-submit-label">Save voice</span></button></div>
           </form>
           <section class="saved-voices-panel"><div class="saved-voices-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Saved voices</span><span class="count-badge" id="profile-count">0</span></div><label class="profile-search"><span class="visually-hidden">Search saved voices</span><input id="profile-filter" type="search" placeholder="Search voices"></label></div><div class="profile-list" id="profile-list"></div></section>
         </div>

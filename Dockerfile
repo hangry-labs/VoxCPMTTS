@@ -132,8 +132,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
-    HF_HOME=/app/.cache/huggingface \
-    MODELSCOPE_CACHE=/app/.cache/modelscope \
+    HF_HOME=/app/persistent/models/huggingface \
+    MODELSCOPE_CACHE=/app/persistent/models/modelscope \
     HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1 \
     VOXCPM_DEVICE=auto \
@@ -152,6 +152,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential ffmpeg libsndfile1 \
+    && mkdir -p /app/persistent/models/huggingface /app/persistent/models/modelscope /app/persistent/app /app/persistent/voices /tmp/voxcpmtts-ssml \
     && rm -rf /var/lib/apt/lists/*
 
 ARG BUILD_DATE=unknown
@@ -167,7 +168,7 @@ ENV VOXCPMTTS_BUILD_DATE="${BUILD_DATE}" \
 EXPOSE 8808
 VOLUME ["/app/persistent"]
 
-CMD ["python", "-u", "-m", "voxcpm.app"]
+CMD ["python", "-u", "-m", "voxcpm.docker_entrypoint"]
 
 FROM runtime-base AS runtime-app
 
@@ -181,7 +182,8 @@ ENV HF_HUB_OFFLINE=0 \
 
 FROM runtime-app AS native-baked
 
-COPY --from=asset-builder /app/.cache /app/.cache
+COPY --from=asset-builder /app/.cache/huggingface /app/baked-models/huggingface
+COPY --from=asset-builder /app/.cache/modelscope /app/baked-models/modelscope
 
 FROM runtime-base AS nano-runtime-app
 
@@ -205,4 +207,4 @@ ENV HF_HUB_OFFLINE=0 \
 
 FROM nano-runtime-app AS baked
 
-COPY --from=nano-asset-builder /app/.cache /app/.cache
+COPY --from=nano-asset-builder /app/.cache/huggingface /app/baked-models/huggingface

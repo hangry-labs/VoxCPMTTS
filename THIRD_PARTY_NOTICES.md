@@ -44,9 +44,10 @@ Major direct runtime dependencies include:
 | --- | --- |
 | CPython | Python Software Foundation License |
 | PyTorch and TorchAudio | BSD-style licenses |
-| Transformers, Hugging Face Hub, Python Multipart, ModelScope, Datasets, WeText, Spaces, Safetensors | Apache-2.0 |
+| Transformers, Hugging Face Hub, Python Multipart, ModelScope, Datasets, WeText, Spaces, Safetensors, SSML-H Tools | Apache-2.0 |
 | FastAPI, Pydantic, Einops, Inflect, Addict | MIT-style licenses |
 | Uvicorn, SoundFile, NumPy | BSD and other permissive licenses |
+| defusedxml | Python Software Foundation License |
 | Librosa | ISC |
 | tqdm | MPL-2.0 and MIT |
 | simplejson | MIT or AFL-2.1 |
