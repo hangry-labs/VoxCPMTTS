@@ -408,5 +408,9 @@
   "timestamps.segments": "分段",
   "timestamps.title": "语音时间轴",
   "timestamps.unavailable": "不可用",
-  "timestamps.words": "词语"
+  "timestamps.words": "词语",
+  "updates.releaseAvailable": "有新版本可用",
+  "updates.releaseTitle": "打开最新的 VoxCPMTTS 版本",
+  "updates.snapshotAvailable": "有新的快照构建可用",
+  "updates.snapshotTitle": "查看更新的快照源代码"
 }

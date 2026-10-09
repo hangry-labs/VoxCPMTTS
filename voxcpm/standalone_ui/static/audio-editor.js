@@ -98,6 +98,7 @@ export class AudioEditor {
     this.trimRange = this.container.querySelector('[data-role="trim-range"]')
     if (!navigator.share) this.container.querySelector('[data-action="share"]').hidden = true
 
+    const waveformHeight = Number.parseFloat(getComputedStyle(this.waveformElement).height) || 104
     this.regions = Regions.create()
     this.wave = WaveSurfer.create({
       container: this.waveformElement,
@@ -105,7 +106,7 @@ export class AudioEditor {
       progressColor: '#ff7a1a',
       cursorColor: '#f7f7f8',
       cursorWidth: 1,
-      height: 132,
+      height: waveformHeight,
       barWidth: 3,
       barGap: 2,
       barRadius: 2,

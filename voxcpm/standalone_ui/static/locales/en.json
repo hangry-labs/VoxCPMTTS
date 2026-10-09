@@ -438,5 +438,9 @@
   "languages.tagalog": "Tagalog",
   "languages.thai": "Thai",
   "languages.turkish": "Turkish",
-  "languages.vietnamese": "Vietnamese"
+  "languages.vietnamese": "Vietnamese",
+  "updates.releaseAvailable": "New version available",
+  "updates.releaseTitle": "Open the latest VoxCPMTTS release",
+  "updates.snapshotAvailable": "New snapshot build",
+  "updates.snapshotTitle": "View the newer snapshot source"
 }

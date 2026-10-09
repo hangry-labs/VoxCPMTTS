@@ -69,9 +69,13 @@ def test_static_workspace_and_assets_are_available() -> None:
                     "/zh",
                     "/es",
                     "/static/app.js",
+                    "/static/dialogue-script-library.js",
                     "/static/i18n.js",
                     "/static/magic-editor.js",
                     "/static/magic-document.js",
+                    "/static/gpu-monitor.js",
+                    "/static/streaming-player.js",
+                    "/static/version-check.js",
                     "/static/styles.css",
                     "/static/audio-editor.js",
                     "/static/locales/en.json",
@@ -89,6 +93,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "voxcpmtts_logo_horizontal.webp" in responses["/"].text
     assert 'src="/assets/voxcpmtts_mascot.webp"' in responses["/"].text
     assert "UI v" not in responses["/"].text
+    assert 'id="version-update"' in responses["/"].text
     assert 'data-tab="clone"' in responses["/"].text
     assert 'data-i18n="tabs.design">Design</button>' in responses["/"].text
     assert 'data-tab="stream"' not in responses["/"].text
@@ -165,24 +170,34 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert responses["/system/gpu"].headers["cache-control"] == "no-store"
 
     script = responses["/static/app.js"].text
+    streaming_player = responses["/static/streaming-player.js"].text
+    gpu_monitor = responses["/static/gpu-monitor.js"].text
+    version_check = responses["/static/version-check.js"].text
+    script_library = responses["/static/dialogue-script-library.js"].text
     assert "IncrementalAudioPlayback" in script
     assert "response.body.getReader()" in script
     assert "await playback.append(value)" in script
     assert "startActivityPolling('stream')" in script
     assert "workflow === 'stream' ? 'generate' : workflow" in script
-    assert "class StreamWaveform" in script
+    assert "class StreamWaveform" in streaming_player
+    assert "class IncrementalAudioPlayback" in streaming_player
     assert "fetchJson('/tts/activity'" in script
-    assert "GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000" in script
-    assert "function renderGpuMonitor(" in script
-    assert "function stopGpuMonitor(" in script
+    assert "HISTORY_RETENTION_MS = 10 * 60 * 1000" in gpu_monitor
+    assert "export class GpuMonitor" in gpu_monitor
+    assert "sessionStorage.setItem(SESSION_KEY" in gpu_monitor
+    assert "export class VersionCheck" in version_check
+    assert "export function determineUpdate" in version_check
+    assert "releases?per_page=10" in version_check
+    assert "actions/workflows/docker-build.yml/runs?branch=main&status=success&per_page=1" in version_check
     assert "inputDrafts: { text: null, ssml: null, 'ssml-h': null }" in script
     assert "state.inputType === 'magic' ? 'ssml-h' : state.inputType" in script
     assert "async function generateMagicPreview(" in script
     assert "async function openMagicCharacterDialog(" in script
     assert "magicEditor.markFullGeneration" in script
-    assert "fetchJson('/tts/dialogue-scripts')" in script
-    assert "magicEditor.loadSSMLH" in script
-    assert "downloadDocument" in script
+    assert "export class DialogueScriptLibrary" in script_library
+    assert "this.fetchJson('/tts/dialogue-scripts')" in script_library
+    assert "this.magicEditor.loadSSMLH" in script_library
+    assert "downloadDocument" in script_library
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
@@ -193,14 +208,18 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "function generatedVoiceRecipe(" in script
     assert "async function processDesignedVoice(" in script
     assert "requestPostProcessedAudio" in script
+    assert "referenceAudio.load(generatedReference" not in script
+    assert "$('#reference-text').value = payload.text" not in script
     assert "sample_text: payload.text" in script
     assert "design_reference_audio" in script
     assert "profile.tags" in script
+    audio_editor = responses["/static/audio-editor.js"].text
+    assert "getComputedStyle(this.waveformElement).height" in audio_editor
+    assert "height: waveformHeight" in audio_editor
     assert "portraitFile" in script
     assert "metadataOnly" in script
     assert "Update details" in script
     assert "async function loadProfileReference(" in script
-    assert "sessionStorage.setItem(GPU_SESSION_KEY" in script
 
 
 def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
@@ -209,7 +228,11 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
     source = "\n".join(
         (
             (static_dir / "app.js").read_text(encoding="utf-8"),
+            (static_dir / "dialogue-script-library.js").read_text(encoding="utf-8"),
             (static_dir / "magic-editor.js").read_text(encoding="utf-8"),
+            (static_dir / "gpu-monitor.js").read_text(encoding="utf-8"),
+            (static_dir / "streaming-player.js").read_text(encoding="utf-8"),
+            (static_dir / "version-check.js").read_text(encoding="utf-8"),
             (static_dir / "index.html").read_text(encoding="utf-8"),
         )
     )

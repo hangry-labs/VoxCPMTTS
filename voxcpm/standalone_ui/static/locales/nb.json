@@ -408,5 +408,9 @@
   "timestamps.segments": "Segmenter",
   "timestamps.title": "Tidsmarkering av tale",
   "timestamps.unavailable": "Utilgjengelig",
-  "timestamps.words": "Ord"
+  "timestamps.words": "Ord",
+  "updates.releaseAvailable": "Ny versjon tilgjengelig",
+  "updates.releaseTitle": "Åpne den nyeste VoxCPMTTS-versjonen",
+  "updates.snapshotAvailable": "Ny øyeblikksbygging",
+  "updates.snapshotTitle": "Vis kilden til den nyere øyeblikksbyggingen"
 }

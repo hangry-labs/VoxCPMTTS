@@ -408,5 +408,9 @@
   "timestamps.segments": "セグメント",
   "timestamps.title": "音声タイミング",
   "timestamps.unavailable": "利用不可",
-  "timestamps.words": "単語"
+  "timestamps.words": "単語",
+  "updates.releaseAvailable": "新しいバージョンがあります",
+  "updates.releaseTitle": "最新の VoxCPMTTS リリースを開く",
+  "updates.snapshotAvailable": "新しいスナップショットビルドがあります",
+  "updates.snapshotTitle": "新しいスナップショットのソースを表示"
 }

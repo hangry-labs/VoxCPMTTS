@@ -47,7 +47,10 @@
     <div class="runtime-badge" id="runtime-badge" data-state="starting">
       <i class="icon-activity"></i>
       <div class="runtime-copy"><strong id="runtime-state" data-i18n="runtime.starting">Inference starting</strong><span id="runtime-model" data-i18n="runtime.waiting">Waiting for inference service</span></div>
-      <a class="runtime-version" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" title="Open VoxCPMTTS releases" data-i18n-title="runtime.openReleases">v{{UI_VERSION}}</a>
+      <div class="runtime-version-group">
+        <a class="runtime-version" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" title="Open VoxCPMTTS releases" data-i18n-title="runtime.openReleases">v{{UI_VERSION}}</a>
+        <a class="version-update" id="version-update" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" hidden><i class="icon-refresh-cw"></i><span></span></a>
+      </div>
     </div>
     <button class="hero-toggle" id="hero-toggle" type="button" aria-controls="brand-hero" aria-expanded="true" aria-label="Collapse header" title="Collapse header" data-i18n-aria-label="hero.collapse" data-i18n-title="hero.collapse"><i class="icon-chevron-up"></i></button>
   </header>

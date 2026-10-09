@@ -1,7 +1,11 @@
 import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
-import { AudioEditor } from './audio-editor.js'
+import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
+import { DialogueScriptLibrary } from './dialogue-script-library.js?v=app-organization'
+import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
 import { MagicEditor } from './magic-editor.js'
+import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
+import { VersionCheck } from './version-check.js?v=published-builds'
 
 await initializeI18n()
 
@@ -9,9 +13,6 @@ const $ = (selector, root = document) => root.querySelector(selector)
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)]
 
 const UI_SESSION_KEY = 'voxcpmtts-ui-state-v1'
-const GPU_SESSION_KEY = 'voxcpmtts-gpu-history-v1'
-const GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000
-const GPU_POLL_INTERVAL_MS = 1000
 const MAX_GENERATED_REFERENCE_CHARACTERS = 320
 const POST_PROCESSING_PRESETS = {
   clean: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: true },
@@ -72,17 +73,6 @@ const RECORDER_LABELS = {
   readyWithTime: t('record.readyWithTime', {}, 'Recording ready · {time}'),
   unavailable: t('record.unavailable', {}, 'Microphone recording requires a supported browser and secure connection.'),
 }
-const GPU_METRICS = [
-  { key: 'utilization', label: t('gpu.metric.gpu', {}, 'GPU utilization'), color: '#ff7a1a' },
-  { key: 'memory_utilization', label: t('gpu.metric.memoryActivity', {}, 'Memory activity'), color: '#c586c0' },
-  { key: 'memory_used', label: t('gpu.metric.vram', {}, 'VRAM'), color: '#72a7ff' },
-  { key: 'temperature', label: t('gpu.metric.temperature', {}, 'Temperature'), color: '#ef6b73' },
-  { key: 'power', label: t('gpu.metric.power', {}, 'Power'), color: '#f2c94c' },
-  { key: 'fan_speed', label: t('gpu.metric.fan', {}, 'Fan'), color: '#55c58a' },
-  { key: 'graphics_clock', label: t('gpu.metric.graphicsClock', {}, 'Graphics clock'), color: '#9cdcfe' },
-  { key: 'memory_clock', label: t('gpu.metric.memoryClock', {}, 'Memory clock'), color: '#ce9178' },
-]
-
 const state = {
   activeTab: 'generate',
   generationMode: 'generate',
@@ -92,24 +82,12 @@ const state = {
   streamAbort: null,
   streamPlayback: null,
   sampleIndex: 0,
-  gpuHistory: new Map(),
-  gpuStats: [],
-  gpuWindowMs: 60 * 1000,
-  gpuTimer: null,
-  gpuRefreshActive: false,
-  gpuHovering: false,
   formats: {},
   streamFormats: {},
   ssmlCapabilities: {},
   defaults: {},
   status: {},
   profiles: [],
-  scripts: [],
-  activeScript: null,
-  scriptDirty: false,
-  pendingDeleteScript: null,
-  editingScriptDetails: null,
-  suppressScriptDirty: false,
   designSource: 'reference',
   cloneMode: 'reference',
   loadingProfile: false,
@@ -192,6 +170,17 @@ const referenceRecorder = new AudioRecorder({
   onFile: (file) => referenceAudio.load(file, file.name),
   onError: (error) => showToast(errorMessage(error)),
 })
+const gpuMonitor = new GpuMonitor($('#gpu-output'), { fetchJson })
+const versionCheck = new VersionCheck($('#version-update'))
+const dialogueScripts = new DialogueScriptLibrary({
+  magicEditor,
+  fetchJson,
+  showToast,
+  errorMessage,
+  getInputType: () => state.inputType,
+  setInputType,
+  onDocumentChange: (documentText) => { state.inputDrafts['ssml-h'] = documentText },
+})
 
 for (const editor of [generateOutput, cloneOutput, cloneProcessedOutput, streamOutput, referenceAudio]) {
   editor.container.addEventListener('audio-error', (event) => showToast(errorMessage(event.detail)))
@@ -238,7 +227,6 @@ function persistUiState() {
       activeTab: state.activeTab,
       generationMode: state.generationMode,
       headerCollapsed: state.headerCollapsed,
-      gpuWindowMs: state.gpuWindowMs,
       inputType: state.inputType,
       designSource: state.designSource,
       cloneMode: state.cloneMode,
@@ -252,18 +240,6 @@ function readSessionJson(key) {
   try { return JSON.parse(sessionStorage.getItem(key) || 'null') } catch { return null }
 }
 
-function persistGpuSession() {
-  try {
-    sessionStorage.setItem(GPU_SESSION_KEY, JSON.stringify({
-      savedAt: Date.now(),
-      stats: state.gpuStats,
-      history: Object.fromEntries(state.gpuHistory),
-    }))
-  } catch {
-    // Monitoring continues in memory when session storage is unavailable.
-  }
-}
-
 function restoreSessionState() {
   const ui = readSessionJson(UI_SESSION_KEY)
   if (['generate', 'clone', 'api', 'system'].includes(ui?.activeTab)) {
@@ -274,21 +250,9 @@ function restoreSessionState() {
   }
   if (['generate', 'stream'].includes(ui?.generationMode)) state.generationMode = ui.generationMode
   if (typeof ui?.headerCollapsed === 'boolean') state.headerCollapsed = ui.headerCollapsed
-  if ([60 * 1000, 10 * 60 * 1000].includes(ui?.gpuWindowMs)) state.gpuWindowMs = ui.gpuWindowMs
   if (['magic', 'text', 'ssml', 'ssml-h'].includes(ui?.inputType)) state.inputType = ui.inputType
   if (['reference', 'direction'].includes(ui?.designSource)) state.designSource = ui.designSource
   if (['reference', 'transcript'].includes(ui?.cloneMode)) state.cloneMode = ui.cloneMode
-
-  const cached = readSessionJson(GPU_SESSION_KEY)
-  const cutoff = Date.now() - GPU_HISTORY_RETENTION_MS
-  if (!cached || !Number.isFinite(cached.savedAt) || cached.savedAt < cutoff) return
-  if (Array.isArray(cached.stats)) state.gpuStats = cached.stats
-  Object.entries(cached.history || {}).forEach(([index, samples]) => {
-    const recent = Array.isArray(samples)
-      ? samples.filter((sample) => Number.isFinite(sample?.timestamp) && sample.timestamp >= cutoff)
-      : []
-    if (recent.length) state.gpuHistory.set(Number(index), recent)
-  })
 }
 
 function escapeHtml(value) {
@@ -339,16 +303,11 @@ function setInputType(inputType, { syncSsmlH = true } = {}) {
   const currentType = state.inputType
   if (currentType !== 'magic') state.inputDrafts[currentType] = editor.value
   if (currentType === 'ssml-h' && inputType === 'magic' && syncSsmlH) {
-    const dirty = state.scriptDirty
     try {
-      state.suppressScriptDirty = true
-      magicEditor.loadSSMLH(editor.value)
-      state.scriptDirty = dirty
+      dialogueScripts.runWithoutDirty(() => magicEditor.loadSSMLH(editor.value))
     } catch (error) {
       showToast(errorMessage(error))
       return
-    } finally {
-      state.suppressScriptDirty = false
     }
   }
   if (currentType === 'magic' && inputType === 'ssml-h') {
@@ -379,204 +338,8 @@ function setInputType(inputType, { syncSsmlH = true } = {}) {
 
 function handleMagicChange(editorInstance) {
   state.inputDrafts['ssml-h'] = editorInstance.toSSMLH()
-  if (!state.suppressScriptDirty && state.activeScript) {
-    state.scriptDirty = true
-    renderScriptLibrary()
-  }
+  dialogueScripts?.markDirty()
   updateMetrics()
-}
-
-function normalizedScriptName(value) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^[-_]+|[-_]+$/g, '').slice(0, 80)
-}
-
-function renderScriptSaveState() {
-  const scriptId = normalizedScriptName($('#script-name').value)
-  const updating = Boolean(scriptId && scriptId === state.activeScript?.id)
-  $('#script-save').hidden = !scriptId
-  const label = $('span', $('#script-save'))
-  label.textContent = updating ? t('scripts.updateShort', {}, 'Update') : t('scripts.saveShort', {}, 'Save')
-}
-
-function renderScriptLibrary() {
-  const query = $('#script-filter').value.trim().toLowerCase()
-  const scripts = state.scripts
-    .filter((script) => !query || [script.name, script.description || '', ...(script.tags || [])].join(' ').toLowerCase().includes(query))
-    .sort((left, right) => {
-      if (left.id === state.activeScript?.id) return -1
-      if (right.id === state.activeScript?.id) return 1
-      return left.name.localeCompare(right.name)
-    })
-  $('#script-count').textContent = String(state.scripts.length)
-  $('#script-list').innerHTML = scripts.length
-    ? scripts.map((script) => {
-      const active = script.id === state.activeScript?.id
-      return `
-        <article class="script-card${active ? ' active' : ''}" data-script-id="${escapeHtml(script.id)}">
-          <div class="script-card-copy">
-            <strong>${escapeHtml(script.name)}${active && state.scriptDirty ? `<span class="script-dirty-badge">${escapeHtml(t('scripts.unsaved', {}, 'Unsaved changes'))}</span>` : ''}</strong>
-            <span>${escapeHtml(script.description || t('scripts.storedDialogue', {}, 'Stored SSML-H dialogue'))}</span>
-            <div class="script-card-metadata">
-              <span>${escapeHtml(t('scripts.turnCount', { count: script.turns }, `${script.turns} turns`))}</span>
-              <span>${escapeHtml(t('scripts.wordCount', { count: script.words }, `${script.words} words`))}</span>
-              ${(script.tags || []).map((tag) => `<span>#${escapeHtml(tag)}</span>`).join('')}
-            </div>
-          </div>
-          <div class="script-card-actions">
-            <button class="secondary-button" type="button" data-script-action="use" ${active ? 'disabled' : ''}>${active ? `<i class="icon-check"></i><span>${escapeHtml(t('scripts.selected', {}, 'Selected'))}</span>` : `<i class="icon-book-open"></i><span>${escapeHtml(t('scripts.use', {}, 'Use script'))}</span>`}</button>
-            <button class="icon-button bordered" type="button" data-script-action="edit" title="${escapeHtml(t('scripts.editNamed', { name: script.name }, `Edit ${script.name}`))}" aria-label="${escapeHtml(t('scripts.editNamed', { name: script.name }, `Edit ${script.name}`))}"><i class="icon-sliders-horizontal"></i></button>
-            <button class="icon-button bordered danger-icon" type="button" data-script-action="delete" title="${escapeHtml(t('common.delete', {}, 'Delete'))}" aria-label="${escapeHtml(t('scripts.deleteNamed', { name: script.name }, `Delete ${script.name}`))}"><i class="icon-x"></i></button>
-          </div>
-        </article>`
-    }).join('')
-    : `<div class="script-empty">${escapeHtml(t(query ? 'scripts.noMatches' : 'scripts.empty', {}, query ? 'No matching scripts.' : 'No saved scripts yet.'))}</div>`
-  renderScriptSaveState()
-}
-
-async function refreshScripts(selectedId = state.activeScript?.id) {
-  const payload = await fetchJson('/tts/dialogue-scripts')
-  state.scripts = payload.data || []
-  if (selectedId) state.activeScript = state.scripts.find((script) => script.id === selectedId) || null
-  renderScriptLibrary()
-}
-
-function currentScriptDocument() {
-  if (state.inputType === 'ssml-h') {
-    const dirty = state.scriptDirty
-    state.suppressScriptDirty = true
-    try {
-      magicEditor.loadSSMLH($('#text-input').value)
-      state.scriptDirty = dirty
-    } finally {
-      state.suppressScriptDirty = false
-    }
-  }
-  return magicEditor.toSSMLH()
-}
-
-function downloadDocument(documentText, filename) {
-  const url = URL.createObjectURL(new Blob([documentText], { type: 'application/ssml+xml;charset=utf-8' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.append(link)
-  link.click()
-  link.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
-}
-
-function downloadCurrentScript() {
-  try {
-    const documentText = currentScriptDocument()
-    const name = state.activeScript?.id || normalizedScriptName($('#script-name').value) || 'voxcpm-dialogue'
-    downloadDocument(documentText, `${name}.ssml`)
-  } catch (error) {
-    showToast(errorMessage(error))
-  }
-}
-
-function startNewScript() {
-  state.activeScript = null
-  state.scriptDirty = false
-  $('#script-name').value = ''
-  setInputType('magic', { syncSsmlH: false })
-  state.suppressScriptDirty = true
-  magicEditor.newDocument()
-  state.suppressScriptDirty = false
-  state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
-  renderScriptLibrary()
-  magicEditor.canvas.querySelector('textarea')?.focus()
-}
-
-async function loadSavedScript(scriptId) {
-  const record = await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(scriptId)}`)
-  setInputType('magic', { syncSsmlH: false })
-  state.suppressScriptDirty = true
-  try {
-    magicEditor.loadSSMLH(record.document)
-  } finally {
-    state.suppressScriptDirty = false
-  }
-  state.activeScript = record
-  state.scriptDirty = false
-  $('#script-name').value = record.name
-  state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
-  renderScriptLibrary()
-  showToast(t('scripts.loaded', { name: record.name }, `Loaded ${record.name}.`), 'success')
-}
-
-async function persistCurrentScript({ overwrite = false } = {}) {
-  const name = $('#script-name').value.trim()
-  if (!normalizedScriptName(name)) throw new Error(t('scripts.nameRequired', {}, 'Enter a script name before saving.'))
-  const documentText = currentScriptDocument()
-  const path = overwrite ? `/tts/dialogue-scripts/${encodeURIComponent(state.activeScript.id)}` : '/tts/dialogue-scripts'
-  const saved = await fetchJson(path, {
-    method: overwrite ? 'PUT' : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name,
-      document: documentText,
-      description: state.activeScript?.description || '',
-      tags: state.activeScript?.tags || [],
-    }),
-  })
-  state.activeScript = saved
-  state.scriptDirty = false
-  $('#script-name').value = saved.name
-  await refreshScripts(saved.id)
-  showToast(t(overwrite ? 'scripts.updatedNamed' : 'scripts.savedNamed', { name: saved.name }, `${overwrite ? 'Updated' : 'Saved'} ${saved.name}.`), 'success')
-}
-
-async function openEditScriptDialog(script) {
-  const record = await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(script.id)}`)
-  state.editingScriptDetails = record
-  $('#edit-script-name').textContent = record.name
-  $('#edit-script-tags').value = (record.tags || []).join(', ')
-  $('#edit-script-description').value = record.description || ''
-  $('#edit-script-dialog').showModal()
-}
-
-function closeEditScriptDialog() {
-  $('#edit-script-dialog').close()
-  state.editingScriptDetails = null
-}
-
-async function updateScriptDetails() {
-  const record = state.editingScriptDetails
-  if (!record) return
-  const saved = await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(record.id)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: record.name,
-      document: record.document,
-      description: $('#edit-script-description').value.trim(),
-      tags: commaSeparatedTags($('#edit-script-tags').value),
-    }),
-  })
-  if (state.activeScript?.id === saved.id) state.activeScript = saved
-  closeEditScriptDialog()
-  await refreshScripts(state.activeScript?.id)
-  showToast(t('scripts.detailsUpdatedNamed', { name: saved.name }, `Updated ${saved.name} details.`), 'success')
-}
-
-async function importScriptFile(file) {
-  if (!file) return
-  if (file.size > 1_000_000) throw new Error(t('scripts.importSize', {}, 'SSML-H scripts must be 1 MB or smaller.'))
-  const source = await file.text()
-  state.activeScript = null
-  state.scriptDirty = false
-  setInputType('magic', { syncSsmlH: false })
-  state.suppressScriptDirty = true
-  try {
-    magicEditor.loadSSMLH(source)
-  } finally {
-    state.suppressScriptDirty = false
-  }
-  $('#script-name').value = file.name.replace(/\.(ssml|xml)$/i, '').slice(0, 80)
-  state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
-  renderScriptLibrary()
-  showToast(t('scripts.imported', { name: file.name }, `Imported ${file.name}.`), 'success')
 }
 
 function setGenerationMode(mode, { persist = true } = {}) {
@@ -1344,13 +1107,8 @@ async function generateAudio(workflow = 'generate') {
       state.selectedCloneVersion = 'original'
       $('#voice-finishing').hidden = false
       selectCloneVersion('original')
-      const generatedReference = new File(
-        [blob],
-        `designed-voice.${extension}`,
-        { type: blob.type || 'application/octet-stream' },
-      )
-      await referenceAudio.load(generatedReference, generatedReference.name)
-      $('#reference-text').value = payload.text
+      // Generated audio is a replacement candidate, not conditioning for the next preview.
+      // Keep the loaded reference and transcript stable across repeated generations.
       renderVoiceSaveState()
       updateDesignCompletion()
     }
@@ -1371,176 +1129,7 @@ async function generateAudio(workflow = 'generate') {
   }
 }
 
-class StreamWaveform {
-  constructor(canvas, surface, stateElement, detailElement) {
-    this.canvas = canvas
-    this.surface = surface
-    this.stateElement = stateElement
-    this.detailElement = detailElement
-    this.peaks = []
-    this.animationFrame = null
-    this.totalBytes = 0
-    this.drawIdle()
-  }
-
-  async attach(audio) {
-    this.stopAudioGraph()
-    this.surface.hidden = false
-    this.stateElement.textContent = t('stream.waitingFirst', {}, 'Waiting for first audio chunk')
-    this.detailElement.textContent = t('stream.buffered', { size: 0 }, '0 KiB buffered')
-    this.peaks = []
-    this.audioContext = new AudioContext()
-    this.source = this.audioContext.createMediaElementSource(audio)
-    this.analyser = this.audioContext.createAnalyser()
-    this.analyser.fftSize = 1024
-    this.source.connect(this.analyser)
-    this.analyser.connect(this.audioContext.destination)
-    await this.audioContext.resume()
-    this.draw()
-  }
-
-  update(totalBytes, currentTime = 0) {
-    this.totalBytes = totalBytes
-    this.stateElement.textContent = totalBytes
-      ? t('stream.playing', {}, 'Playing generated speech')
-      : t('stream.waitingFirst', {}, 'Waiting for first audio chunk')
-    this.detailElement.textContent = t(
-      'stream.bufferedTime',
-      { size: (totalBytes / 1024).toFixed(0), time: formatClock(currentTime) },
-      `${(totalBytes / 1024).toFixed(0)} KiB buffered · ${formatClock(currentTime)}`,
-    )
-  }
-
-  draw() {
-    if (!this.analyser) return
-    const samples = new Uint8Array(this.analyser.fftSize)
-    this.analyser.getByteTimeDomainData(samples)
-    const peak = samples.reduce((maximum, sample) => Math.max(maximum, Math.abs(sample - 128) / 128), 0)
-    this.peaks.push(Math.max(0.025, peak))
-    const maximumPeaks = Math.max(80, Math.round(this.canvas.clientWidth / 3))
-    if (this.peaks.length > maximumPeaks) this.peaks.splice(0, this.peaks.length - maximumPeaks)
-    this.drawPeaks()
-    this.animationFrame = requestAnimationFrame(() => this.draw())
-  }
-
-  drawPeaks() {
-    const context = this.canvas.getContext('2d')
-    const ratio = window.devicePixelRatio || 1
-    const width = this.canvas.width = Math.max(1, Math.round(this.canvas.clientWidth * ratio))
-    const height = this.canvas.height = Math.max(1, Math.round(this.canvas.clientHeight * ratio))
-    context.clearRect(0, 0, width, height)
-    context.strokeStyle = '#2b2d33'
-    context.lineWidth = ratio
-    context.beginPath()
-    context.moveTo(0, height / 2)
-    context.lineTo(width, height / 2)
-    context.stroke()
-    if (!this.peaks.length) return
-    const spacing = width / Math.max(1, this.peaks.length)
-    context.strokeStyle = '#ff7a1a'
-    context.lineWidth = Math.max(ratio, spacing * 0.48)
-    context.beginPath()
-    this.peaks.forEach((value, index) => {
-      const x = (index + 0.5) * spacing
-      const amplitude = Math.max(2 * ratio, value * height * 0.44)
-      context.moveTo(x, height / 2 - amplitude)
-      context.lineTo(x, height / 2 + amplitude)
-    })
-    context.stroke()
-  }
-
-  complete() {
-    this.stateElement.textContent = t('status.streamComplete', {}, 'Stream complete')
-    this.detailElement.textContent = t('stream.received', { size: (this.totalBytes / 1024).toFixed(0) }, `${(this.totalBytes / 1024).toFixed(0)} KiB received`)
-  }
-
-  hide() {
-    this.surface.hidden = true
-    this.stopAudioGraph()
-  }
-
-  stopAudioGraph() {
-    cancelAnimationFrame(this.animationFrame)
-    this.source?.disconnect()
-    this.analyser?.disconnect()
-    if (this.audioContext?.state !== 'closed') this.audioContext?.close().catch(() => {})
-    this.audioContext = null
-    this.source = null
-    this.analyser = null
-    this.animationFrame = null
-  }
-
-  drawIdle() {
-    this.peaks = []
-    this.drawPeaks()
-  }
-}
-
-function formatClock(seconds) {
-  const safe = Math.max(0, Number(seconds) || 0)
-  return `${Math.floor(safe / 60)}:${Math.floor(safe % 60).toString().padStart(2, '0')}`
-}
-
 const streamWaveform = new StreamWaveform($('#stream-live-wave'), $('#stream-live'), $('#stream-live-state'), $('#stream-live-detail'))
-
-class IncrementalAudioPlayback {
-  static async create(visualizer) {
-    if (!window.MediaSource || !MediaSource.isTypeSupported('audio/mpeg')) return null
-    const mediaSource = new MediaSource()
-    const objectUrl = URL.createObjectURL(mediaSource)
-    const audio = new Audio(objectUrl)
-    await new Promise((resolve, reject) => {
-      mediaSource.addEventListener('sourceopen', resolve, { once: true })
-      mediaSource.addEventListener('error', reject, { once: true })
-    })
-    try {
-      const playback = new IncrementalAudioPlayback(mediaSource, audio, objectUrl)
-      await visualizer.attach(audio)
-      return playback
-    } catch {
-      URL.revokeObjectURL(objectUrl)
-      return null
-    }
-  }
-
-  constructor(mediaSource, audio, objectUrl) {
-    this.mediaSource = mediaSource
-    this.audio = audio
-    this.objectUrl = objectUrl
-    this.sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg')
-    this.queue = Promise.resolve()
-    this.started = false
-  }
-
-  append(chunk) {
-    const bytes = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength)
-    this.queue = this.queue.then(() => new Promise((resolve, reject) => {
-      const done = () => { this.sourceBuffer.removeEventListener('error', failed); resolve() }
-      const failed = () => { this.sourceBuffer.removeEventListener('updateend', done); reject(new Error(t('errors.streamBuffer', {}, 'Browser could not buffer streamed MP3 audio.'))) }
-      this.sourceBuffer.addEventListener('updateend', done, { once: true })
-      this.sourceBuffer.addEventListener('error', failed, { once: true })
-      this.sourceBuffer.appendBuffer(bytes)
-    })).then(() => {
-      if (!this.started) { this.started = true; this.audio.play().catch(() => {}) }
-    })
-    return this.queue
-  }
-
-  async finish() {
-    await this.queue
-    if (this.mediaSource.readyState === 'open') this.mediaSource.endOfStream()
-  }
-
-  currentTime() { return this.audio.currentTime || 0 }
-
-  stop() {
-    this.audio.pause()
-    if (this.mediaSource.readyState === 'open') {
-      try { this.mediaSource.endOfStream() } catch {}
-    }
-    URL.revokeObjectURL(this.objectUrl)
-  }
-}
 
 async function streamAudio() {
   const controller = new AbortController()
@@ -2018,258 +1607,6 @@ async function refreshApi() {
   $('#capabilities-output').textContent = JSON.stringify({ defaults, formats, languages, voices }, null, 2)
 }
 
-function element(tag, className, text) {
-  const node = document.createElement(tag)
-  if (className) node.className = className
-  if (text !== undefined) node.textContent = text
-  return node
-}
-
-function gpuHistoryPoints(samples, now, windowMs, metricKey, maximum, width = 300, height = 70) {
-  const windowStart = now - windowMs
-  return samples.filter((sample) => Number.isFinite(sample[metricKey])).map((sample) => {
-    const x = Math.min(width, Math.max(0, (sample.timestamp - windowStart) / windowMs * width))
-    const y = height - (Math.min(maximum, Math.max(0, sample[metricKey])) / maximum * height)
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  }).join(' ')
-}
-
-function addGpuChartGrid(svg, width, height) {
-  for (let column = 0; column <= 10; column += 1) {
-    const x = column * width / 10
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-    line.setAttribute('class', 'gpu-grid-line')
-    line.setAttribute('x1', String(x))
-    line.setAttribute('x2', String(x))
-    line.setAttribute('y1', '0')
-    line.setAttribute('y2', String(height))
-    svg.append(line)
-  }
-  for (let row = 0; row <= 4; row += 1) {
-    const y = row * height / 4
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-    line.setAttribute('class', 'gpu-grid-line')
-    line.setAttribute('x1', '0')
-    line.setAttribute('x2', String(width))
-    line.setAttribute('y1', String(y))
-    line.setAttribute('y2', String(y))
-    svg.append(line)
-  }
-}
-
-function mergeGpuHistory(historyPayload) {
-  const cutoff = Date.now() - GPU_HISTORY_RETENTION_MS
-  Object.entries(historyPayload || {}).forEach(([index, incoming]) => {
-    if (!Array.isArray(incoming)) return
-    const byTimestamp = new Map()
-    ;[...(state.gpuHistory.get(Number(index)) || []), ...incoming].forEach((sample) => {
-      if (Number.isFinite(sample?.timestamp) && sample.timestamp >= cutoff) byTimestamp.set(sample.timestamp, sample)
-    })
-    const merged = [...byTimestamp.values()].sort((left, right) => left.timestamp - right.timestamp)
-    if (merged.length) state.gpuHistory.set(Number(index), merged)
-  })
-  state.gpuHistory.forEach((samples, index) => {
-    const recent = samples.filter((sample) => sample.timestamp >= cutoff)
-    if (recent.length) state.gpuHistory.set(index, recent)
-    else state.gpuHistory.delete(index)
-  })
-  persistGpuSession()
-}
-
-function gpuMetricMaximum(metric, gpu, history) {
-  const observed = Math.max(1, ...history.map((sample) => sample[metric.key] || 0))
-  if (['utilization', 'memory_utilization', 'temperature', 'fan_speed'].includes(metric.key)) return 100
-  if (metric.key === 'memory_used' && Number.isFinite(gpu.memory_total)) return Math.max(1, gpu.memory_total)
-  if (metric.key === 'power' && Number.isFinite(gpu.power_limit)) return Math.max(1, gpu.power_limit)
-  if (metric.key === 'graphics_clock' && Number.isFinite(gpu.graphics_clock_max)) return Math.max(1, gpu.graphics_clock_max)
-  if (metric.key === 'memory_clock' && Number.isFinite(gpu.memory_clock_max)) return Math.max(1, gpu.memory_clock_max)
-  return Math.ceil(observed * 1.1)
-}
-
-function formatGpuMetric(metric, value) {
-  if (!Number.isFinite(value)) return 'N/A'
-  if (['utilization', 'memory_utilization', 'fan_speed'].includes(metric.key)) return `${Math.round(value)}%`
-  if (metric.key === 'memory_used') return `${(value / 1024).toFixed(1)} GB`
-  if (metric.key === 'temperature') return `${Math.round(value)} C`
-  if (metric.key === 'power') return `${Math.round(value)} W`
-  return `${Math.round(value)} MHz`
-}
-
-function attachGpuChartHover(plot, samples, metric, now) {
-  const line = element('div', 'gpu-hover-line')
-  const tooltip = element('div', 'gpu-hover-tooltip')
-  line.hidden = true
-  tooltip.hidden = true
-  plot.append(line, tooltip)
-  plot.addEventListener('pointermove', (event) => {
-    state.gpuHovering = true
-    const bounds = plot.getBoundingClientRect()
-    const offset = Math.min(bounds.width, Math.max(0, event.clientX - bounds.left))
-    const ratio = bounds.width ? offset / bounds.width : 0
-    const targetTime = now - state.gpuWindowMs + (ratio * state.gpuWindowMs)
-    const nearest = samples.reduce((best, sample) => {
-      if (!best) return sample
-      return Math.abs(sample.timestamp - targetTime) < Math.abs(best.timestamp - targetTime) ? sample : best
-    }, null)
-    const tolerance = Math.max(1500, state.gpuWindowMs * 10 / Math.max(1, bounds.width))
-    const hasSample = nearest && Math.abs(nearest.timestamp - targetTime) <= tolerance
-    const shownTime = new Date(hasSample ? nearest.timestamp : targetTime).toLocaleTimeString(browserLanguage())
-    tooltip.textContent = hasSample
-      ? `${formatGpuMetric(metric, nearest[metric.key])} / ${shownTime}`
-      : t('gpu.noSampleAt', { time: shownTime }, `No sample / ${shownTime}`)
-    const percent = ratio * 100
-    line.style.left = `${percent}%`
-    tooltip.style.left = `${percent}%`
-    tooltip.classList.toggle('align-start', percent < 18)
-    tooltip.classList.toggle('align-end', percent > 82)
-    line.hidden = false
-    tooltip.hidden = false
-  })
-  plot.addEventListener('pointerleave', () => {
-    state.gpuHovering = false
-    line.hidden = true
-    tooltip.hidden = true
-    renderGpuMonitor(state.gpuStats)
-  })
-}
-
-function createGpuMetricChart(metric, gpu, history, now) {
-  const current = gpu[metric.key]
-  if (!Number.isFinite(current)) return null
-  const samples = history.filter((sample) => Number.isFinite(sample[metric.key]))
-  const maximum = gpuMetricMaximum(metric, gpu, samples)
-  const average = samples.length ? samples.reduce((total, sample) => total + sample[metric.key], 0) / samples.length : current
-  const peak = samples.length ? Math.max(...samples.map((sample) => sample[metric.key])) : current
-  const chart = element('div', 'gpu-metric-chart')
-  chart.style.setProperty('--chart-color', metric.color)
-  const chartScale = element('div', 'gpu-chart-scale')
-  chartScale.append(element('span', '', metric.label), element('strong', '', formatGpuMetric(metric, current)))
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  svg.setAttribute('class', 'gpu-sparkline')
-  svg.setAttribute('viewBox', '0 0 300 70')
-  svg.setAttribute('preserveAspectRatio', 'none')
-  svg.setAttribute('role', 'img')
-  svg.setAttribute('aria-label', t('gpu.historyLabel', {
-    metric: metric.label,
-    average: formatGpuMetric(metric, average),
-    peak: formatGpuMetric(metric, peak),
-  }, `${metric.label} history, average ${formatGpuMetric(metric, average)}, peak ${formatGpuMetric(metric, peak)}`))
-  addGpuChartGrid(svg, 300, 70)
-  const points = gpuHistoryPoints(samples, now, state.gpuWindowMs, metric.key, maximum)
-  if (samples.length > 1) {
-    const pointList = points.split(' ')
-    const area = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
-    area.setAttribute('class', 'gpu-chart-area')
-    area.setAttribute('points', `${pointList[0].split(',')[0]},70 ${points} ${pointList.at(-1).split(',')[0]},70`)
-    svg.append(area)
-  }
-  const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline')
-  polyline.setAttribute('class', 'gpu-chart-line')
-  polyline.setAttribute('points', points)
-  svg.append(polyline)
-  if (samples.length) {
-    const latest = points.split(' ').at(-1).split(',')
-    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
-    marker.setAttribute('class', 'gpu-chart-marker')
-    marker.setAttribute('cx', latest[0])
-    marker.setAttribute('cy', latest[1])
-    marker.setAttribute('r', '2.5')
-    svg.append(marker)
-  }
-  const plot = element('div', 'gpu-chart-plot')
-  plot.append(svg)
-  attachGpuChartHover(plot, samples, metric, now)
-  const axis = element('div', 'gpu-chart-axis')
-  axis.append(
-    element('span', '', state.gpuWindowMs === 60 * 1000 ? t('gpu.oneMinute', {}, '1 minute') : t('gpu.tenMinutes', {}, '10 minutes')),
-    element('span', '', t('gpu.averagePeak', {
-      average: formatGpuMetric(metric, average),
-      peak: formatGpuMetric(metric, peak),
-    }, `Average ${formatGpuMetric(metric, average)} · Peak ${formatGpuMetric(metric, peak)}`)),
-  )
-  chart.append(chartScale, plot, axis)
-  return chart
-}
-
-function renderGpuMonitor(gpus) {
-  const output = $('#gpu-output')
-  const monitor = element('div', 'gpu-monitor')
-  const heading = element('div', 'gpu-monitor-heading')
-  const title = element('div', 'gpu-monitor-title')
-  const icon = element('i', 'icon-activity')
-  title.append(icon, element('strong', '', t('gpu.telemetry', {}, 'GPU telemetry')))
-  const windowControl = element('div', 'gpu-window-control')
-  windowControl.setAttribute('role', 'group')
-  windowControl.setAttribute('aria-label', t('gpu.historyWindow', {}, 'GPU history window'))
-  ;[[60 * 1000, t('gpu.oneMinuteShort', {}, '1 min')], [10 * 60 * 1000, t('gpu.tenMinutesShort', {}, '10 min')]].forEach(([windowMs, label]) => {
-    const button = element('button', windowMs === state.gpuWindowMs ? 'active' : '', label)
-    button.type = 'button'
-    button.setAttribute('aria-pressed', String(windowMs === state.gpuWindowMs))
-    button.addEventListener('click', () => {
-      state.gpuWindowMs = windowMs
-      persistUiState()
-      renderGpuMonitor(state.gpuStats)
-    })
-    windowControl.append(button)
-  })
-  heading.append(title, windowControl)
-  monitor.append(heading)
-  if (!gpus.length) {
-    monitor.append(element('div', 'gpu-monitor-muted', t('gpu.unavailable', {}, 'GPU telemetry unavailable.')))
-    output.replaceChildren(monitor)
-    return
-  }
-
-  const grid = element('div', 'gpu-card-grid')
-  gpus.forEach((gpu) => {
-    const now = Date.now()
-    const history = (state.gpuHistory.get(gpu.index) || []).filter((sample) => sample.timestamp >= now - state.gpuWindowMs)
-    const card = element('article', 'gpu-card')
-    const cardHead = element('div', 'gpu-card-head')
-    cardHead.append(element('strong', '', `GPU ${gpu.index}`), element('span', '', gpu.name))
-    const metrics = element('div', 'gpu-metrics-grid')
-    GPU_METRICS.forEach((metric) => {
-      const chart = createGpuMetricChart(metric, gpu, history, now)
-      if (chart) metrics.append(chart)
-    })
-    const details = element('div', 'gpu-live-details')
-    if (gpu.performance_state) details.append(element('span', '', t('gpu.state', { state: gpu.performance_state }, `State ${gpu.performance_state}`)))
-    if (Number.isFinite(gpu.pcie_generation) && Number.isFinite(gpu.pcie_width)) details.append(element('span', '', `PCIe Gen ${gpu.pcie_generation} x${gpu.pcie_width}`))
-    if (Number.isFinite(gpu.power_limit)) details.append(element('span', '', t('gpu.powerLimit', { power: Math.round(gpu.power_limit) }, `Power limit ${Math.round(gpu.power_limit)} W`)))
-    card.append(cardHead, metrics, details)
-    grid.append(card)
-  })
-  monitor.append(grid)
-  output.replaceChildren(monitor)
-}
-
-async function refreshGpuMonitor() {
-  if (state.gpuRefreshActive) return
-  state.gpuRefreshActive = true
-  try {
-    const payload = await fetchJson('/system/gpu')
-    state.gpuStats = Array.isArray(payload.gpus) ? payload.gpus : []
-    mergeGpuHistory(payload.history)
-    if (!state.gpuHovering) renderGpuMonitor(state.gpuStats)
-  } catch {
-    if (!state.gpuHovering) renderGpuMonitor(state.gpuStats)
-  } finally {
-    state.gpuRefreshActive = false
-  }
-}
-
-function startGpuMonitor() {
-  if (state.gpuTimer || document.hidden) return
-  if (state.gpuStats.length) renderGpuMonitor(state.gpuStats)
-  refreshGpuMonitor()
-  state.gpuTimer = setInterval(refreshGpuMonitor, GPU_POLL_INTERVAL_MS)
-}
-
-function stopGpuMonitor() {
-  clearInterval(state.gpuTimer)
-  state.gpuTimer = null
-}
-
 async function refreshSystemStatus() {
   try {
     const status = await fetchJson('/tts/status')
@@ -2280,7 +1617,7 @@ async function refreshSystemStatus() {
 }
 
 async function refreshSystem() {
-  await Promise.all([refreshSystemStatus(), refreshGpuMonitor()])
+  await Promise.all([refreshSystemStatus(), gpuMonitor.refresh()])
 }
 
 function activateTab(tab) {
@@ -2299,11 +1636,11 @@ function activateTab(tab) {
   updateWorkflowControls()
   if (tab !== 'clone') referenceRecorder.stop()
   else requestAnimationFrame(() => referenceRecorder.refresh())
-  stopGpuMonitor()
+  gpuMonitor.stop()
   if (tab === 'api') refreshApi().catch((error) => showToast(errorMessage(error)))
   if (tab === 'system') {
     refreshSystemStatus()
-    startGpuMonitor()
+    gpuMonitor.start()
   }
   refreshFormatOptions()
   persistUiState()
@@ -2361,14 +1698,13 @@ async function initialize() {
   state.formats = formats.formats || {}
   state.streamFormats = streamFormats.formats || {}
   state.profiles = profiles.data || []
-  state.scripts = scripts.data || []
   state.ssmlCapabilities = ssmlCapabilities
 
   populateSelect($('#language'), languages.languages.map((language) => ({ value: language, label: languageLabel(language) })), defaults.language)
   populateSelect($('#device'), status.hardware || [{ value: 'auto', label: t('common.auto', {}, 'Auto') }, { value: 'cpu', label: 'CPU' }], defaults.device)
   renderVoiceProfileSelect()
   renderCloneProfileList()
-  renderScriptLibrary()
+  dialogueScripts.initialize(scripts.data || [])
   magicEditor.setCapabilities(ssmlCapabilities)
   resetControls()
   $('#denoise').disabled = !status.load_denoiser
@@ -2381,6 +1717,7 @@ async function initialize() {
   $('#runtime-badge').dataset.state = 'ready'
   $('#runtime-state').textContent = t('runtime.backendReady', { backend: status.backend === 'nano' ? 'Nano' : t('runtime.native', {}, 'Native') }, `${status.backend === 'nano' ? 'Nano' : 'Native'} backend ready`)
   $('#runtime-model').textContent = `${status.model_id} · ${status.runtime}`
+  versionCheck.check(status)
   setStatus(t('status.ready', {}, 'Ready'), 'success')
   setDesignSource(state.designSource, { persist: false })
   setCloneMode(state.cloneMode, { persist: false })
@@ -2394,10 +1731,7 @@ async function initialize() {
 
 $('#text-input').addEventListener('input', () => {
   if (state.inputType !== 'magic') state.inputDrafts[state.inputType] = $('#text-input').value
-  if (state.inputType === 'ssml-h' && state.activeScript) {
-    state.scriptDirty = true
-    renderScriptLibrary()
-  }
+  if (state.inputType === 'ssml-h') dialogueScripts.markDirty()
   updateMetrics()
 })
 $('#design-text-input').addEventListener('input', updateDesignMetrics)
@@ -2712,83 +2046,6 @@ $('#delete-profile-confirm').addEventListener('click', async (event) => {
     button.disabled = false
   }
 })
-$('#script-import').addEventListener('click', () => $('#script-import-input').click())
-$('#script-import-input').addEventListener('change', async (event) => {
-  const file = event.target.files[0]
-  event.target.value = ''
-  try {
-    await importScriptFile(file)
-  } catch (error) {
-    showToast(errorMessage(error))
-  }
-})
-$('#script-download').addEventListener('click', downloadCurrentScript)
-$('#script-name').addEventListener('input', renderScriptSaveState)
-$('#script-filter').addEventListener('input', renderScriptLibrary)
-$('#script-save').addEventListener('click', () => {
-  const updating = normalizedScriptName($('#script-name').value) === state.activeScript?.id
-  if (updating) {
-    $('#update-script-name').textContent = state.activeScript.name
-    $('#update-script-dialog').showModal()
-    return
-  }
-  persistCurrentScript().catch((error) => showToast(errorMessage(error)))
-})
-$('#script-list').addEventListener('click', (event) => {
-  const action = event.target.closest('[data-script-action]')?.dataset.scriptAction
-  const scriptId = event.target.closest('[data-script-id]')?.dataset.scriptId
-  if (!action || !scriptId) return
-  const script = state.scripts.find((item) => item.id === scriptId)
-  if (!script) return
-  if (action === 'use') loadSavedScript(scriptId).catch((error) => showToast(errorMessage(error)))
-  if (action === 'edit') openEditScriptDialog(script).catch((error) => showToast(errorMessage(error)))
-  if (action === 'delete') {
-    state.pendingDeleteScript = script
-    $('#delete-script-name').textContent = script.name
-    $('#delete-script-dialog').showModal()
-  }
-})
-$('#edit-script-close').addEventListener('click', closeEditScriptDialog)
-$('#edit-script-cancel').addEventListener('click', closeEditScriptDialog)
-$('#edit-script-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeEditScriptDialog() })
-$('#edit-script-form').addEventListener('submit', (event) => {
-  event.preventDefault()
-  updateScriptDetails().catch((error) => showToast(errorMessage(error)))
-})
-$('#update-script-close').addEventListener('click', () => $('#update-script-dialog').close())
-$('#update-script-cancel').addEventListener('click', () => $('#update-script-dialog').close())
-$('#update-script-confirm').addEventListener('click', async (event) => {
-  const button = event.currentTarget
-  button.disabled = true
-  try {
-    await persistCurrentScript({ overwrite: true })
-    $('#update-script-dialog').close()
-  } catch (error) {
-    showToast(errorMessage(error))
-  } finally {
-    button.disabled = false
-  }
-})
-$('#delete-script-close').addEventListener('click', () => $('#delete-script-dialog').close())
-$('#delete-script-cancel').addEventListener('click', () => $('#delete-script-dialog').close())
-$('#delete-script-confirm').addEventListener('click', async (event) => {
-  const script = state.pendingDeleteScript
-  if (!script) return
-  const button = event.currentTarget
-  button.disabled = true
-  try {
-    await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(script.id)}`, { method: 'DELETE' })
-    $('#delete-script-dialog').close()
-    state.pendingDeleteScript = null
-    if (state.activeScript?.id === script.id) startNewScript()
-    await refreshScripts()
-    showToast(t('scripts.deletedNamed', { name: script.name }, `Deleted ${script.name}.`), 'success')
-  } catch (error) {
-    showToast(errorMessage(error))
-  } finally {
-    button.disabled = false
-  }
-})
 $('#generate-button').addEventListener('click', () => {
   if (state.generationMode === 'stream') streamAudio()
   else generateAudio('generate')
@@ -2827,11 +2084,11 @@ initialize().catch((error) => {
 })
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) stopGpuMonitor()
-  else if (state.activeTab === 'system') startGpuMonitor()
+  if (document.hidden) gpuMonitor.stop()
+  else if (state.activeTab === 'system') gpuMonitor.start()
 })
 window.addEventListener('beforeunload', () => {
-  stopGpuMonitor()
+  gpuMonitor.stop()
   state.streamAbort?.abort()
   state.streamPlayback?.stop()
   clearInterval(state.activityTimer)

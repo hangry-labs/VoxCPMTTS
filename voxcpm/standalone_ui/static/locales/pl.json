@@ -408,5 +408,9 @@
   "timestamps.segments": "Segmenty",
   "timestamps.title": "Czasy mowy",
   "timestamps.unavailable": "Niedostępne",
-  "timestamps.words": "Słowa"
+  "timestamps.words": "Słowa",
+  "updates.releaseAvailable": "Dostępna nowa wersja",
+  "updates.releaseTitle": "Otwórz najnowszą wersję VoxCPMTTS",
+  "updates.snapshotAvailable": "Dostępna nowa kompilacja snapshot",
+  "updates.snapshotTitle": "Wyświetl źródło nowszej kompilacji snapshot"
 }
