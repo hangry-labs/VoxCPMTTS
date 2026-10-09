@@ -33,6 +33,26 @@ Ta wersja Hangry Labs została przygotowana z myślą o prostej lokalnej pracy. 
 > [!IMPORTANT]
 > Kod własny projektu i kod pochodzący z projektu nadrzędnego korzystają z licencji Apache-2.0. Obrazy Docker są jednak dystrybucjami zbiorczymi zawierającymi również zasoby modeli, biblioteki NVIDIA CUDA, FFmpeg i inne pakiety na ich własnych warunkach. Przed wdrożeniem lub redystrybucją przeczytaj [informacje o komponentach zewnętrznych](THIRD_PARTY_NOTICES.md).
 
+### Twórz kompletne scenariusze dialogów
+
+Edytor Magic pozwala wizualnie układać sceny z wieloma mówcami, przypisywać zapisane głosy, określać sposób wypowiedzi każdej postaci, odsłuchiwać pojedyncze kwestie i zapisywać cały dialog jako przenośny dokument SSML-H.
+
+<p align="center">
+  <a href="assets/screenshots/generate-ui.webp">
+    <img src="assets/screenshots/generate-ui.webp" alt="Interfejs generowania VoxCPMTTS z reżyserowanym dialogiem trzech postaci i biblioteką zapisanych scenariuszy" width="1200">
+  </a>
+</p>
+
+### Projektuj, klonuj i wykorzystuj głosy ponownie
+
+Twórz głosy na podstawie opisu w języku naturalnym lub nagrania referencyjnego, blokuj ziarno dla zachowania spójności, dodawaj portrety i tagi, dopracowuj dźwięk oraz wykorzystuj zapisane postacie w kolejnych scenariuszach.
+
+<p align="center">
+  <a href="assets/screenshots/design-ui.webp">
+    <img src="assets/screenshots/design-ui.webp" alt="Interfejs projektowania VoxCPMTTS z narratorem studyjnym o zablokowanym ziarnie i biblioteką głosów wielokrotnego użytku" width="1200">
+  </a>
+</p>
+
 ## Szybki start
 
 Uruchom pełny obraz na karcie NVIDIA:

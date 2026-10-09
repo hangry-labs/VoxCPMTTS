@@ -33,6 +33,26 @@ Esta versión de Hangry Labs está pensada para un uso local sencillo. Inicia un
 > [!IMPORTANT]
 > El código propio del proyecto y el derivado del proyecto original usan Apache-2.0. Sin embargo, las imágenes Docker son distribuciones agregadas que también incluyen recursos de modelos, bibliotecas NVIDIA CUDA, FFmpeg y otros paquetes bajo sus respectivas condiciones. Lee los [avisos de terceros](THIRD_PARTY_NOTICES.md) antes de implementar o redistribuir.
 
+### Crea guiones de diálogo completos
+
+Usa el editor Magic para componer visualmente escenas con varios hablantes, asignar voces guardadas, dirigir cada interpretación, previsualizar intervenciones individuales y guardar el diálogo completo como SSML-H portátil.
+
+<p align="center">
+  <a href="assets/screenshots/generate-ui.webp">
+    <img src="assets/screenshots/generate-ui.webp" alt="Espacio de generación de VoxCPMTTS con un diálogo dirigido de tres personajes y una biblioteca de guiones guardados" width="1200">
+  </a>
+</p>
+
+### Diseña, clona y reutiliza voces
+
+Crea voces a partir de instrucciones en lenguaje natural o grabaciones de referencia, bloquea semillas para mantener la consistencia, añade retratos y etiquetas, perfecciona el audio y reutiliza personajes guardados en futuros guiones.
+
+<p align="center">
+  <a href="assets/screenshots/design-ui.webp">
+    <img src="assets/screenshots/design-ui.webp" alt="Espacio de diseño de VoxCPMTTS con un narrador de estudio de semilla bloqueada y una biblioteca de voces reutilizables" width="1200">
+  </a>
+</p>
+
 ## Inicio rápido
 
 Ejecuta la imagen completa en una GPU NVIDIA:

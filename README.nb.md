@@ -33,6 +33,26 @@ Denne Hangry Labs-versjonen er laget for enkel lokal bruk. Start én container, 
 > [!IMPORTANT]
 > Prosjektets egen og oppstrømsavledede kildekode bruker Apache-2.0. Docker-bildene er samlede distribusjoner som også inneholder modellressurser, NVIDIA CUDA-biblioteker, FFmpeg og andre pakker med egne vilkår. Les [merknadene om tredjepartskomponenter](THIRD_PARTY_NOTICES.md) før distribusjon eller videredistribusjon.
 
+### Bygg komplette dialogmanus
+
+Bruk Magic-redigereren til å sette sammen scener med flere talere visuelt, tilordne lagrede stemmer, styre hver fremføring, forhåndsvise enkeltreplikker og lagre hele dialogen som portabel SSML-H.
+
+<p align="center">
+  <a href="assets/screenshots/generate-ui.webp">
+    <img src="assets/screenshots/generate-ui.webp" alt="VoxCPMTTS-genereringsgrensesnitt med en regissert dialog mellom tre talere og et bibliotek med lagrede manus" width="1200">
+  </a>
+</p>
+
+### Design, klon og gjenbruk stemmer
+
+Lag stemmer fra beskrivelser i naturlig språk eller referanseopptak, lås frø for konsistens, legg til portretter og etiketter, finjuster lyden og gjenbruk lagrede karakterer i fremtidige manus.
+
+<p align="center">
+  <a href="assets/screenshots/design-ui.webp">
+    <img src="assets/screenshots/design-ui.webp" alt="VoxCPMTTS-grensesnitt for stemmedesign med en studioforteller med låst frø og et bibliotek med gjenbrukbare stemmer" width="1200">
+  </a>
+</p>
+
 ## Hurtigstart
 
 Start det komplette bildet på en NVIDIA-GPU:

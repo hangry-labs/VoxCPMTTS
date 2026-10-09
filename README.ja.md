@@ -33,6 +33,26 @@ Nano-vLLM 推論、ローカルのブラウザー UI、HTTP API を備えた、�
 > [!IMPORTANT]
 > プロジェクト独自およびアップストリーム由来のソースコードは Apache-2.0 です。ただし Docker イメージは、モデル資産、NVIDIA CUDA ライブラリ、FFmpeg、その他それぞれの条件が適用されるパッケージを含む集合配布物です。導入または再配布の前に[サードパーティ通知](THIRD_PARTY_NOTICES.md)を確認してください。
 
+### 完成した対話スクリプトを視覚的に作成
+
+Magic エディターでは、複数話者のシーンを視覚的に組み立て、保存済み音声の割り当て、各演技の指示、個別ターンのプレビュー、対話全体のポータブルな SSML-H としての保存ができます。
+
+<p align="center">
+  <a href="assets/screenshots/generate-ui.webp">
+    <img src="assets/screenshots/generate-ui.webp" alt="3 人の話者による演出付き対話と保存済みスクリプトライブラリを表示する VoxCPMTTS 生成ワークスペース" width="1200">
+  </a>
+</p>
+
+### 音声をデザイン、クローン、再利用
+
+自然言語の指示または参照録音から音声を作成し、一貫性のためにシードを固定し、ポートレートとタグを追加して音声を調整し、保存したキャラクターを今後のスクリプトで再利用できます。
+
+<p align="center">
+  <a href="assets/screenshots/design-ui.webp">
+    <img src="assets/screenshots/design-ui.webp" alt="固定シードのスタジオナレーターと再利用可能な保存済み音声ライブラリを表示する VoxCPMTTS デザインワークスペース" width="1200">
+  </a>
+</p>
+
 ## クイックスタート
 
 NVIDIA GPU で完全版イメージを起動します。

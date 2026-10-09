@@ -19,14 +19,14 @@ Easy-to-run VoxCPM2 text-to-speech Docker images with Nano-vLLM inference, a bro
 
 This Hangry Labs fork is made for local use without the usual Python environment, model download, and runtime setup work. Install Docker, run one command, open the browser interface, or connect an application to the local API.
 
-## What This Project Provides
+## What You Get
 
 - A browser UI for voice design, voice cloning, transcript-guided cloning, local reference transcription, and optional non-destructive voice finishing
 - Persistent saved voices and dialogue scripts with restorable recipes, portraits, search, SSML-H import/export, and reuse across sessions
 - SSML and SSML-H documents for timed narration, multi-speaker discussions, and plays
 - An OpenAI-compatible speech API plus the complete native API for applications and local integrations
 - Multilingual generation across 30 VoxCPM2 languages
-- WAV, MP3, FLAC, and OGG output
+- WAV, MP3, FLAC, OGG, Opus, AAC, and raw PCM output
 - Nano-vLLM inference with CUDA graph acceleration
 - A baked image containing the model assets required for offline inference
 - A smaller image for persistent Hugging Face cache workflows
@@ -41,9 +41,23 @@ Official images are published to [Docker Hub](https://hub.docker.com/r/hangrylab
 
 Product page and installation guide: [hangrylabs.app/software/voxcpmtts](https://hangrylabs.app/software/voxcpmtts).
 
+### Build complete dialogue scripts
+
+Use the Magic editor to assemble multi-speaker scenes visually, assign saved voices, direct each performance, preview individual turns, and save the complete dialogue as portable SSML-H.
+
 <p align="center">
-  <a href="https://hangry-labs.github.io/VoxCPMTTS/examples/">
-    <img src="assets/voxcpmtts_badge.webp" alt="VoxCPMTTS voice design and cloning badge" width="620">
+  <a href="assets/screenshots/generate-ui.webp">
+    <img src="assets/screenshots/generate-ui.webp" alt="VoxCPMTTS Generate workspace showing a directed three-speaker launch dialogue and saved script library" width="1200">
+  </a>
+</p>
+
+### Design, clone, and reuse voices
+
+Create voices from natural-language direction or reference recordings, lock seeds for consistency, attach portraits and tags, refine the audio, and reuse saved characters across future scripts.
+
+<p align="center">
+  <a href="assets/screenshots/design-ui.webp">
+    <img src="assets/screenshots/design-ui.webp" alt="VoxCPMTTS Design workspace showing a locked-seed studio narrator and reusable saved voice library" width="1200">
   </a>
 </p>
 
