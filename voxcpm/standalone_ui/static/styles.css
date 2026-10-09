@@ -387,7 +387,7 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .magic-custom-direction-field { flex-basis: 240px; }
 .magic-expression-field { flex-basis: 170px; }
 .magic-toolbar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-.magic-canvas { display: grid; gap: 7px; min-height: 260px; max-height: 540px; padding: 9px; overflow-y: auto; background: #111214; }
+.magic-canvas { display: grid; align-content: start; gap: 7px; max-height: 540px; padding: 9px; overflow-y: auto; background: #111214; }
 .magic-turn { border: 1px solid var(--line-soft); border-radius: 5px; background: #191a1e; transition: border-color 120ms ease, box-shadow 120ms ease; }
 .magic-turn.active { border-color: #bd5611; box-shadow: inset 3px 0 var(--accent); }
 .magic-block-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; padding: 3px 5px 3px 8px; border-bottom: 1px solid var(--line-soft); }
@@ -690,7 +690,6 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
   .magic-tool-field, .magic-custom-direction-field { flex: 1 1 calc(50% - 4px); min-width: 130px; }
   .magic-toolbar-actions { width: 100%; }
   .magic-toolbar-actions .secondary-button { flex: 1; }
-  .magic-canvas { min-height: 300px; }
   .magic-footer { align-items: flex-start; flex-direction: column; gap: 3px; }
   .generation-command-bar { align-items: stretch; flex-direction: column; }
   .generation-mode-control { width: 100%; }
