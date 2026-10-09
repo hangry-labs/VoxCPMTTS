@@ -89,6 +89,11 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "UI v" not in responses["/"].text
     assert 'data-tab="clone"' in responses["/"].text
     assert 'data-i18n="tabs.design">Design</button>' in responses["/"].text
+    assert 'data-tab="stream"' not in responses["/"].text
+    assert 'data-panel="stream"' not in responses["/"].text
+    assert 'data-generation-mode="generate"' in responses["/"].text
+    assert 'data-generation-mode="stream"' in responses["/"].text
+    assert 'id="stream-start"' not in responses["/"].text
     assert '<html lang="en" dir="ltr">' in responses["/"].text
     assert '<html lang="pl" dir="ltr">' in responses["/pl"].text
     assert '"locale":"pl"' in responses["/pl"].text
@@ -118,6 +123,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="timing-settings"' in responses["/"].text
     assert 'id="generate-timestamps"' in responses["/"].text
     assert 'id="stream-live-wave"' in responses["/"].text
+    assert responses["/"].text.count('id="generate-progress"') == 1
     assert 'id="reference-record-wave"' in responses["/"].text
     assert 'class="reference-audio-surface"' in responses["/"].text
     assert 'id="reference-audio-choose"' in responses["/"].text
@@ -142,6 +148,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "IncrementalAudioPlayback" in script
     assert "response.body.getReader()" in script
     assert "await playback.append(value)" in script
+    assert "startActivityPolling('stream')" in script
+    assert "workflow === 'stream' ? 'generate' : workflow" in script
     assert "class StreamWaveform" in script
     assert "fetchJson('/tts/activity'" in script
     assert "GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000" in script
@@ -177,7 +185,7 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
         )
     )
 
-    used_keys = set(re.findall(r"\bt\('([^']+)'\s*,", source))
+    used_keys = set(re.findall(r"\bt\(\s*'([^']+)'\s*,", source))
     used_keys.update(re.findall(r'data-i18n(?:-[a-z-]+)?="([^"]+)"', source))
     assert used_keys <= english.keys()
 

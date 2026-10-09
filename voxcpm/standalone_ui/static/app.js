@@ -80,6 +80,7 @@ const GPU_METRICS = [
 
 const state = {
   activeTab: 'generate',
+  generationMode: 'generate',
   inputType: 'text',
   inputDrafts: { text: null, ssml: null, 'ssml-h': null },
   headerCollapsed: document.documentElement.dataset.headerCollapsed === 'true',
@@ -196,6 +197,7 @@ function persistUiState() {
   try {
     sessionStorage.setItem(UI_SESSION_KEY, JSON.stringify({
       activeTab: state.activeTab,
+      generationMode: state.generationMode,
       headerCollapsed: state.headerCollapsed,
       gpuWindowMs: state.gpuWindowMs,
       inputType: state.inputType,
@@ -225,9 +227,13 @@ function persistGpuSession() {
 
 function restoreSessionState() {
   const ui = readSessionJson(UI_SESSION_KEY)
-  if (['generate', 'clone', 'stream', 'api', 'system'].includes(ui?.activeTab)) {
+  if (['generate', 'clone', 'api', 'system'].includes(ui?.activeTab)) {
     state.activeTab = ui.activeTab
+  } else if (ui?.activeTab === 'stream') {
+    state.activeTab = 'generate'
+    state.generationMode = 'stream'
   }
+  if (['generate', 'stream'].includes(ui?.generationMode)) state.generationMode = ui.generationMode
   if (typeof ui?.headerCollapsed === 'boolean') state.headerCollapsed = ui.headerCollapsed
   if ([60 * 1000, 10 * 60 * 1000].includes(ui?.gpuWindowMs)) state.gpuWindowMs = ui.gpuWindowMs
   if (['text', 'ssml', 'ssml-h'].includes(ui?.inputType)) state.inputType = ui.inputType
@@ -299,6 +305,37 @@ function setInputType(inputType) {
   })
   updateMetrics()
   persistUiState()
+}
+
+function setGenerationMode(mode, { persist = true } = {}) {
+  if (!['generate', 'stream'].includes(mode) || state.streamAbort) return
+  state.generationMode = mode
+  $$('.generation-mode-control button').forEach((button) => {
+    const active = button.dataset.generationMode === mode
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-pressed', String(active))
+  })
+  const streaming = mode === 'stream'
+  const action = $('#generate-button')
+  $('i', action).className = streaming ? 'icon-radio' : 'icon-audio-lines'
+  $('span', action).textContent = streaming
+    ? t('common.startStream', {}, 'Start stream')
+    : t('common.generateAudio', {}, 'Generate audio')
+  $('#stream-stop').hidden = !streaming
+  $('#generate-result').hidden = streaming
+  $('#stream-result').hidden = !streaming
+  $('#generation-output-icon').className = streaming ? 'icon-radio' : 'icon-audio-lines'
+  $('#generation-output-title').textContent = streaming
+    ? t('output.stream', {}, 'Stream output')
+    : t('output.generated', {}, 'Generated audio')
+  $('#generation-output-badge').textContent = streaming
+    ? t('output.live', {}, 'Live output')
+    : t('output.final', {}, 'Final output')
+  $('#timing-settings').hidden = streaming
+  if (!streaming) streamWaveform.hide()
+  refreshFormatOptions()
+  updateTimestampState()
+  if (persist) persistUiState()
 }
 
 function populateSelect(select, options, selected) {
@@ -631,7 +668,7 @@ function formatOptions(formats) {
 }
 
 function refreshFormatOptions() {
-  const streaming = state.activeTab === 'stream'
+  const streaming = state.activeTab === 'generate' && state.generationMode === 'stream'
   const formats = streaming ? state.streamFormats : state.formats
   const preferred = $('#output-format').value || (streaming ? 'mp3' : 'mp3')
   populateSelect($('#output-format'), formatOptions(formats), preferred)
@@ -852,8 +889,8 @@ const ACTIVITY_STAGE_INDEX = {
 }
 
 function renderInferenceProgress(workflow, activity) {
-  if (workflow === 'stream') return
-  const panel = $(`#${workflow}-progress`)
+  const progressWorkflow = workflow === 'stream' ? 'generate' : workflow
+  const panel = $(`#${progressWorkflow}-progress`)
   const phase = activity.phase || 'preparing'
   const index = ACTIVITY_STAGE_INDEX[phase] ?? 0
   panel.hidden = false
@@ -871,7 +908,9 @@ function renderInferenceProgress(workflow, activity) {
   $('.progress-copy > span', panel).textContent = phase === 'loading_model'
     ? t('progress.firstLoad', {}, 'First use can take longer while model weights enter GPU memory')
     : phase === 'encoding'
-      ? t('progress.outputFormat', {}, 'Preparing the selected output format')
+      ? t('progress.outputFormat', {
+          format: workflow === 'stream' ? 'MP3' : ($('#output-format').value || 'audio').toUpperCase(),
+        }, 'Preparing the selected output format')
       : t('progress.active', {}, 'The request is active')
   $$('[data-stage]', panel).forEach((dot, dotIndex) => {
     dot.classList.toggle('done', phase === 'complete' || dotIndex < index)
@@ -894,19 +933,18 @@ function startActivityPolling(workflow) {
 function finishActivityPolling(workflow, phase, message) {
   clearInterval(state.activityTimer)
   state.activityTimer = null
-  if (workflow === 'stream') return
   renderInferenceProgress(workflow, { phase, message })
-  const panel = $(`#${workflow}-progress`)
+  const panel = $(`#${workflow === 'stream' ? 'generate' : workflow}-progress`)
   clearTimeout(panel.hideTimer)
   panel.hideTimer = setTimeout(() => { panel.hidden = true }, phase === 'complete' ? 1800 : 5000)
 }
 
 function setGenerationBusy(active, workflow = 'generate') {
-  const button = workflow === 'stream' ? $('#stream-start') : $(`#${workflow}-button`)
+  const button = workflow === 'stream' ? $('#generate-button') : $(`#${workflow}-button`)
   button.disabled = active
-  if (workflow === 'stream') {
-    $('#stream-stop').disabled = !active
-    $('#stream-progress').hidden = !active
+  if (workflow === 'stream') $('#stream-stop').disabled = !active
+  if (['generate', 'stream'].includes(workflow)) {
+    $$('.generation-mode-control button').forEach((modeButton) => { modeButton.disabled = active })
   }
 }
 
@@ -1127,6 +1165,7 @@ async function streamAudio() {
   let playback = null
   state.streamAbort = controller
   setGenerationBusy(true, 'stream')
+  startActivityPolling('stream')
   streamWaveform.surface.hidden = false
   streamWaveform.stateElement.textContent = t('stream.preparing', {}, 'Preparing stream')
   streamWaveform.detailElement.textContent = t('stream.buffered', { size: 0 }, '0 KiB buffered')
@@ -1174,15 +1213,18 @@ async function streamAudio() {
     streamWaveform.complete()
     setTimeout(() => streamWaveform.hide(), 1000)
     setStatus(t('status.streamComplete', {}, 'Stream complete'), 'success')
+    finishActivityPolling('stream', 'complete', t('progress.complete', {}, 'Audio is ready'))
   } catch (error) {
     if (error.name === 'AbortError') {
       if (chunks.length) await streamOutput.load(new Blob(chunks, { type: 'audio/mpeg' }), 'voxcpmtts-stream-partial.mp3')
       streamWaveform.complete()
       setStatus(t('status.streamStopped', {}, 'Stream stopped'), 'success')
+      finishActivityPolling('stream', 'complete', t('status.streamStopped', {}, 'Stream stopped'))
     }
     else {
       setStatus(errorMessage(error), 'error')
       showToast(errorMessage(error))
+      finishActivityPolling('stream', 'failed', errorMessage(error))
     }
   } finally {
     playback?.stop()
@@ -1703,7 +1745,7 @@ async function refreshSystem() {
 
 function activateTab(tab) {
   state.activeTab = tab
-  const workflowActive = ['generate', 'clone', 'stream'].includes(tab)
+  const workflowActive = ['generate', 'clone'].includes(tab)
   $('.workspace').dataset.view = tab
   $$('.tab-button').forEach((button) => {
     const active = button.dataset.tab === tab
@@ -1712,7 +1754,7 @@ function activateTab(tab) {
   })
   $$('.tab-panel').forEach((panel) => { panel.hidden = panel.dataset.panel !== tab })
   $('#inference-settings').hidden = !workflowActive
-  $('#composer').hidden = !['generate', 'stream'].includes(tab)
+  $('#composer').hidden = tab !== 'generate'
   updateWorkflowControls()
   if (tab !== 'clone') referenceRecorder.stop()
   else requestAnimationFrame(() => referenceRecorder.refresh())
@@ -1799,6 +1841,7 @@ async function initialize() {
   refreshFormatOptions()
 
   setHeaderCollapsed(state.headerCollapsed)
+  setGenerationMode(state.generationMode, { persist: false })
   activateTab(state.activeTab)
 }
 
@@ -1809,6 +1852,7 @@ $('#design-voice-tags').addEventListener('input', renderVoiceSaveState)
 $('#clone-control-input').addEventListener('input', updateDesignCompletion)
 $('#reference-text').addEventListener('input', updateDesignCompletion)
 $$('.input-type-control button').forEach((button) => button.addEventListener('click', () => setInputType(button.dataset.inputType)))
+$$('.generation-mode-control button').forEach((button) => button.addEventListener('click', () => setGenerationMode(button.dataset.generationMode)))
 $$('.design-source-control button').forEach((button) => button.addEventListener('click', () => setDesignSource(button.dataset.designSource)))
 $$('.clone-mode-control button').forEach((button) => button.addEventListener('click', () => setCloneMode(button.dataset.cloneMode)))
 $('#voice-profile').addEventListener('change', () => {
@@ -2029,9 +2073,11 @@ $('#delete-profile-confirm').addEventListener('click', async (event) => {
     button.disabled = false
   }
 })
-$('#generate-button').addEventListener('click', () => generateAudio('generate'))
+$('#generate-button').addEventListener('click', () => {
+  if (state.generationMode === 'stream') streamAudio()
+  else generateAudio('generate')
+})
 $('#clone-button').addEventListener('click', () => generateAudio('clone'))
-$('#stream-start').addEventListener('click', streamAudio)
 $('#stream-stop').addEventListener('click', () => {
   state.streamAbort?.abort()
   state.streamPlayback?.stop()

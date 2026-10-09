@@ -55,7 +55,6 @@
   <div class="app-tabs" role="tablist" aria-label="Workspace views" data-i18n-aria-label="tabs.aria">
     <button class="tab-button active" type="button" role="tab" aria-selected="true" data-tab="generate" data-i18n="tabs.generate">Generate</button>
     <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="clone" data-i18n="tabs.design">Design</button>
-    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="stream" data-i18n="tabs.stream">Stream</button>
     <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="api" data-i18n="tabs.api">API</button>
     <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="system" data-i18n="tabs.system">System</button>
   </div>
@@ -112,9 +111,16 @@
       </section>
 
       <div class="tab-panel" data-panel="generate">
-        <div class="generate-action-row"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span data-i18n="common.generateAudio">Generate audio</span></button></div>
+        <div class="generation-command-bar">
+          <div class="segmented-control generation-mode-control" role="group" aria-label="Output mode" data-i18n-aria-label="generation.outputMode">
+            <button class="active" type="button" data-generation-mode="generate" aria-pressed="true"><i class="icon-audio-lines"></i><span data-i18n="tabs.generate">Generate</span></button>
+            <button type="button" data-generation-mode="stream" aria-pressed="false"><i class="icon-radio"></i><span data-i18n="tabs.stream">Stream</span></button>
+          </div>
+          <div class="generation-actions"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span data-i18n="common.generateAudio">Generate audio</span></button><button class="secondary-button stop-button" id="stream-stop" type="button" disabled hidden data-i18n="common.stop">Stop</button></div>
+        </div>
         <div class="inference-progress" id="generate-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong data-i18n="progress.preparing">Preparing request</strong><span data-i18n="progress.gettingReady">VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span data-i18n="output.generated">Generated audio</span></div><div><span class="final-badge" data-i18n="output.final">Final output</span></div></div><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></section>
+        <div class="live-stream-surface" id="stream-live" hidden><canvas id="stream-live-wave" aria-label="Live streamed audio waveform" data-i18n-aria-label="stream.waveform"></canvas><div><strong id="stream-live-state" data-i18n="stream.waiting">Waiting for audio</strong><span id="stream-live-detail">0 KiB buffered</span></div></div>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i id="generation-output-icon" class="icon-audio-lines"></i><span id="generation-output-title" data-i18n="output.generated">Generated audio</span></div><div><span class="final-badge" id="generation-output-badge" data-i18n="output.final">Final output</span></div></div><div id="generate-result"><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></div><div id="stream-result" hidden><section id="stream-output" aria-live="polite"></section></div></section>
       </div>
 
       <div class="tab-panel" data-panel="clone" hidden>
@@ -177,12 +183,6 @@
           </div>
           <aside class="clone-library" aria-labelledby="clone-library-title"><div class="clone-library-heading"><div class="section-title"><i class="icon-audio-lines"></i><span id="clone-library-title" data-i18n="profiles.saved">Saved voices</span><span class="count-badge" id="clone-profile-count">0</span></div></div><label class="profile-search clone-profile-search"><span class="visually-hidden" data-i18n="profiles.search">Search saved voices</span><input id="clone-profile-filter" type="search" placeholder="Search voices" data-i18n-placeholder="profiles.searchPlaceholder"></label><div class="clone-profile-list" id="clone-profile-list"></div></aside>
         </div>
-      </div>
-
-      <div class="tab-panel" data-panel="stream" hidden>
-        <div class="generate-action-row"><button class="primary-button" id="stream-start" type="button"><i class="icon-radio"></i><span data-i18n="common.startStream">Start stream</span></button><button class="secondary-button stop-button" id="stream-stop" type="button" disabled data-i18n="common.stop">Stop</button></div>
-        <div class="stream-progress" id="stream-progress" hidden><span></span></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-radio"></i><span data-i18n="output.stream">Stream output</span></div></div><div class="live-stream-surface" id="stream-live" hidden><canvas id="stream-live-wave" aria-label="Live streamed audio waveform" data-i18n-aria-label="stream.waveform"></canvas><div><strong id="stream-live-state" data-i18n="stream.waiting">Waiting for audio</strong><span id="stream-live-detail">0 KiB buffered</span></div></div><section id="stream-output" aria-live="polite"></section></section>
       </div>
 
       <div class="tab-panel" data-panel="api" hidden>
