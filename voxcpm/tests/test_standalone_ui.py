@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -61,9 +62,18 @@ def test_static_workspace_and_assets_are_available() -> None:
                 path: client.get(path)
                 for path in (
                     "/",
+                    "/en",
+                    "/nb",
+                    "/pl",
+                    "/ja",
+                    "/zh",
+                    "/es",
                     "/static/app.js",
+                    "/static/i18n.js",
                     "/static/styles.css",
                     "/static/audio-editor.js",
+                    "/static/locales/en.json",
+                    "/static/locales/pl.json",
                     "/static/vendor/lucide/lucide.woff2",
                     "/assets/voxcpmtts_logo_horizontal.webp",
                     "/assets/voxcpmtts_mascot.webp",
@@ -78,7 +88,12 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'src="/assets/voxcpmtts_mascot.webp"' in responses["/"].text
     assert "UI v" not in responses["/"].text
     assert 'data-tab="clone"' in responses["/"].text
-    assert '>Design</button>' in responses["/"].text
+    assert 'data-i18n="tabs.design">Design</button>' in responses["/"].text
+    assert '<html lang="en" dir="ltr">' in responses["/"].text
+    assert '<html lang="pl" dir="ltr">' in responses["/pl"].text
+    assert '"locale":"pl"' in responses["/pl"].text
+    assert '"storageKey":"voxcpmtts-ui-locale-v1"' in responses["/pl"].text
+    assert '"tabs.generate":"Generuj"' in responses["/pl"].text
     assert 'data-tab="voices"' not in responses["/"].text
     assert 'id="voice-mode"' not in responses["/"].text
     assert 'id="voice-design-details"' not in responses["/"].text
@@ -150,6 +165,29 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "Update details" in script
     assert "async function loadProfileReference(" in script
     assert "sessionStorage.setItem(GPU_SESSION_KEY" in script
+
+
+def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
+    static_dir = Path(runtime.__file__).parent / "standalone_ui" / "static"
+    english = json.loads((static_dir / "locales" / "en.json").read_text(encoding="utf-8"))
+    source = "\n".join(
+        (
+            (static_dir / "app.js").read_text(encoding="utf-8"),
+            (static_dir / "index.html").read_text(encoding="utf-8"),
+        )
+    )
+
+    used_keys = set(re.findall(r"\bt\('([^']+)'\s*,", source))
+    used_keys.update(re.findall(r'data-i18n(?:-[a-z-]+)?="([^"]+)"', source))
+    assert used_keys <= english.keys()
+
+    for locale in ("en", "nb", "pl", "ja", "zh", "es"):
+        catalog = json.loads((static_dir / "locales" / f"{locale}.json").read_text(encoding="utf-8"))
+        assert catalog
+        assert set(catalog) <= set(english)
+        if locale != "en":
+            assert {key for key in english if not key.startswith("languages.")} <= set(catalog)
+        assert all(isinstance(value, str) and "\ufffd" not in value for value in catalog.values())
 
 
 def test_generate_upload_passes_a_temporary_reference_and_removes_it() -> None:

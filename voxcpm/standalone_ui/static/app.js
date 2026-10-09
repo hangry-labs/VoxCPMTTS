@@ -1,5 +1,8 @@
+import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
 import { AudioEditor } from './audio-editor.js'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
+
+await initializeI18n()
 
 const $ = (selector, root = document) => root.querySelector(selector)
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)]
@@ -10,10 +13,10 @@ const GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000
 const GPU_POLL_INTERVAL_MS = 1000
 const MAX_GENERATED_REFERENCE_CHARACTERS = 320
 const SAMPLE_TEXTS = [
-  'VoxCPM2 generates natural multilingual speech with voice design and cloning.',
-  'A steady voice can make technical information easier to understand.',
-  'Good morning. The latest build is ready for a careful listening test.',
-  'This reference voice can speak new text while preserving its character and pacing.',
+  t('samples.first', {}, 'VoxCPM2 generates natural multilingual speech with voice design and cloning.'),
+  t('samples.second', {}, 'A steady voice can make technical information easier to understand.'),
+  t('samples.third', {}, 'Good morning. The latest build is ready for a careful listening test.'),
+  t('samples.fourth', {}, 'This reference voice can speak new text while preserving its character and pacing.'),
 ]
 const INPUT_SAMPLES = {
   ssml: [
@@ -39,40 +42,40 @@ const INPUT_SAMPLES = {
   ],
 }
 const AUDIO_EDITOR_LABELS = {
-  noAudio: 'No audio selected',
-  download: 'Download audio',
-  share: 'Share audio',
-  remove: 'Remove audio',
-  mute: 'Mute or unmute',
-  volume: 'Volume',
-  playbackSpeed: 'Playback speed',
-  backward: 'Seek backward 5 seconds',
-  play: 'Play',
-  pause: 'Pause',
-  forward: 'Seek forward 5 seconds',
-  restart: 'Return to start',
-  trim: 'Select and trim audio',
-  cancel: 'Cancel',
-  applySelection: 'Apply selection',
+  noAudio: t('audio.noAudio', {}, 'No audio selected'),
+  download: t('audio.download', {}, 'Download audio'),
+  share: t('audio.share', {}, 'Share audio'),
+  remove: t('audio.remove', {}, 'Remove audio'),
+  mute: t('audio.mute', {}, 'Mute or unmute'),
+  volume: t('audio.volume', {}, 'Volume'),
+  playbackSpeed: t('audio.playbackSpeed', {}, 'Playback speed'),
+  backward: t('audio.backward', {}, 'Seek backward 5 seconds'),
+  play: t('audio.play', {}, 'Play'),
+  pause: t('audio.pause', {}, 'Pause'),
+  forward: t('audio.forward', {}, 'Seek forward 5 seconds'),
+  restart: t('audio.restart', {}, 'Return to start'),
+  trim: t('audio.trim', {}, 'Select and trim audio'),
+  cancel: t('common.cancel', {}, 'Cancel'),
+  applySelection: t('audio.applySelection', {}, 'Apply selection'),
 }
 const RECORDER_LABELS = {
-  record: 'Record',
-  stop: 'Stop recording',
-  ready: 'Ready to record',
-  recording: 'Recording {time}',
-  processing: 'Preparing recording',
-  readyWithTime: 'Recording ready · {time}',
-  unavailable: 'Microphone recording requires a supported browser and secure connection.',
+  record: t('record.record', {}, 'Record'),
+  stop: t('record.stop', {}, 'Stop recording'),
+  ready: t('record.ready', {}, 'Ready to record'),
+  recording: t('record.recording', {}, 'Recording {time}'),
+  processing: t('record.processing', {}, 'Preparing recording'),
+  readyWithTime: t('record.readyWithTime', {}, 'Recording ready · {time}'),
+  unavailable: t('record.unavailable', {}, 'Microphone recording requires a supported browser and secure connection.'),
 }
 const GPU_METRICS = [
-  { key: 'utilization', label: 'GPU utilization', color: '#ff7a1a' },
-  { key: 'memory_utilization', label: 'Memory activity', color: '#c586c0' },
-  { key: 'memory_used', label: 'VRAM', color: '#72a7ff' },
-  { key: 'temperature', label: 'Temperature', color: '#ef6b73' },
-  { key: 'power', label: 'Power', color: '#f2c94c' },
-  { key: 'fan_speed', label: 'Fan', color: '#55c58a' },
-  { key: 'graphics_clock', label: 'Graphics clock', color: '#9cdcfe' },
-  { key: 'memory_clock', label: 'Memory clock', color: '#ce9178' },
+  { key: 'utilization', label: t('gpu.metric.gpu', {}, 'GPU utilization'), color: '#ff7a1a' },
+  { key: 'memory_utilization', label: t('gpu.metric.memoryActivity', {}, 'Memory activity'), color: '#c586c0' },
+  { key: 'memory_used', label: t('gpu.metric.vram', {}, 'VRAM'), color: '#72a7ff' },
+  { key: 'temperature', label: t('gpu.metric.temperature', {}, 'Temperature'), color: '#ef6b73' },
+  { key: 'power', label: t('gpu.metric.power', {}, 'Power'), color: '#f2c94c' },
+  { key: 'fan_speed', label: t('gpu.metric.fan', {}, 'Fan'), color: '#55c58a' },
+  { key: 'graphics_clock', label: t('gpu.metric.graphicsClock', {}, 'Graphics clock'), color: '#9cdcfe' },
+  { key: 'memory_clock', label: t('gpu.metric.memoryClock', {}, 'Memory clock'), color: '#ce9178' },
 ]
 
 const state = {
@@ -109,32 +112,32 @@ const state = {
 }
 
 const generateOutput = new AudioEditor($('#generate-output'), {
-  label: 'Generated audio',
-  emptyTitle: 'Audio output',
-  emptyDescription: 'Ready for synthesis',
+  label: t('output.generated', {}, 'Generated audio'),
+  emptyTitle: t('output.emptyTitle', {}, 'Audio output'),
+  emptyDescription: t('output.ready', {}, 'Ready for synthesis'),
   labels: AUDIO_EDITOR_LABELS,
 })
 const streamOutput = new AudioEditor($('#stream-output'), {
-  label: 'Streamed audio',
-  emptyTitle: 'Audio output',
-  emptyDescription: 'Ready for streaming',
+  label: t('output.streamed', {}, 'Streamed audio'),
+  emptyTitle: t('output.emptyTitle', {}, 'Audio output'),
+  emptyDescription: t('output.readyStream', {}, 'Ready for streaming'),
   labels: AUDIO_EDITOR_LABELS,
 })
 const cloneOutput = new AudioEditor($('#clone-output'), {
-  label: 'Designed voice',
-  emptyTitle: 'Audio output',
-  emptyDescription: 'Ready for voice design',
+  label: t('output.designed', {}, 'Designed voice'),
+  emptyTitle: t('output.emptyTitle', {}, 'Audio output'),
+  emptyDescription: t('output.readyDesign', {}, 'Ready for voice design'),
   labels: AUDIO_EDITOR_LABELS,
   onChange: (file) => $('#clone-output-section').classList.toggle('is-complete', Boolean(file)),
 })
 const referenceAudio = new AudioEditor($('#reference-audio-preview'), {
-  label: 'Reference preview',
-  emptyTitle: 'No reference selected',
-  emptyDescription: 'Choose or record a sample',
+  label: t('clone.referencePreview', {}, 'Reference preview'),
+  emptyTitle: t('clone.noReference', {}, 'No reference selected'),
+  emptyDescription: t('clone.chooseOrRecord', {}, 'Choose or record a sample'),
   labels: AUDIO_EDITOR_LABELS,
   onChange: (file) => {
     $('#reference-audio-drop').classList.toggle('has-file', Boolean(file))
-    $('#reference-audio-name').textContent = file?.name || 'No audio selected'
+    $('#reference-audio-name').textContent = file?.name || t('audio.noAudio', {}, 'No audio selected')
     $('#reference-audio-clear').hidden = !file
     if (file && state.activeTab === 'clone' && $('#voice-profile').value && !state.loadingProfile) renderVoiceProfileSelect('')
     updateWorkflowControls()
@@ -255,21 +258,21 @@ function escapeHtml(value) {
 function updateMetrics() {
   const text = $('#text-input').value
   const words = text.trim() ? text.trim().split(/\s+/).length : 0
-  $('#text-metrics').textContent = `${text.length} characters · ${words} words`
+  $('#text-metrics').textContent = t('composer.metrics', { characters: text.length, words }, `${text.length} characters · ${words} words`)
 }
 
 function updateDesignMetrics() {
   const text = $('#design-text-input').value
   const words = text.trim() ? text.trim().split(/\s+/).length : 0
-  $('#design-text-metrics').textContent = `${text.length} characters · ${words} words`
+  $('#design-text-metrics').textContent = t('composer.metrics', { characters: text.length, words }, `${text.length} characters · ${words} words`)
   updateDesignCompletion()
 }
 
 function loadDesignPortrait(file) {
   if (!file) return
   const allowed = ['image/png', 'image/jpeg', 'image/webp']
-  if (!allowed.includes(file.type)) return showToast('Choose a PNG, JPEG, or WebP portrait.')
-  if (file.size > 5 * 1024 * 1024) return showToast('Voice portraits must be 5 MB or smaller.')
+  if (!allowed.includes(file.type)) return showToast(t('errors.portraitFormat', {}, 'Choose a PNG, JPEG, or WebP portrait.'))
+  if (file.size > 5 * 1024 * 1024) return showToast(t('errors.portraitSize', {}, 'Voice portraits must be 5 MB or smaller.'))
   setDesignPortrait({ file })
   return true
 }
@@ -385,19 +388,23 @@ function selectedProfile() {
 function updateVoiceProfileState() {
   const profile = selectedProfile()
   const note = $('#voice-profile-note')
-  if (!profile) note.textContent = 'Use a saved design or clone sample'
-  else if (profile.profile_type === 'cloned') note.textContent = `${profile.id} · stored reference audio${profile.has_transcript ? ' · transcript' : ''}`
-  else note.textContent = `${profile.id} · saved voice design`
+  if (!profile) note.textContent = t('profiles.selectionHelp', {}, 'Use a saved design or clone sample')
+  else if (profile.profile_type === 'cloned') note.textContent = t(
+    profile.has_transcript ? 'profiles.clonedWithTranscript' : 'profiles.cloned',
+    { name: profile.id },
+    `${profile.id} · stored reference audio${profile.has_transcript ? ' · transcript' : ''}`,
+  )
+  else note.textContent = t('profiles.designed', { name: profile.id }, `${profile.id} · saved voice design`)
   updateWorkflowControls()
   renderCloneProfileList()
 }
 
 function renderVoiceProfileSelect(selected = $('#voice-profile').value) {
   populateSelect($('#voice-profile'), [
-    { value: '', label: 'None' },
+    { value: '', label: t('common.none', {}, 'None') },
     ...state.profiles.map((profile) => ({
       value: profile.id,
-      label: `${profile.id} (${profile.profile_type === 'cloned' ? 'reference' : 'direction'})`,
+      label: `${profile.id} (${profile.profile_type === 'cloned' ? t('clone.reference', {}, 'reference') : t('clone.directionLower', {}, 'direction')})`,
     })),
   ], selected)
   updateVoiceProfileState()
@@ -486,7 +493,9 @@ async function useProfile(profile, tab, { editing = false } = {}) {
   }
   activateTab(tab)
   renderVoiceSaveState()
-  setStatus(editing ? `Refining ${profile.id}` : `Voice ${profile.id} loaded`, 'success')
+  setStatus(editing
+    ? t('profiles.refining', { name: profile.id }, `Refining ${profile.id}`)
+    : t('profiles.loaded', { name: profile.id }, `Voice ${profile.id} loaded`), 'success')
 }
 
 function renderCloneProfileList() {
@@ -498,13 +507,15 @@ function renderCloneProfileList() {
     .sort((left, right) => {
       if (left.id === state.editingProfile?.id) return -1
       if (right.id === state.editingProfile?.id) return 1
-      return left.id.localeCompare(right.id)
+      return left.id.localeCompare(right.id, browserLanguage())
     })
   $('#clone-profile-count').textContent = String(state.profiles.length)
   if (!profiles.length) {
     const empty = document.createElement('div')
     empty.className = 'clone-profile-empty'
-    empty.textContent = state.profiles.length ? 'No saved voices match this search.' : 'No saved voices yet.'
+    empty.textContent = state.profiles.length
+      ? t('profiles.noMatches', {}, 'No saved voices match this search.')
+      : t('profiles.none', {}, 'No saved voices yet.')
     list.replaceChildren(empty)
     return
   }
@@ -521,17 +532,19 @@ function renderCloneProfileList() {
     if (profile.id === state.editingProfile?.id) {
       const editing = document.createElement('span')
       editing.className = 'editing-badge'
-      editing.textContent = 'Editing'
+      editing.textContent = t('profiles.editing', {}, 'Editing')
       name.append(editing)
     }
     const description = document.createElement('span')
-    description.textContent = profile.description || (profile.profile_type === 'designed' ? 'Direction-only voice design' : 'Stored reference voice')
+    description.textContent = profile.description || (profile.profile_type === 'designed'
+      ? t('profiles.directionOnly', {}, 'Direction-only voice design')
+      : t('profiles.storedReference', {}, 'Stored reference voice'))
     const metadata = document.createElement('div')
     metadata.className = 'clone-profile-metadata'
     ;[
-      profile.profile_type === 'cloned' ? 'Reference' : 'Direction',
-      profile.has_transcript ? 'Transcript' : null,
-      Number.isInteger(profile.recipe?.seed) ? `Seed ${profile.recipe.seed}` : null,
+      profile.profile_type === 'cloned' ? t('clone.referenceBadge', {}, 'Reference') : t('clone.direction', {}, 'Direction'),
+      profile.has_transcript ? t('clone.transcript', {}, 'Transcript') : null,
+      Number.isInteger(profile.recipe?.seed) ? t('profiles.seed', { seed: profile.recipe.seed }, `Seed ${profile.recipe.seed}`) : null,
       ...(profile.tags || []).map((tag) => `#${tag}`),
     ].filter(Boolean).forEach((label) => {
       const badge = document.createElement('span')
@@ -542,13 +555,15 @@ function renderCloneProfileList() {
     const portraitButton = document.createElement('button')
     portraitButton.type = 'button'
     portraitButton.className = 'clone-profile-portrait'
-    portraitButton.title = profile.portrait_url ? `Replace ${profile.id} portrait` : `Add ${profile.id} portrait`
+    portraitButton.title = profile.portrait_url
+      ? t('profiles.replacePortrait', { name: profile.id }, `Replace ${profile.id} portrait`)
+      : t('profiles.addPortrait', { name: profile.id }, `Add ${profile.id} portrait`)
     portraitButton.setAttribute('aria-label', portraitButton.title)
     if (profile.portrait_url) {
       const portrait = document.createElement('img')
       const version = encodeURIComponent(profile.created_at || 'current')
       portrait.src = `${profile.portrait_url}?v=${version}`
-      portrait.alt = `${profile.id} portrait`
+      portrait.alt = t('profiles.portraitAlt', { name: profile.id }, `${profile.id} portrait`)
       portrait.loading = 'lazy'
       portraitButton.append(portrait)
     } else {
@@ -578,21 +593,21 @@ function renderCloneProfileList() {
     use.className = 'secondary-button'
     use.disabled = profile.id === selected
     use.innerHTML = profile.id === selected
-      ? '<i class="icon-check"></i><span>Selected</span>'
-      : '<i class="icon-audio-lines"></i><span>Use voice</span>'
+      ? `<i class="icon-check"></i><span>${escapeHtml(t('profiles.selected', {}, 'Selected'))}</span>`
+      : `<i class="icon-audio-lines"></i><span>${escapeHtml(t('profiles.use', {}, 'Use voice'))}</span>`
     use.addEventListener('click', () => useProfile(profile, 'clone').catch((error) => showToast(errorMessage(error))))
     const edit = document.createElement('button')
     edit.type = 'button'
     edit.className = 'icon-button bordered'
-    edit.title = `Edit ${profile.id}`
-    edit.setAttribute('aria-label', `Edit ${profile.id}`)
+    edit.title = t('profiles.edit', { name: profile.id }, `Edit ${profile.id}`)
+    edit.setAttribute('aria-label', edit.title)
     edit.innerHTML = '<i class="icon-sliders-horizontal"></i>'
     edit.addEventListener('click', () => useProfile(profile, 'clone', { editing: true }).catch((error) => showToast(errorMessage(error))))
     const remove = document.createElement('button')
     remove.type = 'button'
     remove.className = 'icon-button bordered danger-icon'
-    remove.title = `Delete ${profile.id}`
-    remove.setAttribute('aria-label', `Delete ${profile.id}`)
+    remove.title = t('profiles.delete', { name: profile.id }, `Delete ${profile.id}`)
+    remove.setAttribute('aria-label', remove.title)
     remove.innerHTML = '<i class="icon-x"></i>'
     remove.addEventListener('click', () => openDeleteProfileDialog(profile))
     actions.append(use, edit, remove)
@@ -639,11 +654,11 @@ function setDesignSource(source, { persist = true } = {}) {
   } else {
     $('#clone-direction-panel').hidden = false
     $('#clone-transcript-panel').hidden = true
-    $('#clone-conditioning-copy').textContent = 'Describe the voice and delivery to create'
+    $('#clone-conditioning-copy').textContent = t('design.describe', {}, 'Describe the voice and delivery to create')
   }
   $('#clone-direction-label').innerHTML = usesReference
-    ? 'Clone direction <small>Optional</small>'
-    : 'Voice direction <small>Required</small>'
+    ? `${escapeHtml(t('clone.cloneDirection', {}, 'Clone direction'))} <small>${escapeHtml(t('common.optional', {}, 'Optional'))}</small>`
+    : `${escapeHtml(t('design.voiceDirection', {}, 'Voice direction'))} <small>${escapeHtml(t('common.required', {}, 'Required'))}</small>`
   updateWorkflowControls()
   updateDesignCompletion()
   if (persist) persistUiState()
@@ -661,10 +676,10 @@ function setCloneMode(mode, { persist = true } = {}) {
   $('#clone-direction-panel').hidden = usesReference && mode !== 'reference'
   $('#clone-transcript-panel').hidden = !usesReference || mode !== 'transcript'
   $('#clone-conditioning-copy').textContent = !usesReference
-    ? 'Describe the voice and delivery to create'
+    ? t('design.describe', {}, 'Describe the voice and delivery to create')
     : mode === 'reference'
-      ? 'Direct the delivery of the cloned voice'
-      : 'Guide cloning with the exact reference words'
+      ? t('clone.directionHelp', {}, 'Direct the delivery of the cloned voice')
+      : t('clone.transcriptHelp', {}, 'Guide cloning with the exact reference words')
   updateDesignCompletion()
   if (persist) persistUiState()
 }
@@ -674,9 +689,13 @@ function updateSeedState() {
   $('#seed').disabled = randomized
   const lockButton = $('#design-seed-lock')
   lockButton.setAttribute('aria-pressed', String(!randomized))
-  lockButton.title = randomized ? 'Lock generation seed' : 'Unlock generation seed'
+  lockButton.title = randomized
+    ? t('generation.lockSeed', {}, 'Lock generation seed')
+    : t('generation.unlockSeed', {}, 'Unlock generation seed')
   $('i', lockButton).className = randomized ? 'icon-square' : 'icon-check'
-  $('span', lockButton).textContent = randomized ? 'Seed unlocked' : 'Seed locked'
+  $('span', lockButton).textContent = randomized
+    ? t('generation.seedUnlocked', {}, 'Seed unlocked')
+    : t('generation.seedLocked', {}, 'Seed locked')
   lockButton.classList.toggle('active', !randomized)
 }
 
@@ -730,20 +749,20 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
 async function requestAudioResponse(options = {}) {
   const { workflow = state.activeTab, streaming = false, signal, payloadOverride = null } = options
   const payload = payloadOverride || buildPayload({ workflow, streaming })
-  if (!payload.text) throw new Error('Enter text to synthesize.')
+  if (!payload.text) throw new Error(t('errors.textRequired', {}, 'Enter text to synthesize.'))
   const needsReference = workflow === 'clone' && payload.voice === 'reference'
   const reference = Object.prototype.hasOwnProperty.call(options, 'referenceOverride')
     ? options.referenceOverride
     : referenceAudio.currentFile()
   const profile = state.profiles.find((item) => item.id === payload.voice_profile) || null
   if (needsReference && !reference && profile?.profile_type !== 'cloned') {
-    throw new Error('Choose or record reference audio, or select a saved cloned voice.')
+    throw new Error(t('errors.referenceRequired', {}, 'Choose or record reference audio, or select a saved cloned voice.'))
   }
   if (needsReference && payload.clone_mode === 'transcript' && !payload.ref_text && !profile?.has_transcript) {
-    throw new Error('Enter or transcribe the reference words for transcript-guided cloning.')
+    throw new Error(t('errors.transcriptRequired', {}, 'Enter or transcribe the reference words for transcript-guided cloning.'))
   }
   if (workflow === 'clone' && !needsReference && !payload.control) {
-    throw new Error('Describe the voice you want to design.')
+    throw new Error(t('errors.directionRequired', {}, 'Describe the voice you want to design.'))
   }
 
   const route = streaming ? '/tts/stream' : '/tts/generate'
@@ -780,9 +799,9 @@ function renderTimestamps(workflow, result) {
   const panel = $(`#${workflow}-timestamp-results`)
   const header = document.createElement('header')
   const title = document.createElement('strong')
-  title.textContent = `${result.level[0].toUpperCase()}${result.level.slice(1)} timestamps`
+  title.textContent = t('timestamps.resultTitle', { level: result.level }, `${result.level} timestamps`)
   const count = document.createElement('span')
-  count.textContent = `${result.items.length} aligned`
+  count.textContent = t('timestamps.aligned', { count: result.items.length }, `${result.items.length} aligned`)
   header.append(title, count)
   const list = document.createElement('ol')
   list.className = 'timestamp-list'
@@ -807,7 +826,7 @@ async function alignGeneratedAudio(workflow, blob, extension, payload) {
     panel.hidden = true
     return
   }
-  setStatus('Aligning generated speech')
+  setStatus(t('status.aligning', {}, 'Aligning generated speech'))
   const form = new FormData()
   form.append('audio', blob, `voxcpmtts.${extension}`)
   form.append('text', payload.text)
@@ -818,7 +837,7 @@ async function alignGeneratedAudio(workflow, blob, extension, payload) {
     renderTimestamps(workflow, result)
   } catch (error) {
     panel.hidden = true
-    showToast(`Audio is ready, but timestamp alignment failed: ${errorMessage(error)}`)
+    showToast(t('errors.timestampFailed', { error: errorMessage(error) }, `Audio is ready, but timestamp alignment failed: ${errorMessage(error)}`))
   }
 }
 
@@ -839,10 +858,21 @@ function renderInferenceProgress(workflow, activity) {
   const index = ACTIVITY_STAGE_INDEX[phase] ?? 0
   panel.hidden = false
   panel.dataset.phase = phase
-  $('.progress-copy strong', panel).textContent = activity.message || 'Preparing request'
+  const phaseTitles = {
+    preparing: t('progress.preparing', {}, 'Preparing request'),
+    loading_model: t('progress.loadingModel', {}, 'Loading model'),
+    generating: t('progress.generating', {}, 'Generating speech'),
+    streaming: t('progress.streaming', {}, 'Streaming speech'),
+    encoding: t('progress.encoding', {}, 'Encoding audio'),
+    complete: t('progress.complete', {}, 'Audio is ready'),
+    failed: t('progress.failed', {}, 'Generation failed'),
+  }
+  $('.progress-copy strong', panel).textContent = phaseTitles[phase] || activity.message || phaseTitles.preparing
   $('.progress-copy > span', panel).textContent = phase === 'loading_model'
-    ? 'First use can take longer while model weights enter GPU memory'
-    : phase === 'encoding' ? 'Preparing the selected output format' : 'The request is active'
+    ? t('progress.firstLoad', {}, 'First use can take longer while model weights enter GPU memory')
+    : phase === 'encoding'
+      ? t('progress.outputFormat', {}, 'Preparing the selected output format')
+      : t('progress.active', {}, 'The request is active')
   $$('[data-stage]', panel).forEach((dot, dotIndex) => {
     dot.classList.toggle('done', phase === 'complete' || dotIndex < index)
     dot.classList.toggle('active', phase !== 'complete' && phase !== 'failed' && dotIndex === index)
@@ -851,7 +881,7 @@ function renderInferenceProgress(workflow, activity) {
 
 function startActivityPolling(workflow) {
   clearInterval(state.activityTimer)
-  renderInferenceProgress(workflow, { phase: 'preparing', message: 'Preparing request' })
+  renderInferenceProgress(workflow, { phase: 'preparing', message: t('progress.preparing', {}, 'Preparing request') })
   state.activityTimer = setInterval(async () => {
     try {
       renderInferenceProgress(workflow, await fetchJson('/tts/activity', { cache: 'no-store' }))
@@ -888,7 +918,7 @@ async function generateAudio(workflow = 'generate') {
   }
   setGenerationBusy(true, workflow)
   startActivityPolling(workflow)
-  setStatus('Generating audio')
+  setStatus(t('status.generating', {}, 'Generating audio'))
   try {
     const { blob, extension, seed, payload, reference } = await requestAudio({ workflow })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
@@ -909,8 +939,8 @@ async function generateAudio(workflow = 'generate') {
       $('#seed').value = seed
     }
     await alignGeneratedAudio(workflow, blob, extension, payload)
-    setStatus('Generation complete', 'success')
-    finishActivityPolling(workflow, 'complete', 'Audio is ready')
+    setStatus(t('status.complete', {}, 'Generation complete'), 'success')
+    finishActivityPolling(workflow, 'complete', t('progress.complete', {}, 'Audio is ready'))
   } catch (error) {
     setStatus(errorMessage(error), 'error')
     showToast(errorMessage(error))
@@ -935,8 +965,8 @@ class StreamWaveform {
   async attach(audio) {
     this.stopAudioGraph()
     this.surface.hidden = false
-    this.stateElement.textContent = 'Waiting for first audio chunk'
-    this.detailElement.textContent = '0 KiB buffered'
+    this.stateElement.textContent = t('stream.waitingFirst', {}, 'Waiting for first audio chunk')
+    this.detailElement.textContent = t('stream.buffered', { size: 0 }, '0 KiB buffered')
     this.peaks = []
     this.audioContext = new AudioContext()
     this.source = this.audioContext.createMediaElementSource(audio)
@@ -950,8 +980,14 @@ class StreamWaveform {
 
   update(totalBytes, currentTime = 0) {
     this.totalBytes = totalBytes
-    this.stateElement.textContent = totalBytes ? 'Playing generated speech' : 'Waiting for first audio chunk'
-    this.detailElement.textContent = `${(totalBytes / 1024).toFixed(0)} KiB buffered · ${formatClock(currentTime)}`
+    this.stateElement.textContent = totalBytes
+      ? t('stream.playing', {}, 'Playing generated speech')
+      : t('stream.waitingFirst', {}, 'Waiting for first audio chunk')
+    this.detailElement.textContent = t(
+      'stream.bufferedTime',
+      { size: (totalBytes / 1024).toFixed(0), time: formatClock(currentTime) },
+      `${(totalBytes / 1024).toFixed(0)} KiB buffered · ${formatClock(currentTime)}`,
+    )
   }
 
   draw() {
@@ -993,8 +1029,8 @@ class StreamWaveform {
   }
 
   complete() {
-    this.stateElement.textContent = 'Stream complete'
-    this.detailElement.textContent = `${(this.totalBytes / 1024).toFixed(0)} KiB received`
+    this.stateElement.textContent = t('status.streamComplete', {}, 'Stream complete')
+    this.detailElement.textContent = t('stream.received', { size: (this.totalBytes / 1024).toFixed(0) }, `${(this.totalBytes / 1024).toFixed(0)} KiB received`)
   }
 
   hide() {
@@ -1059,7 +1095,7 @@ class IncrementalAudioPlayback {
     const bytes = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength)
     this.queue = this.queue.then(() => new Promise((resolve, reject) => {
       const done = () => { this.sourceBuffer.removeEventListener('error', failed); resolve() }
-      const failed = () => { this.sourceBuffer.removeEventListener('updateend', done); reject(new Error('Browser could not buffer streamed MP3 audio.')) }
+      const failed = () => { this.sourceBuffer.removeEventListener('updateend', done); reject(new Error(t('errors.streamBuffer', {}, 'Browser could not buffer streamed MP3 audio.'))) }
       this.sourceBuffer.addEventListener('updateend', done, { once: true })
       this.sourceBuffer.addEventListener('error', failed, { once: true })
       this.sourceBuffer.appendBuffer(bytes)
@@ -1092,9 +1128,9 @@ async function streamAudio() {
   state.streamAbort = controller
   setGenerationBusy(true, 'stream')
   streamWaveform.surface.hidden = false
-  streamWaveform.stateElement.textContent = 'Preparing stream'
-  streamWaveform.detailElement.textContent = '0 KiB buffered'
-  setStatus('Streaming audio')
+  streamWaveform.stateElement.textContent = t('stream.preparing', {}, 'Preparing stream')
+  streamWaveform.detailElement.textContent = t('stream.buffered', { size: 0 }, '0 KiB buffered')
+  setStatus(t('status.streaming', {}, 'Streaming audio'))
   try {
     playback = await IncrementalAudioPlayback.create(streamWaveform)
     state.streamPlayback = playback
@@ -1104,7 +1140,7 @@ async function streamAudio() {
       $('#last-generated-seed').value = seed
       $('#seed').value = seed
     }
-    if (!response.body) throw new Error('Streaming response body is unavailable in this browser.')
+    if (!response.body) throw new Error(t('errors.streamUnavailable', {}, 'Streaming response body is unavailable in this browser.'))
     const reader = response.body.getReader()
     let totalBytes = 0
     while (true) {
@@ -1123,7 +1159,7 @@ async function streamAudio() {
         }
       }
       streamWaveform.update(totalBytes, playback?.currentTime() || 0)
-      setStatus(`Streaming audio · ${(totalBytes / 1024).toFixed(0)} KiB`)
+      setStatus(t('status.streamingSize', { size: (totalBytes / 1024).toFixed(0) }, `Streaming audio · ${(totalBytes / 1024).toFixed(0)} KiB`))
     }
     let resumeAt = 0
     if (playback) {
@@ -1137,12 +1173,12 @@ async function streamAudio() {
     if (resumeAt > 0) await streamOutput.playFrom(resumeAt).catch(() => {})
     streamWaveform.complete()
     setTimeout(() => streamWaveform.hide(), 1000)
-    setStatus('Stream complete', 'success')
+    setStatus(t('status.streamComplete', {}, 'Stream complete'), 'success')
   } catch (error) {
     if (error.name === 'AbortError') {
       if (chunks.length) await streamOutput.load(new Blob(chunks, { type: 'audio/mpeg' }), 'voxcpmtts-stream-partial.mp3')
       streamWaveform.complete()
-      setStatus('Stream stopped', 'success')
+      setStatus(t('status.streamStopped', {}, 'Stream stopped'), 'success')
     }
     else {
       setStatus(errorMessage(error), 'error')
@@ -1158,13 +1194,15 @@ async function streamAudio() {
 
 async function transcribeReference() {
   const file = referenceAudio.currentFile()
-  if (!file) return showToast('Choose or record reference audio first.')
+  if (!file) return showToast(t('errors.referenceFirst', {}, 'Choose or record reference audio first.'))
   const button = $('#transcribe-reference')
   const label = button.querySelector('span')
   button.disabled = true
   const firstLoad = !state.status.asr_loaded
-  label.textContent = firstLoad ? 'Loading transcription model' : 'Transcribing reference'
-  setStatus(firstLoad ? 'Loading transcription model' : 'Transcribing reference')
+  label.textContent = firstLoad
+    ? t('status.loadingTranscription', {}, 'Loading transcription model')
+    : t('status.transcribing', {}, 'Transcribing reference')
+  setStatus(label.textContent)
   try {
     const form = new FormData()
     form.append('reference_audio', file, file.name)
@@ -1173,12 +1211,12 @@ async function transcribeReference() {
     $('#reference-text').value = result.text || ''
     state.status.asr_loaded = true
     setCloneMode('transcript')
-    setStatus('Reference transcript ready', 'success')
+    setStatus(t('status.transcriptReady', {}, 'Reference transcript ready'), 'success')
   } catch (error) {
     setStatus(errorMessage(error), 'error')
     showToast(errorMessage(error))
   } finally {
-    label.textContent = 'Transcribe'
+    label.textContent = t('clone.transcribe', {}, 'Transcribe')
     button.disabled = !state.status.load_asr
   }
 }
@@ -1261,9 +1299,9 @@ function compactGeneratedReferenceText(value) {
 
 async function prepareGeneratedVoiceReference() {
   const generated = state.lastCloneGeneration
-  if (!generated) throw new Error('Generate cloned audio before storing this voice.')
+  if (!generated) throw new Error(t('errors.generateBeforeStore', {}, 'Generate cloned audio before storing this voice.'))
   const referenceText = compactGeneratedReferenceText(generated.payload.text)
-  if (!referenceText) throw new Error('The generated input does not contain usable reference text.')
+  if (!referenceText) throw new Error(t('errors.referenceTextMissing', {}, 'The generated input does not contain usable reference text.'))
   const originalText = generated.payload.text.replace(/\s+/g, ' ').trim()
   if (referenceText === originalText) {
     return {
@@ -1276,7 +1314,7 @@ async function prepareGeneratedVoiceReference() {
     }
   }
 
-  setStatus('Generating a compact voice reference')
+  setStatus(t('status.compactReference', {}, 'Generating a compact voice reference'))
   const payload = {
     ...generated.payload,
     text: referenceText,
@@ -1299,14 +1337,14 @@ async function prepareGeneratedVoiceReference() {
 
 function openQuickSaveDialog(profileType) {
   if (profileType === 'clone-generated' && !state.lastCloneGeneration) {
-    return showToast('Generate a designed voice before storing it.')
+    return showToast(t('errors.generateDesignedFirst', {}, 'Generate a designed voice before storing it.'))
   }
   const name = normalizedProfileName($('#design-voice-name').value)
-  if (!name) return showToast('Name this voice before storing it.')
-  if (state.profiles.some((profile) => profile.id === name)) return showToast(`Voice ${name} already exists. Use Edit to refine it.`)
+  if (!name) return showToast(t('errors.nameVoice', {}, 'Name this voice before storing it.'))
+  if (state.profiles.some((profile) => profile.id === name)) return showToast(t('errors.voiceExists', { name }, `Voice ${name} already exists. Use Edit to refine it.`))
   state.quickSaveType = profileType
-  $('#save-profile-title').textContent = `Store ${name}`
-  $('#save-profile-copy').textContent = 'Add an optional description, then store the voice, portrait, tags, and complete design recipe.'
+  $('#save-profile-title').textContent = t('profiles.storeNamed', { name }, `Store ${name}`)
+  $('#save-profile-copy').textContent = t('profiles.storeCopy', {}, 'Add an optional description, then store the voice, portrait, tags, and complete design recipe.')
   $('#quick-profile-description').value = ''
   $('#save-profile-dialog').showModal()
   $('#quick-profile-description').focus()
@@ -1334,17 +1372,23 @@ function renderVoiceSaveState() {
   const hasGeneration = Boolean(state.lastCloneGeneration)
   const metadataChanged = profileMetadataChanged()
   row.hidden = !editing && !hasGeneration
-  $('#clone-store-title').textContent = editing ? `Refine ${editing.id}` : 'Keep this voice'
+  $('#clone-store-title').textContent = editing
+    ? t('profiles.refineNamed', { name: editing.id }, `Refine ${editing.id}`)
+    : t('profiles.keep', {}, 'Keep this voice')
   $('#clone-store-copy').textContent = editing
     ? (hasGeneration
-        ? `Replace ${editing.id} with this refined voice`
+        ? t('profiles.replaceRefined', { name: editing.id }, `Replace ${editing.id} with this refined voice`)
         : metadataChanged
-          ? 'Update tags or portrait without replacing the saved audio'
-          : 'Generate a refined voice or change its tags or portrait')
-    : 'Store a compact generated reference and its design recipe'
+          ? t('profiles.updateMetadataCopy', {}, 'Update tags or portrait without replacing the saved audio')
+          : t('profiles.refineCopy', {}, 'Generate a refined voice or change its tags or portrait'))
+    : t('profiles.storeRecipe', {}, 'Store a compact generated reference and its design recipe')
   $('#cancel-voice-edit').hidden = !editing
   const button = $('#store-generated-voice')
-  $('span', button).textContent = editing && !hasGeneration ? 'Update details' : editing ? 'Update voice' : 'Store voice'
+  $('span', button).textContent = editing && !hasGeneration
+    ? t('profiles.updateDetails', {}, 'Update details')
+    : editing
+      ? t('profiles.updateVoice', {}, 'Update voice')
+      : t('profiles.store', {}, 'Store voice')
   button.disabled = !hasGeneration && !metadataChanged
 }
 
@@ -1358,17 +1402,21 @@ function cancelVoiceEdit() {
 function openUpdateProfileDialog() {
   if (!state.editingProfile || (!state.lastCloneGeneration && !profileMetadataChanged())) return
   const replacingVoice = Boolean(state.lastCloneGeneration)
-  $('#update-profile-title').textContent = replacingVoice ? 'Replace saved voice?' : 'Update saved voice?'
+  $('#update-profile-title').textContent = replacingVoice
+    ? t('profiles.replaceTitle', {}, 'Replace saved voice?')
+    : t('profiles.updateTitle', {}, 'Update saved voice?')
   const copy = $('#update-profile-copy')
   const name = document.createElement('strong')
   name.id = 'update-profile-name'
   name.textContent = state.editingProfile.id
   copy.replaceChildren(
-    replacingVoice ? 'Replace ' : 'Update tags or portrait for ',
+    replacingVoice ? t('profiles.replacePrefix', {}, 'Replace ') : t('profiles.updatePrefix', {}, 'Update tags or portrait for '),
     name,
-    replacingVoice ? ' with this newly refined voice?' : ' without replacing its audio or design recipe?',
+    replacingVoice ? t('profiles.replaceSuffix', {}, ' with this newly refined voice?') : t('profiles.updateSuffix', {}, ' without replacing its audio or design recipe?'),
   )
-  $('span', $('#update-profile-confirm')).textContent = replacingVoice ? 'Update voice' : 'Update details'
+  $('span', $('#update-profile-confirm')).textContent = replacingVoice
+    ? t('profiles.updateVoice', {}, 'Update voice')
+    : t('profiles.updateDetails', {}, 'Update details')
   $('#update-profile-dialog').showModal()
 }
 
@@ -1483,8 +1531,10 @@ function attachGpuChartHover(plot, samples, metric, now) {
     }, null)
     const tolerance = Math.max(1500, state.gpuWindowMs * 10 / Math.max(1, bounds.width))
     const hasSample = nearest && Math.abs(nearest.timestamp - targetTime) <= tolerance
-    const shownTime = new Date(hasSample ? nearest.timestamp : targetTime).toLocaleTimeString()
-    tooltip.textContent = hasSample ? `${formatGpuMetric(metric, nearest[metric.key])} / ${shownTime}` : `No sample / ${shownTime}`
+    const shownTime = new Date(hasSample ? nearest.timestamp : targetTime).toLocaleTimeString(browserLanguage())
+    tooltip.textContent = hasSample
+      ? `${formatGpuMetric(metric, nearest[metric.key])} / ${shownTime}`
+      : t('gpu.noSampleAt', { time: shownTime }, `No sample / ${shownTime}`)
     const percent = ratio * 100
     line.style.left = `${percent}%`
     tooltip.style.left = `${percent}%`
@@ -1517,7 +1567,11 @@ function createGpuMetricChart(metric, gpu, history, now) {
   svg.setAttribute('viewBox', '0 0 300 70')
   svg.setAttribute('preserveAspectRatio', 'none')
   svg.setAttribute('role', 'img')
-  svg.setAttribute('aria-label', `${metric.label} history, average ${formatGpuMetric(metric, average)}, peak ${formatGpuMetric(metric, peak)}`)
+  svg.setAttribute('aria-label', t('gpu.historyLabel', {
+    metric: metric.label,
+    average: formatGpuMetric(metric, average),
+    peak: formatGpuMetric(metric, peak),
+  }, `${metric.label} history, average ${formatGpuMetric(metric, average)}, peak ${formatGpuMetric(metric, peak)}`))
   addGpuChartGrid(svg, 300, 70)
   const points = gpuHistoryPoints(samples, now, state.gpuWindowMs, metric.key, maximum)
   if (samples.length > 1) {
@@ -1545,8 +1599,11 @@ function createGpuMetricChart(metric, gpu, history, now) {
   attachGpuChartHover(plot, samples, metric, now)
   const axis = element('div', 'gpu-chart-axis')
   axis.append(
-    element('span', '', state.gpuWindowMs === 60 * 1000 ? '1 minute' : '10 minutes'),
-    element('span', '', `Average ${formatGpuMetric(metric, average)} · Peak ${formatGpuMetric(metric, peak)}`),
+    element('span', '', state.gpuWindowMs === 60 * 1000 ? t('gpu.oneMinute', {}, '1 minute') : t('gpu.tenMinutes', {}, '10 minutes')),
+    element('span', '', t('gpu.averagePeak', {
+      average: formatGpuMetric(metric, average),
+      peak: formatGpuMetric(metric, peak),
+    }, `Average ${formatGpuMetric(metric, average)} · Peak ${formatGpuMetric(metric, peak)}`)),
   )
   chart.append(chartScale, plot, axis)
   return chart
@@ -1558,11 +1615,11 @@ function renderGpuMonitor(gpus) {
   const heading = element('div', 'gpu-monitor-heading')
   const title = element('div', 'gpu-monitor-title')
   const icon = element('i', 'icon-activity')
-  title.append(icon, element('strong', '', 'GPU telemetry'))
+  title.append(icon, element('strong', '', t('gpu.telemetry', {}, 'GPU telemetry')))
   const windowControl = element('div', 'gpu-window-control')
   windowControl.setAttribute('role', 'group')
-  windowControl.setAttribute('aria-label', 'GPU history window')
-  ;[[60 * 1000, '1 min'], [10 * 60 * 1000, '10 min']].forEach(([windowMs, label]) => {
+  windowControl.setAttribute('aria-label', t('gpu.historyWindow', {}, 'GPU history window'))
+  ;[[60 * 1000, t('gpu.oneMinuteShort', {}, '1 min')], [10 * 60 * 1000, t('gpu.tenMinutesShort', {}, '10 min')]].forEach(([windowMs, label]) => {
     const button = element('button', windowMs === state.gpuWindowMs ? 'active' : '', label)
     button.type = 'button'
     button.setAttribute('aria-pressed', String(windowMs === state.gpuWindowMs))
@@ -1576,7 +1633,7 @@ function renderGpuMonitor(gpus) {
   heading.append(title, windowControl)
   monitor.append(heading)
   if (!gpus.length) {
-    monitor.append(element('div', 'gpu-monitor-muted', 'GPU telemetry unavailable.'))
+    monitor.append(element('div', 'gpu-monitor-muted', t('gpu.unavailable', {}, 'GPU telemetry unavailable.')))
     output.replaceChildren(monitor)
     return
   }
@@ -1594,9 +1651,9 @@ function renderGpuMonitor(gpus) {
       if (chart) metrics.append(chart)
     })
     const details = element('div', 'gpu-live-details')
-    if (gpu.performance_state) details.append(element('span', '', `State ${gpu.performance_state}`))
+    if (gpu.performance_state) details.append(element('span', '', t('gpu.state', { state: gpu.performance_state }, `State ${gpu.performance_state}`)))
     if (Number.isFinite(gpu.pcie_generation) && Number.isFinite(gpu.pcie_width)) details.append(element('span', '', `PCIe Gen ${gpu.pcie_generation} x${gpu.pcie_width}`))
-    if (Number.isFinite(gpu.power_limit)) details.append(element('span', '', `Power limit ${Math.round(gpu.power_limit)} W`))
+    if (Number.isFinite(gpu.power_limit)) details.append(element('span', '', t('gpu.powerLimit', { power: Math.round(gpu.power_limit) }, `Power limit ${Math.round(gpu.power_limit)} W`)))
     card.append(cardHead, metrics, details)
     grid.append(card)
   })
@@ -1675,8 +1732,8 @@ function setHeaderCollapsed(collapsed) {
   $('#brand-hero').dataset.collapsed = String(collapsed)
   const button = $('#hero-toggle')
   button.setAttribute('aria-expanded', String(!collapsed))
-  button.setAttribute('aria-label', collapsed ? 'Expand header' : 'Collapse header')
-  button.title = collapsed ? 'Expand header' : 'Collapse header'
+  button.setAttribute('aria-label', collapsed ? t('hero.expand', {}, 'Expand header') : t('hero.collapse', {}, 'Collapse header'))
+  button.title = collapsed ? t('hero.expand', {}, 'Expand header') : t('hero.collapse', {}, 'Collapse header')
   button.innerHTML = `<i class="icon-chevron-${collapsed ? 'down' : 'up'}"></i>`
   persistUiState()
 }
@@ -1720,8 +1777,8 @@ async function initialize() {
   state.streamFormats = streamFormats.formats || {}
   state.profiles = profiles.data || []
 
-  populateSelect($('#language'), languages.languages.map((language) => ({ value: language, label: language })), defaults.language)
-  populateSelect($('#device'), status.hardware || [{ value: 'auto', label: 'Auto' }, { value: 'cpu', label: 'CPU' }], defaults.device)
+  populateSelect($('#language'), languages.languages.map((language) => ({ value: language, label: languageLabel(language) })), defaults.language)
+  populateSelect($('#device'), status.hardware || [{ value: 'auto', label: t('common.auto', {}, 'Auto') }, { value: 'cpu', label: 'CPU' }], defaults.device)
   renderVoiceProfileSelect()
   renderCloneProfileList()
   resetControls()
@@ -1729,13 +1786,13 @@ async function initialize() {
   $('#transcribe-reference').disabled = !status.load_asr
   const timestampsAvailable = Boolean(status.timestamps?.available)
   $('#generate-timestamps').disabled = !timestampsAvailable
-  $('#timestamp-state').textContent = timestampsAvailable ? 'Ready' : 'Unavailable'
+  $('#timestamp-state').textContent = timestampsAvailable ? t('timestamps.ready', {}, 'Ready') : t('timestamps.unavailable', {}, 'Unavailable')
   $('#timestamp-state').dataset.state = timestampsAvailable ? 'available' : 'unavailable'
   updateTimestampState()
   $('#runtime-badge').dataset.state = 'ready'
-  $('#runtime-state').textContent = `${status.backend === 'nano' ? 'Nano' : 'Native'} backend ready`
+  $('#runtime-state').textContent = t('runtime.backendReady', { backend: status.backend === 'nano' ? 'Nano' : t('runtime.native', {}, 'Native') }, `${status.backend === 'nano' ? 'Nano' : 'Native'} backend ready`)
   $('#runtime-model').textContent = `${status.model_id} · ${status.runtime}`
-  setStatus('Ready', 'success')
+  setStatus(t('status.ready', {}, 'Ready'), 'success')
   setDesignSource(state.designSource, { persist: false })
   setCloneMode(state.cloneMode, { persist: false })
   updateDesignMetrics()
@@ -1791,10 +1848,10 @@ $('#design-portrait-input').addEventListener('change', async (event) => {
     return
   }
   const allowed = ['image/png', 'image/jpeg', 'image/webp']
-  if (!allowed.includes(file.type)) return showToast('Choose a PNG, JPEG, or WebP portrait.')
-  if (file.size > 5 * 1024 * 1024) return showToast('Voice portraits must be 5 MB or smaller.')
+  if (!allowed.includes(file.type)) return showToast(t('errors.portraitFormat', {}, 'Choose a PNG, JPEG, or WebP portrait.'))
+  if (file.size > 5 * 1024 * 1024) return showToast(t('errors.portraitSize', {}, 'Voice portraits must be 5 MB or smaller.'))
   try {
-    setStatus(`Updating ${targetProfile.id} portrait`)
+    setStatus(t('status.updatingPortrait', { name: targetProfile.id }, `Updating ${targetProfile.id} portrait`))
     const saved = await saveProfileRequest({
       name: targetProfile.id,
       profileType: targetProfile.profile_type,
@@ -1809,8 +1866,8 @@ $('#design-portrait-input').addEventListener('change', async (event) => {
       setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
     }
     renderCloneProfileList()
-    showToast(`Updated ${saved.id} portrait.`, 'success')
-    setStatus(`Voice ${saved.id} portrait updated`, 'success')
+    showToast(t('profiles.portraitUpdated', { name: saved.id }, `Updated ${saved.id} portrait.`), 'success')
+    setStatus(t('status.portraitUpdated', { name: saved.id }, `Voice ${saved.id} portrait updated`), 'success')
   } catch (error) {
     showToast(errorMessage(error))
   }
@@ -1855,7 +1912,7 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
   event.preventDefault()
   const profileType = state.quickSaveType
   const name = normalizedProfileName($('#design-voice-name').value)
-  if (!profileType || !name) return showToast('Name this voice before storing it.')
+  if (!profileType || !name) return showToast(t('errors.nameVoice', {}, 'Name this voice before storing it.'))
   const button = $('button[type="submit"]', event.currentTarget)
   button.disabled = true
   try {
@@ -1883,8 +1940,8 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
     setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
     renderVoiceSaveState()
     renderCloneProfileList()
-    showToast(`Saved ${saved.id}.`, 'success')
-    setStatus(`Voice ${saved.id} stored`, 'success')
+    showToast(t('profiles.savedNamed', { name: saved.id }, `Saved ${saved.id}.`), 'success')
+    setStatus(t('status.voiceStored', { name: saved.id }, `Voice ${saved.id} stored`), 'success')
   } catch (error) {
     showToast(errorMessage(error))
   } finally {
@@ -1940,8 +1997,12 @@ $('#update-profile-confirm').addEventListener('click', async (event) => {
     setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
     renderVoiceSaveState()
     renderCloneProfileList()
-    showToast(generated ? `Updated ${saved.id}.` : `Updated ${saved.id} details.`, 'success')
-    setStatus(generated ? `Voice ${saved.id} updated` : `Voice ${saved.id} details updated`, 'success')
+    showToast(generated
+      ? t('profiles.updatedNamed', { name: saved.id }, `Updated ${saved.id}.`)
+      : t('profiles.detailsUpdatedNamed', { name: saved.id }, `Updated ${saved.id} details.`), 'success')
+    setStatus(generated
+      ? t('status.voiceUpdated', { name: saved.id }, `Voice ${saved.id} updated`)
+      : t('status.voiceDetailsUpdated', { name: saved.id }, `Voice ${saved.id} details updated`), 'success')
   } catch (error) {
     showToast(errorMessage(error))
   } finally {
@@ -1961,7 +2022,7 @@ $('#delete-profile-confirm').addEventListener('click', async (event) => {
     closeDeleteProfileDialog()
     if (state.editingProfile?.id === profile.id) cancelVoiceEdit()
     await refreshProfiles()
-    showToast(`Deleted ${profile.id}.`, 'success')
+    showToast(t('profiles.deletedNamed', { name: profile.id }, `Deleted ${profile.id}.`), 'success')
   } catch (error) {
     showToast(errorMessage(error))
   } finally {
@@ -1982,7 +2043,7 @@ $('#system-refresh').addEventListener('click', refreshSystem)
 $('#purge-models').addEventListener('click', async () => {
   try {
     const result = await fetchJson('/tts/purge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    showToast(`Purged ${result.purged.length} model cache entries.`, 'success')
+    showToast(t('system.purged', { count: result.purged.length }, `Purged ${result.purged.length} model cache entries.`), 'success')
     refreshSystem()
   } catch (error) {
     showToast(errorMessage(error))
@@ -1998,7 +2059,7 @@ state.inputDrafts.text = $('#text-input').value
 setInputType(state.inputType)
 initialize().catch((error) => {
   $('#runtime-badge').dataset.state = 'error'
-  $('#runtime-state').textContent = 'Service unavailable'
+  $('#runtime-state').textContent = t('runtime.serviceUnavailable', {}, 'Service unavailable')
   $('#runtime-model').textContent = errorMessage(error)
   setStatus(errorMessage(error), 'error')
 })

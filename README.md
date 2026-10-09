@@ -4,6 +4,15 @@
   </a>
 </p>
 
+<p align="center">
+  <strong>English</strong> ·
+  <a href="README.nb.md">Norsk bokmål</a> ·
+  <a href="README.pl.md">Polski</a> ·
+  <a href="README.ja.md">日本語</a> ·
+  <a href="README.zh.md">简体中文</a> ·
+  <a href="README.es.md">Español</a>
+</p>
+
 # Hangry Labs VoxCPMTTS
 
 Easy-to-run VoxCPM2 text-to-speech Docker images with Nano-vLLM inference, a browser UI, and an HTTP API included.
@@ -30,7 +39,7 @@ Official images are published to [Docker Hub](https://hub.docker.com/r/hangrylab
 
 **Listen first:** [30-language voice design and cloning examples](https://hangry-labs.github.io/VoxCPMTTS/examples/).
 
-Hangry Labs home: [hangrylabs.app](https://hangrylabs.app/).
+Product page and installation guide: [hangrylabs.app/software/voxcpmtts](https://hangrylabs.app/software/voxcpmtts).
 
 <p align="center">
   <a href="https://hangry-labs.github.io/VoxCPMTTS/examples/">

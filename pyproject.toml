@@ -76,6 +76,7 @@ include = ["voxcpm*"]
     "static/*.css",
     "static/*.html",
     "static/*.js",
+    "static/locales/*.json",
     "static/vendor/lucide/*",
     "static/vendor/wavesurfer/*.js",
     "static/vendor/wavesurfer/LICENSE",

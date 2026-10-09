@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{UI_LOCALE}}" dir="{{UI_DIRECTION}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,7 +7,14 @@
   <title>VoxCPMTTS</title>
   <link rel="icon" type="image/webp" sizes="128x128" href="/assets/voxcpmtts_badge.webp">
   <script>
+    window.__VOXCPMTTS_UI__ = {{UI_BOOTSTRAP}}
     try {
+      const localeConfig = window.__VOXCPMTTS_UI__
+      const savedLocale = localStorage.getItem(localeConfig.storageKey)
+      const savedEntry = localeConfig.locales.find((item) => item.code === savedLocale)
+      if (location.pathname === '/' && savedEntry && savedEntry.code !== localeConfig.defaultLocale) {
+        location.replace(`${savedEntry.path}${location.search}${location.hash}`)
+      }
       const state = JSON.parse(sessionStorage.getItem('voxcpmtts-ui-state-v1') || 'null')
       if (state?.headerCollapsed) document.documentElement.dataset.headerCollapsed = 'true'
     } catch {
@@ -20,93 +27,94 @@
 </head>
 <body>
   <header class="brand-hero" id="brand-hero" data-collapsed="false">
-    <a class="labs-signature" href="https://hangrylabs.app/" target="_blank" rel="noreferrer" aria-label="Hangry Labs home" title="Hangry Labs home">
-      <span class="powered-label">Powered by</span>
+    <a class="labs-signature" href="https://hangrylabs.app/" target="_blank" rel="noreferrer" aria-label="Hangry Labs home" title="Hangry Labs home" data-i18n-aria-label="brand.labsHome" data-i18n-title="brand.labsHome">
+      <span class="powered-label" data-i18n="brand.poweredBy">Powered by</span>
       <img class="labs-logo" src="/assets/hangrylabs_logo.webp" alt="Hangry Labs">
     </a>
-    <img class="collapsed-mascot" src="/assets/voxcpmtts_mascot.webp" alt="VoxCPMTTS mascot">
-    <nav class="brand-nav" aria-label="Application links">
+    <img class="collapsed-mascot" src="/assets/voxcpmtts_mascot.webp" alt="VoxCPMTTS mascot" data-i18n-alt="brand.mascotAlt">
+    <nav class="brand-nav" aria-label="Application links" data-i18n-aria-label="nav.aria">
       <div class="brand-links">
-        <a class="primary-link" href="https://hangry-labs.github.io/VoxCPMTTS/examples/" target="_blank" rel="noreferrer"><i class="icon-sparkles"></i><span>Examples</span></a>
-        <a href="/tts/docs"><i class="icon-book-open"></i><span>API docs</span></a>
-        <a href="/tts/voices"><i class="icon-audio-lines"></i><span>Voices</span></a>
-        <a href="https://github.com/Hangry-Labs/VoxCPMTTS" target="_blank" rel="noreferrer"><i class="icon-git-branch"></i><span>GitHub</span></a>
+        <a class="primary-link" href="https://hangry-labs.github.io/VoxCPMTTS/examples/" target="_blank" rel="noreferrer"><i class="icon-sparkles"></i><span data-i18n="nav.examples">Examples</span></a>
+        <a href="/tts/docs"><i class="icon-book-open"></i><span data-i18n="nav.apiDocs">API docs</span></a>
+        <a href="/tts/voices"><i class="icon-audio-lines"></i><span data-i18n="nav.voices">Voices</span></a>
+        <a href="https://github.com/Hangry-Labs/VoxCPMTTS" target="_blank" rel="noreferrer"><i class="icon-git-branch"></i><span data-i18n="nav.github">GitHub</span></a>
+        <label class="locale-picker"><span class="visually-hidden" data-i18n="locale.label">Interface language</span><select id="ui-locale" aria-label="Interface language" data-i18n-aria-label="locale.label"></select></label>
       </div>
     </nav>
     <div class="brand-copy">
-      <h1><img class="product-logo" src="/assets/voxcpmtts_logo_horizontal.webp" alt="VoxCPMTTS"></h1>
+      <h1><img class="product-logo" src="/assets/voxcpmtts_logo_horizontal.webp" alt="VoxCPMTTS multilingual text to speech" data-i18n-alt="brand.productAlt"></h1>
     </div>
     <div class="runtime-badge" id="runtime-badge" data-state="starting">
       <i class="icon-activity"></i>
-      <div class="runtime-copy"><strong id="runtime-state">Inference starting</strong><span id="runtime-model">Waiting for inference service</span></div>
-      <a class="runtime-version" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" title="Open VoxCPMTTS releases">v{{UI_VERSION}}</a>
+      <div class="runtime-copy"><strong id="runtime-state" data-i18n="runtime.starting">Inference starting</strong><span id="runtime-model" data-i18n="runtime.waiting">Waiting for inference service</span></div>
+      <a class="runtime-version" href="https://github.com/Hangry-Labs/VoxCPMTTS/releases" target="_blank" rel="noreferrer" title="Open VoxCPMTTS releases" data-i18n-title="runtime.openReleases">v{{UI_VERSION}}</a>
     </div>
-    <button class="hero-toggle" id="hero-toggle" type="button" aria-controls="brand-hero" aria-expanded="true" aria-label="Collapse header" title="Collapse header"><i class="icon-chevron-up"></i></button>
+    <button class="hero-toggle" id="hero-toggle" type="button" aria-controls="brand-hero" aria-expanded="true" aria-label="Collapse header" title="Collapse header" data-i18n-aria-label="hero.collapse" data-i18n-title="hero.collapse"><i class="icon-chevron-up"></i></button>
   </header>
 
-  <div class="app-tabs" role="tablist" aria-label="Workspace views">
-    <button class="tab-button active" type="button" role="tab" aria-selected="true" data-tab="generate">Generate</button>
-    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="clone">Design</button>
-    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="stream">Stream</button>
-    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="api">API</button>
-    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="system">System</button>
+  <div class="app-tabs" role="tablist" aria-label="Workspace views" data-i18n-aria-label="tabs.aria">
+    <button class="tab-button active" type="button" role="tab" aria-selected="true" data-tab="generate" data-i18n="tabs.generate">Generate</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="clone" data-i18n="tabs.design">Design</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="stream" data-i18n="tabs.stream">Stream</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="api" data-i18n="tabs.api">API</button>
+    <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="system" data-i18n="tabs.system">System</button>
   </div>
 
   <main class="workspace" data-view="generate">
     <aside class="settings-panel workflow-only" id="inference-settings">
-      <div class="section-title"><i class="icon-sliders-horizontal"></i><span>Voice setup</span></div>
+      <div class="section-title"><i class="icon-sliders-horizontal"></i><span data-i18n="inference.title">Voice setup</span></div>
       <div class="voice-setup-grid">
-        <label class="compact-field"><span>Language</span><select id="language"><option value="English">English</option></select></label>
-        <label class="compact-field" id="voice-profile-field"><span>Saved voice</span><select id="voice-profile"><option value="">None</option></select></label>
-        <label class="compact-field"><span>Hardware</span><select id="device"><option value="auto">Auto</option><option value="cpu">CPU</option></select></label>
-        <label class="compact-field"><span>Format</span><select id="output-format"><option value="mp3">MP3</option></select></label>
+        <label class="compact-field"><span data-i18n="inference.language">Language</span><select id="language"><option value="English">English</option></select></label>
+        <label class="compact-field" id="voice-profile-field"><span data-i18n="inference.profile">Saved voice</span><select id="voice-profile"><option value="" data-i18n="common.none">None</option></select></label>
+        <label class="compact-field"><span data-i18n="inference.device">Hardware</span><select id="device"><option value="auto" data-i18n="common.auto">Auto</option><option value="cpu">CPU</option></select></label>
+        <label class="compact-field"><span data-i18n="inference.outputFormat">Format</span><select id="output-format"><option value="mp3">MP3</option></select></label>
       </div>
-      <small class="voice-profile-note" id="voice-profile-note">Use a saved design or clone sample</small>
+      <small class="voice-profile-note" id="voice-profile-note" data-i18n="profiles.selectionHelp">Use a saved design or clone sample</small>
 
       <details class="settings-details compact-advanced" id="generation-settings">
-        <summary><span><i class="icon-sliders-horizontal"></i>Generation settings</span><i class="icon-chevron-down disclosure-icon"></i></summary>
-        <div class="section-heading-row settings-actions"><strong>Model controls</strong><button class="icon-button reset-controls" id="reset-controls" type="button" title="Reset controls" aria-label="Reset controls"><i class="icon-rotate-ccw"></i></button></div>
+        <summary><span><i class="icon-sliders-horizontal"></i><span data-i18n="generation.settings">Generation settings</span></span><i class="icon-chevron-down disclosure-icon"></i></summary>
+        <div class="section-heading-row settings-actions"><strong data-i18n="generation.modelControls">Model controls</strong><button class="icon-button reset-controls" id="reset-controls" type="button" title="Reset controls" aria-label="Reset controls" data-i18n-title="generation.reset" data-i18n-aria-label="generation.reset"><i class="icon-rotate-ccw"></i></button></div>
         <div class="range-stack">
-          <label class="range-control"><span class="range-heading"><span>Guidance</span></span><span class="range-input-row"><input id="guidance-slider" type="range" min="0.1" max="10" step="0.1" value="2" data-value-input="guidance"><input id="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" aria-label="Guidance value" data-range-input="guidance-slider"></span></label>
-          <label class="range-control"><span class="range-heading"><span>Inference steps</span></span><span class="range-input-row"><input id="steps-slider" type="range" min="1" max="100" step="1" value="10" data-value-input="steps"><input id="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" aria-label="Inference steps value" data-range-input="steps-slider"></span></label>
+          <label class="range-control"><span class="range-heading"><span data-i18n="generation.guidance">Guidance</span></span><span class="range-input-row"><input id="guidance-slider" type="range" min="0.1" max="10" step="0.1" value="2" data-value-input="guidance"><input id="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" aria-label="Guidance value" data-i18n-aria-label="generation.guidanceValue" data-range-input="guidance-slider"></span></label>
+          <label class="range-control"><span class="range-heading"><span data-i18n="generation.steps">Inference steps</span></span><span class="range-input-row"><input id="steps-slider" type="range" min="1" max="100" step="1" value="10" data-value-input="steps"><input id="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" aria-label="Inference steps value" data-i18n-aria-label="generation.stepsValue" data-range-input="steps-slider"></span></label>
         </div>
         <section class="settings-group seed-panel" aria-labelledby="seed-heading">
-          <div class="compact-section-heading"><strong id="seed-heading">Seed</strong><label class="inline-toggle seed-randomize"><span>Randomize</span><input id="randomize-seed" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label></div>
-          <label class="seed-field"><span class="visually-hidden">Seed value</span><input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></label>
-          <div class="seed-result"><span>Last used seed</span><output id="last-generated-seed">--</output></div>
+          <div class="compact-section-heading"><strong id="seed-heading" data-i18n="generation.seed">Seed</strong><label class="inline-toggle seed-randomize"><span data-i18n="generation.randomSeed">Randomize</span><input id="randomize-seed" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label></div>
+          <label class="seed-field"><span class="visually-hidden" data-i18n="generation.seedValue">Seed value</span><input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></label>
+          <div class="seed-result"><span data-i18n="generation.lastSeed">Last used seed</span><output id="last-generated-seed">--</output></div>
         </section>
         <section class="settings-group output-settings" aria-labelledby="output-settings-heading">
-          <div class="compact-section-heading"><strong id="output-settings-heading">Output processing</strong><span>-16 LUFS</span></div>
+          <div class="compact-section-heading"><strong id="output-settings-heading" data-i18n="generation.outputProcessing">Output processing</strong><span>-16 LUFS</span></div>
           <div class="compact-toggle-list">
-            <label class="toggle-field"><span>Normalize loudness</span><input id="normalize-loudness" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
-            <label class="toggle-field"><span>Normalize text</span><input id="normalize-text" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
-            <label class="toggle-field"><span>Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+            <label class="toggle-field"><span data-i18n="generation.normalize">Normalize loudness</span><input id="normalize-loudness" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
+            <label class="toggle-field"><span data-i18n="generation.normalizeText">Normalize text</span><input id="normalize-text" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+            <label class="toggle-field"><span data-i18n="generation.denoise">Denoise reference</span><input id="denoise" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
           </div>
         </section>
         <details class="settings-subdetails" id="timing-settings">
-          <summary><span>Speech timing</span><span class="capability-state" id="timestamp-state" data-state="unavailable">Checking</span></summary>
+          <summary><span data-i18n="timestamps.title">Speech timing</span><span class="capability-state" id="timestamp-state" data-state="unavailable" data-i18n="common.checking">Checking</span></summary>
           <div class="timestamp-options">
-            <label class="toggle-field timestamp-toggle"><span>Generate timestamps</span><input id="generate-timestamps" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
-            <label class="compact-field timestamp-level-field"><span>Detail</span><select id="timestamp-level"><option value="word">Words</option><option value="segment">Segments</option><option value="char">Characters</option></select></label>
+            <label class="toggle-field timestamp-toggle"><span data-i18n="timestamps.generate">Generate timestamps</span><input id="generate-timestamps" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+            <label class="compact-field timestamp-level-field"><span data-i18n="timestamps.detail">Detail</span><select id="timestamp-level"><option value="word" data-i18n="timestamps.words">Words</option><option value="segment" data-i18n="timestamps.segments">Segments</option><option value="char" data-i18n="timestamps.characters">Characters</option></select></label>
           </div>
         </details>
       </details>
-      <div class="status-line" id="global-status" data-tone="neutral">Connecting to inference</div>
+      <div class="status-line" id="global-status" data-tone="neutral" data-i18n="status.connecting">Connecting to inference</div>
     </aside>
 
     <section class="content-panel">
       <section class="composer workflow-only" id="composer">
         <div class="composer-heading">
-          <div class="section-title"><i class="icon-message-square-text"></i><span>Input text</span></div>
-          <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format"><button class="active" type="button" data-input-type="text" aria-pressed="true">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span>New sample</span></button></div>
+          <div class="section-title"><i class="icon-message-square-text"></i><span data-i18n="composer.text">Input text</span></div>
+          <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format" data-i18n-aria-label="composer.inputType"><button class="active" type="button" data-input-type="text" aria-pressed="true">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span data-i18n="composer.newSample">New sample</span></button></div>
         </div>
-        <textarea id="text-input" rows="7" spellcheck="true" aria-label="Text to synthesize">VoxCPM2 generates natural multilingual speech with voice design and cloning.</textarea>
+        <textarea id="text-input" rows="7" spellcheck="true" aria-label="Text to synthesize" data-i18n-aria-label="composer.input" data-i18n="composer.defaultText">VoxCPM2 generates natural multilingual speech with voice design and cloning.</textarea>
       </section>
 
       <div class="tab-panel" data-panel="generate">
-        <div class="generate-action-row"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span>Generate audio</span></button></div>
-        <div class="inference-progress" id="generate-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong>Preparing request</strong><span>VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Generated audio</span></div><div><span class="final-badge">Final output</span></div></div><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></section>
+        <div class="generate-action-row"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span data-i18n="common.generateAudio">Generate audio</span></button></div>
+        <div class="inference-progress" id="generate-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong data-i18n="progress.preparing">Preparing request</strong><span data-i18n="progress.gettingReady">VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span data-i18n="output.generated">Generated audio</span></div><div><span class="final-badge" data-i18n="output.final">Final output</span></div></div><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></section>
       </div>
 
       <div class="tab-panel" data-panel="clone" hidden>
@@ -114,78 +122,78 @@
           <div class="clone-primary-column">
             <section class="composer design-composer" id="design-composer">
               <div class="composer-heading">
-                <div class="section-title"><i class="icon-message-square-text"></i><span>Design sample text</span></div>
-                <div class="composer-actions"><span class="text-metrics" id="design-text-metrics">0 characters</span><button class="secondary-button compact-command seed-lock-button" id="design-seed-lock" type="button" aria-pressed="false" title="Lock generation seed"><i class="icon-square"></i><span>Seed unlocked</span></button><button class="secondary-button compact-command" id="design-sample-button" type="button"><i class="icon-refresh-cw"></i><span>New sample</span></button></div>
+                <div class="section-title"><i class="icon-message-square-text"></i><span data-i18n="design.sampleText">Design sample text</span></div>
+                <div class="composer-actions"><span class="text-metrics" id="design-text-metrics">0 characters</span><button class="secondary-button compact-command seed-lock-button" id="design-seed-lock" type="button" aria-pressed="false" title="Lock generation seed" data-i18n-title="generation.lockSeed"><i class="icon-square"></i><span data-i18n="generation.seedUnlocked">Seed unlocked</span></button><button class="secondary-button compact-command" id="design-sample-button" type="button"><i class="icon-refresh-cw"></i><span data-i18n="composer.newSample">New sample</span></button></div>
               </div>
               <div class="design-identity" id="design-identity">
                 <div class="portrait-control">
                   <input class="visually-hidden" id="design-portrait-input" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
-                  <button class="portrait-picker" id="design-portrait-choose" type="button" title="Choose character portrait" aria-label="Choose character portrait"><span class="portrait-placeholder" aria-hidden="true">?</span><img id="design-portrait-preview" alt="" hidden></button>
-                  <button class="portrait-remove" id="design-portrait-remove" type="button" title="Remove character portrait" aria-label="Remove character portrait" hidden><i class="icon-x"></i></button>
+                  <button class="portrait-picker" id="design-portrait-choose" type="button" title="Choose character portrait" aria-label="Choose character portrait" data-i18n-title="profiles.choosePortrait" data-i18n-aria-label="profiles.choosePortrait"><span class="portrait-placeholder" aria-hidden="true">?</span><img id="design-portrait-preview" alt="" hidden></button>
+                  <button class="portrait-remove" id="design-portrait-remove" type="button" title="Remove character portrait" aria-label="Remove character portrait" data-i18n-title="profiles.removePortrait" data-i18n-aria-label="profiles.removePortrait" hidden><i class="icon-x"></i></button>
                 </div>
-                <label class="compact-field design-name-field"><span>Voice name</span><input id="design-voice-name" type="text" maxlength="48" placeholder="studio-narrator" autocomplete="off"></label>
-                <label class="compact-field design-tags-field"><span>Tags <small>Comma separated</small></span><input id="design-voice-tags" type="text" maxlength="395" placeholder="warm, narrator, english" autocomplete="off"></label>
+                <label class="compact-field design-name-field"><span data-i18n="profiles.name">Voice name</span><input id="design-voice-name" type="text" maxlength="48" placeholder="studio-narrator" data-i18n-placeholder="profiles.namePlaceholder" autocomplete="off"></label>
+                <label class="compact-field design-tags-field"><span><span data-i18n="profiles.tags">Tags</span> <small data-i18n="profiles.commaSeparated">Comma separated</small></span><input id="design-voice-tags" type="text" maxlength="395" placeholder="warm, narrator, english" data-i18n-placeholder="profiles.tagsPlaceholder" autocomplete="off"></label>
               </div>
-              <label class="design-sample-field"><span class="visually-hidden">Text used to design and test the voice</span><input id="design-text-input" type="text" maxlength="500" spellcheck="true" aria-label="Text used to design and test the voice" value="VoxCPM2 generates natural multilingual speech with voice design and cloning."></label>
+              <label class="design-sample-field"><span class="visually-hidden" data-i18n="design.sampleHelp">Text used to design and test the voice</span><input id="design-text-input" type="text" maxlength="500" spellcheck="true" aria-label="Text used to design and test the voice" data-i18n-aria-label="design.sampleHelp" data-i18n-value="composer.defaultText" value="VoxCPM2 generates natural multilingual speech with voice design and cloning."></label>
             </section>
             <section class="conditioning-panel" id="clone-panel">
               <div class="design-source-heading">
-                <div><div class="section-title"><i class="icon-sparkles"></i><span>Design voice</span></div><small>Build from a recording or describe a new voice</small></div>
-                <div class="segmented-control design-source-control" role="group" aria-label="Voice design source">
-                  <button class="active" type="button" data-design-source="reference" aria-pressed="true">Reference audio</button>
-                  <button type="button" data-design-source="direction" aria-pressed="false">Direction only</button>
+                <div><div class="section-title"><i class="icon-sparkles"></i><span data-i18n="design.title">Design voice</span></div><small data-i18n="design.description">Build from a recording or describe a new voice</small></div>
+                <div class="segmented-control design-source-control" role="group" aria-label="Voice design source" data-i18n-aria-label="design.source">
+                  <button class="active" type="button" data-design-source="reference" aria-pressed="true" data-i18n="clone.referenceAudio">Reference audio</button>
+                  <button type="button" data-design-source="direction" aria-pressed="false" data-i18n="design.directionOnly">Direction only</button>
                 </div>
               </div>
               <div class="reference-audio-surface" id="reference-audio-drop" data-design-reference>
                 <input class="visually-hidden" id="reference-audio" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.webm,audio/*">
                 <div class="reference-source-toolbar">
-                  <div class="reference-source-label"><i class="icon-file-audio"></i><div><strong>Reference audio</strong><small id="reference-audio-name">No audio selected</small></div></div>
+                  <div class="reference-source-label"><i class="icon-file-audio"></i><div><strong data-i18n="clone.referenceAudio">Reference audio</strong><small id="reference-audio-name" data-i18n="audio.noAudio">No audio selected</small></div></div>
                   <div class="reference-source-actions">
-                    <button class="icon-button bordered" id="reference-audio-clear" type="button" title="Remove reference audio" aria-label="Remove reference audio" hidden><i class="icon-x"></i></button>
-                    <button class="secondary-button compact-command" id="reference-audio-choose" type="button"><i class="icon-upload"></i><span>Choose audio</span></button>
-                    <button class="record-button compact-command" id="reference-record-toggle" type="button" aria-pressed="false"><i class="icon-mic"></i><span>Record</span></button>
+                    <button class="icon-button bordered" id="reference-audio-clear" type="button" title="Remove reference audio" aria-label="Remove reference audio" data-i18n-title="clone.removeAudio" data-i18n-aria-label="clone.removeAudio" hidden><i class="icon-x"></i></button>
+                    <button class="secondary-button compact-command" id="reference-audio-choose" type="button"><i class="icon-upload"></i><span data-i18n="clone.chooseAudio">Choose audio</span></button>
+                    <button class="record-button compact-command" id="reference-record-toggle" type="button" aria-pressed="false"><i class="icon-mic"></i><span data-i18n="record.record">Record</span></button>
                   </div>
                 </div>
                 <div class="reference-recording-monitor">
-                  <canvas class="recording-wave" id="reference-record-wave" aria-label="Live microphone waveform"></canvas>
-                  <span class="record-state" id="reference-record-state" aria-live="polite">Ready to record</span>
+                  <canvas class="recording-wave" id="reference-record-wave" aria-label="Live microphone waveform" data-i18n-aria-label="record.waveform"></canvas>
+                  <span class="record-state" id="reference-record-state" aria-live="polite" data-i18n="record.ready">Ready to record</span>
                 </div>
                 <section class="reference-audio-preview" id="reference-audio-preview" aria-live="polite"></section>
-                <div class="reference-drop-note"><i class="icon-upload"></i><span>Drop audio here to replace the current reference</span><small>WAV, MP3, FLAC, OGG, M4A, AAC, or WebM</small></div>
+                <div class="reference-drop-note"><i class="icon-upload"></i><span data-i18n="clone.dropAudio">Drop audio here to replace the current reference</span><small>WAV, MP3, FLAC, OGG, M4A, AAC, or WebM</small></div>
               </div>
               <div class="clone-conditioning-heading">
-                <div><strong>Conditioning</strong><small id="clone-conditioning-copy">Direct the delivery of the cloned voice</small></div>
-                <div class="segmented-control clone-mode-control" role="group" aria-label="Reference conditioning mode">
-                  <button class="active" type="button" data-clone-mode="reference" aria-pressed="true">Direction</button>
-                  <button type="button" data-clone-mode="transcript" aria-pressed="false">Transcript</button>
+                <div><strong data-i18n="clone.conditioning">Conditioning</strong><small id="clone-conditioning-copy" data-i18n="clone.directionHelp">Direct the delivery of the cloned voice</small></div>
+                <div class="segmented-control clone-mode-control" role="group" aria-label="Reference conditioning mode" data-i18n-aria-label="clone.conditioningMode">
+                  <button class="active" type="button" data-clone-mode="reference" aria-pressed="true" data-i18n="clone.direction">Direction</button>
+                  <button type="button" data-clone-mode="transcript" aria-pressed="false" data-i18n="clone.transcript">Transcript</button>
                 </div>
               </div>
-              <label class="field clone-conditioning-panel" id="clone-direction-panel"><span id="clone-direction-label">Clone direction <small>Optional</small></span><textarea id="clone-control-input" rows="4" placeholder="Warm, measured delivery with a clear tone"></textarea></label>
-              <div class="field clone-conditioning-panel" id="clone-transcript-panel" hidden><div class="clone-field-heading"><label for="reference-text">Reference transcript</label><button class="secondary-button compact-command" id="transcribe-reference" type="button"><i class="icon-message-square-text"></i><span>Transcribe</span></button></div><textarea id="reference-text" rows="4" placeholder="Enter exactly what is spoken in the reference audio"></textarea></div>
+              <label class="field clone-conditioning-panel" id="clone-direction-panel"><span id="clone-direction-label"><span data-i18n="clone.cloneDirection">Clone direction</span> <small data-i18n="common.optional">Optional</small></span><textarea id="clone-control-input" rows="4" placeholder="Warm, measured delivery with a clear tone" data-i18n-placeholder="clone.directionPlaceholder"></textarea></label>
+              <div class="field clone-conditioning-panel" id="clone-transcript-panel" hidden><div class="clone-field-heading"><label for="reference-text" data-i18n="clone.referenceTranscript">Reference transcript</label><button class="secondary-button compact-command" id="transcribe-reference" type="button"><i class="icon-message-square-text"></i><span data-i18n="clone.transcribe">Transcribe</span></button></div><textarea id="reference-text" rows="4" placeholder="Enter exactly what is spoken in the reference audio" data-i18n-placeholder="clone.transcriptPlaceholder"></textarea></div>
             </section>
-            <div class="generate-action-row"><button class="primary-button" id="clone-button" type="button"><i class="icon-audio-lines"></i><span>Generate designed voice</span></button></div>
-            <div class="inference-progress" id="clone-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong>Preparing request</strong><span>VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
-            <section class="output-section" id="clone-output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span>Designed voice</span></div><div><span class="final-badge">Final output</span></div></div><section id="clone-output" aria-live="polite"></section><section class="timestamp-results" id="clone-timestamp-results" hidden aria-live="polite"></section><div class="clone-store-row" id="clone-store-row" hidden><div><strong id="clone-store-title">Keep this voice</strong><span id="clone-store-copy">Store a compact generated reference and its design recipe</span></div><div class="clone-store-actions"><button class="secondary-button" id="cancel-voice-edit" type="button" hidden>Cancel edit</button><button class="secondary-button" id="store-generated-voice" type="button"><i class="icon-check"></i><span>Store voice</span></button></div></div></section>
+            <div class="generate-action-row"><button class="primary-button" id="clone-button" type="button"><i class="icon-audio-lines"></i><span data-i18n="design.generate">Generate designed voice</span></button></div>
+            <div class="inference-progress" id="clone-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong data-i18n="progress.preparing">Preparing request</strong><span data-i18n="progress.gettingReady">VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
+            <section class="output-section" id="clone-output-section"><div class="output-heading"><div class="section-title"><i class="icon-audio-lines"></i><span data-i18n="output.designed">Designed voice</span></div><div><span class="final-badge" data-i18n="output.final">Final output</span></div></div><section id="clone-output" aria-live="polite"></section><section class="timestamp-results" id="clone-timestamp-results" hidden aria-live="polite"></section><div class="clone-store-row" id="clone-store-row" hidden><div><strong id="clone-store-title" data-i18n="profiles.keep">Keep this voice</strong><span id="clone-store-copy" data-i18n="profiles.storeRecipe">Store a compact generated reference and its design recipe</span></div><div class="clone-store-actions"><button class="secondary-button" id="cancel-voice-edit" type="button" hidden data-i18n="profiles.cancelEdit">Cancel edit</button><button class="secondary-button" id="store-generated-voice" type="button"><i class="icon-check"></i><span data-i18n="profiles.store">Store voice</span></button></div></div></section>
           </div>
-          <aside class="clone-library" aria-labelledby="clone-library-title"><div class="clone-library-heading"><div class="section-title"><i class="icon-audio-lines"></i><span id="clone-library-title">Saved voices</span><span class="count-badge" id="clone-profile-count">0</span></div></div><label class="profile-search clone-profile-search"><span class="visually-hidden">Search saved voices</span><input id="clone-profile-filter" type="search" placeholder="Search voices"></label><div class="clone-profile-list" id="clone-profile-list"></div></aside>
+          <aside class="clone-library" aria-labelledby="clone-library-title"><div class="clone-library-heading"><div class="section-title"><i class="icon-audio-lines"></i><span id="clone-library-title" data-i18n="profiles.saved">Saved voices</span><span class="count-badge" id="clone-profile-count">0</span></div></div><label class="profile-search clone-profile-search"><span class="visually-hidden" data-i18n="profiles.search">Search saved voices</span><input id="clone-profile-filter" type="search" placeholder="Search voices" data-i18n-placeholder="profiles.searchPlaceholder"></label><div class="clone-profile-list" id="clone-profile-list"></div></aside>
         </div>
       </div>
 
       <div class="tab-panel" data-panel="stream" hidden>
-        <div class="generate-action-row"><button class="primary-button" id="stream-start" type="button"><i class="icon-radio"></i><span>Start stream</span></button><button class="secondary-button stop-button" id="stream-stop" type="button" disabled>Stop</button></div>
+        <div class="generate-action-row"><button class="primary-button" id="stream-start" type="button"><i class="icon-radio"></i><span data-i18n="common.startStream">Start stream</span></button><button class="secondary-button stop-button" id="stream-stop" type="button" disabled data-i18n="common.stop">Stop</button></div>
         <div class="stream-progress" id="stream-progress" hidden><span></span></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-radio"></i><span>Stream output</span></div></div><div class="live-stream-surface" id="stream-live" hidden><canvas id="stream-live-wave" aria-label="Live streamed audio waveform"></canvas><div><strong id="stream-live-state">Waiting for audio</strong><span id="stream-live-detail">0 KiB buffered</span></div></div><section id="stream-output" aria-live="polite"></section></section>
+        <section class="output-section"><div class="output-heading"><div class="section-title"><i class="icon-radio"></i><span data-i18n="output.stream">Stream output</span></div></div><div class="live-stream-surface" id="stream-live" hidden><canvas id="stream-live-wave" aria-label="Live streamed audio waveform" data-i18n-aria-label="stream.waveform"></canvas><div><strong id="stream-live-state" data-i18n="stream.waiting">Waiting for audio</strong><span id="stream-live-detail">0 KiB buffered</span></div></div><section id="stream-output" aria-live="polite"></section></section>
       </div>
 
       <div class="tab-panel" data-panel="api" hidden>
-        <div class="view-heading"><div><h2>API</h2><p>Native VoxCPMTTS endpoint status</p></div><button class="secondary-button" id="api-refresh" type="button"><i class="icon-refresh-cw"></i><span>Refresh</span></button></div>
-        <div class="api-grid"><section><div class="section-title"><i class="icon-activity"></i><span>Runtime details</span></div><pre class="data-output json-output" id="api-output"></pre></section><section><div class="section-title"><i class="icon-book-open"></i><span>Service capabilities</span></div><pre class="data-output json-output" id="capabilities-output"></pre></section></div>
+        <div class="view-heading"><div><h2>API</h2><p data-i18n="api.description">Native VoxCPMTTS endpoint status</p></div><button class="secondary-button" id="api-refresh" type="button"><i class="icon-refresh-cw"></i><span data-i18n="common.refresh">Refresh</span></button></div>
+        <div class="api-grid"><section><div class="section-title"><i class="icon-activity"></i><span data-i18n="system.runtime">Runtime details</span></div><pre class="data-output json-output" id="api-output"></pre></section><section><div class="section-title"><i class="icon-book-open"></i><span data-i18n="api.capabilities">Service capabilities</span></div><pre class="data-output json-output" id="capabilities-output"></pre></section></div>
       </div>
 
       <div class="tab-panel" data-panel="system" hidden>
-        <div class="view-heading"><div><h2>System</h2><p>Model memory and GPU telemetry</p></div><button class="secondary-button" id="system-refresh" type="button"><i class="icon-refresh-cw"></i><span>Refresh</span></button></div>
+        <div class="view-heading"><div><h2 data-i18n="system.title">System</h2><p data-i18n="system.description">Model memory and GPU telemetry</p></div><button class="secondary-button" id="system-refresh" type="button"><i class="icon-refresh-cw"></i><span data-i18n="common.refresh">Refresh</span></button></div>
         <div class="system-grid">
-          <div class="system-controls"><section class="runtime-settings-card"><div class="runtime-settings-heading"><div><i class="icon-activity"></i><strong>Memory controls</strong></div></div><div class="system-action-row"><button class="danger-button" id="purge-models" type="button">Purge models</button></div></section><pre class="data-output" id="readiness-output">Runtime status unavailable.</pre></div>
+          <div class="system-controls"><section class="runtime-settings-card"><div class="runtime-settings-heading"><div><i class="icon-activity"></i><strong data-i18n="system.memory">Memory controls</strong></div></div><div class="system-action-row"><button class="danger-button" id="purge-models" type="button" data-i18n="system.purge">Purge models</button></div></section><pre class="data-output" id="readiness-output" data-i18n="system.unavailable">Runtime status unavailable.</pre></div>
           <section class="gpu-system-panel" id="gpu-output" aria-live="polite"></section>
         </div>
       </div>
@@ -193,14 +201,14 @@
   </main>
   <dialog class="guide-dialog" id="save-profile-dialog">
     <form id="quick-save-form" method="dialog">
-      <div class="dialog-heading"><h2 id="save-profile-title">Save voice</h2><button class="icon-button" id="save-profile-close" type="button" title="Close" aria-label="Close"><i class="icon-x"></i></button></div>
-      <p id="save-profile-copy">Store this voice in the persistent product volume.</p>
-      <label class="field"><span>Description <small>Optional</small></span><input id="quick-profile-description" type="text" maxlength="240" placeholder="Where this voice works best"></label>
-      <div class="dialog-actions"><button class="secondary-button" id="save-profile-cancel" type="button">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span>Save voice</span></button></div>
+      <div class="dialog-heading"><h2 id="save-profile-title" data-i18n="profiles.save">Save voice</h2><button class="icon-button" id="save-profile-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div>
+      <p id="save-profile-copy" data-i18n="profiles.persisted">Store this voice in the persistent product volume.</p>
+      <label class="field"><span><span data-i18n="profiles.description">Description</span> <small data-i18n="common.optional">Optional</small></span><input id="quick-profile-description" type="text" maxlength="240" placeholder="Where this voice works best" data-i18n-placeholder="profiles.descriptionPlaceholder"></label>
+      <div class="dialog-actions"><button class="secondary-button" id="save-profile-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="profiles.save">Save voice</span></button></div>
     </form>
   </dialog>
-  <dialog class="confirm-dialog" id="update-profile-dialog"><div class="dialog-heading"><h2 id="update-profile-title">Replace saved voice?</h2><button class="icon-button" id="update-profile-close" type="button" title="Close" aria-label="Close"><i class="icon-x"></i></button></div><p id="update-profile-copy">Replace <strong id="update-profile-name"></strong> with this newly refined voice?</p><div class="dialog-actions"><button class="secondary-button" id="update-profile-cancel" type="button">Cancel</button><button class="primary-button" id="update-profile-confirm" type="button"><i class="icon-check"></i><span>Update voice</span></button></div></dialog>
-  <dialog class="confirm-dialog" id="delete-profile-dialog"><div class="dialog-heading"><h2>Delete saved voice</h2><button class="icon-button" id="delete-profile-close" type="button" title="Close" aria-label="Close"><i class="icon-x"></i></button></div><p>Delete <strong id="delete-profile-name"></strong> and its stored audio?</p><div class="dialog-actions"><button class="secondary-button" id="delete-profile-cancel" type="button">Cancel</button><button class="danger-button" id="delete-profile-confirm" type="button">Delete</button></div></dialog>
+  <dialog class="confirm-dialog" id="update-profile-dialog"><div class="dialog-heading"><h2 id="update-profile-title" data-i18n="profiles.replaceTitle">Replace saved voice?</h2><button class="icon-button" id="update-profile-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div><p id="update-profile-copy"><span data-i18n="profiles.replacePrefix">Replace</span> <strong id="update-profile-name"></strong> <span data-i18n="profiles.replaceSuffix">with this newly refined voice?</span></p><div class="dialog-actions"><button class="secondary-button" id="update-profile-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" id="update-profile-confirm" type="button"><i class="icon-check"></i><span data-i18n="profiles.updateVoice">Update voice</span></button></div></dialog>
+  <dialog class="confirm-dialog" id="delete-profile-dialog"><div class="dialog-heading"><h2 data-i18n="profiles.deleteTitle">Delete saved voice</h2><button class="icon-button" id="delete-profile-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div><p><span data-i18n="profiles.deletePrefix">Delete</span> <strong id="delete-profile-name"></strong> <span data-i18n="profiles.deleteSuffix">and its stored audio?</span></p><div class="dialog-actions"><button class="secondary-button" id="delete-profile-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="danger-button" id="delete-profile-confirm" type="button" data-i18n="common.delete">Delete</button></div></dialog>
   <div class="toast" id="toast" role="alert" hidden></div>
 </body>
 </html>
