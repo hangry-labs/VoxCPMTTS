@@ -403,10 +403,8 @@ function renderVoiceProfileSelect(selected = $('#voice-profile').value) {
   updateVoiceProfileState()
 }
 
-function restoreProfileRecipe(profile) {
+function restoreProfileGenerationSettings(profile) {
   const recipe = profile.recipe || {}
-  $('#design-text-input').value = recipe.sample_text || profile.ref_text || $('#design-text-input').value
-  updateDesignMetrics()
   if (profile.language && [...$('#language').options].some((option) => option.value === profile.language)) {
     $('#language').value = profile.language
   }
@@ -428,6 +426,13 @@ function restoreProfileRecipe(profile) {
     $('#output-format').value = recipe.output_format
   }
   updateSeedState()
+}
+
+function restoreProfileRecipe(profile) {
+  const recipe = profile.recipe || {}
+  $('#design-text-input').value = recipe.sample_text || profile.ref_text || $('#design-text-input').value
+  updateDesignMetrics()
+  restoreProfileGenerationSettings(profile)
 }
 
 async function loadProfileReference(profile, { design = false } = {}) {
@@ -477,7 +482,7 @@ async function useProfile(profile, tab, { editing = false } = {}) {
     }
   } else {
     renderVoiceProfileSelect(profile.id)
-    if (profile.language) $('#language').value = profile.language
+    restoreProfileGenerationSettings(profile)
   }
   activateTab(tab)
   renderVoiceSaveState()
@@ -692,6 +697,7 @@ function updateWorkflowControls() {
 function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
   const cloning = workflow === 'clone'
   const usesReference = cloning && state.designSource === 'reference'
+  const profileId = $('#voice-profile').value || null
   const outputFormat = streaming ? 'mp3' : $('#output-format').value
   const referenceText = usesReference && state.cloneMode === 'transcript'
     ? ($('#reference-text').value.trim() || null)
@@ -701,7 +707,7 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
     input_type: cloning ? 'text' : state.inputType,
     language: $('#language').value || 'English',
     voice: usesReference ? 'reference' : 'auto',
-    voice_profile: usesReference ? ($('#voice-profile').value || null) : null,
+    voice_profile: cloning ? (usesReference ? profileId : null) : profileId,
     clone_mode: usesReference ? state.cloneMode : 'auto',
     control: cloning
       ? (!usesReference || state.cloneMode === 'reference' ? ($('#clone-control-input').value.trim() || null) : null)
@@ -1748,7 +1754,11 @@ $('#reference-text').addEventListener('input', updateDesignCompletion)
 $$('.input-type-control button').forEach((button) => button.addEventListener('click', () => setInputType(button.dataset.inputType)))
 $$('.design-source-control button').forEach((button) => button.addEventListener('click', () => setDesignSource(button.dataset.designSource)))
 $$('.clone-mode-control button').forEach((button) => button.addEventListener('click', () => setCloneMode(button.dataset.cloneMode)))
-$('#voice-profile').addEventListener('change', updateVoiceProfileState)
+$('#voice-profile').addEventListener('change', () => {
+  const profile = selectedProfile()
+  if (profile) restoreProfileGenerationSettings(profile)
+  updateVoiceProfileState()
+})
 $('#randomize-seed').addEventListener('change', updateSeedState)
 $('#design-seed-lock').addEventListener('click', () => {
   $('#randomize-seed').checked = !$('#randomize-seed').checked

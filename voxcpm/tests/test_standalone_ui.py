@@ -134,6 +134,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "function stopGpuMonitor(" in script
     assert "inputDrafts: { text: null, ssml: null, 'ssml-h': null }" in script
     assert "input_type: cloning ? 'text' : state.inputType" in script
+    assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
+    assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
     assert "useProfile(profile, 'clone', { editing: true })" in script
     assert "referenceAudio.clear()" in script
