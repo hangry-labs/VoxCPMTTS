@@ -1,6 +1,7 @@
 import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
 import { AudioEditor } from './audio-editor.js'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
+import { MagicEditor } from './magic-editor.js'
 
 await initializeI18n()
 
@@ -85,7 +86,7 @@ const GPU_METRICS = [
 const state = {
   activeTab: 'generate',
   generationMode: 'generate',
-  inputType: 'text',
+  inputType: 'magic',
   inputDrafts: { text: null, ssml: null, 'ssml-h': null },
   headerCollapsed: document.documentElement.dataset.headerCollapsed === 'true',
   streamAbort: null,
@@ -99,6 +100,7 @@ const state = {
   gpuHovering: false,
   formats: {},
   streamFormats: {},
+  ssmlCapabilities: {},
   defaults: {},
   status: {},
   profiles: [],
@@ -116,6 +118,8 @@ const state = {
   pendingDeleteProfile: null,
   activityTimer: null,
 }
+
+const magicEditor = new MagicEditor($('#magic-editor-shell'), { onChange: updateMetrics })
 
 const generateOutput = new AudioEditor($('#generate-output'), {
   label: t('output.generated', {}, 'Generated audio'),
@@ -256,7 +260,7 @@ function restoreSessionState() {
   if (['generate', 'stream'].includes(ui?.generationMode)) state.generationMode = ui.generationMode
   if (typeof ui?.headerCollapsed === 'boolean') state.headerCollapsed = ui.headerCollapsed
   if ([60 * 1000, 10 * 60 * 1000].includes(ui?.gpuWindowMs)) state.gpuWindowMs = ui.gpuWindowMs
-  if (['text', 'ssml', 'ssml-h'].includes(ui?.inputType)) state.inputType = ui.inputType
+  if (['magic', 'text', 'ssml', 'ssml-h'].includes(ui?.inputType)) state.inputType = ui.inputType
   if (['reference', 'direction'].includes(ui?.designSource)) state.designSource = ui.designSource
   if (['reference', 'transcript'].includes(ui?.cloneMode)) state.cloneMode = ui.cloneMode
 
@@ -282,6 +286,11 @@ function escapeHtml(value) {
 }
 
 function updateMetrics() {
+  if (state.inputType === 'magic') {
+    const stats = magicEditor.stats()
+    $('#text-metrics').textContent = t('composer.metrics', { characters: stats.characters, words: stats.words }, `${stats.characters} characters · ${stats.words} words`)
+    return
+  }
   const text = $('#text-input').value
   const words = text.trim() ? text.trim().split(/\s+/).length : 0
   $('#text-metrics').textContent = t('composer.metrics', { characters: text.length, words }, `${text.length} characters · ${words} words`)
@@ -304,19 +313,27 @@ function loadDesignPortrait(file) {
 }
 
 function inputSample(inputType) {
+  if (inputType === 'magic') return SAMPLE_TEXTS[state.sampleIndex]
   if (inputType === 'text') return SAMPLE_TEXTS[state.sampleIndex]
   return INPUT_SAMPLES[inputType][0]
 }
 
 function setInputType(inputType) {
-  if (!['text', 'ssml', 'ssml-h'].includes(inputType)) return
+  if (!['magic', 'text', 'ssml', 'ssml-h'].includes(inputType)) return
   const editor = $('#text-input')
-  const currentType = editor.dataset.inputType || state.inputType
-  state.inputDrafts[currentType] = editor.value
-  if (state.inputDrafts[inputType] == null) state.inputDrafts[inputType] = inputSample(inputType)
-  editor.value = state.inputDrafts[inputType]
-  editor.dataset.inputType = inputType
-  editor.spellcheck = inputType === 'text'
+  const currentType = state.inputType
+  if (currentType !== 'magic') state.inputDrafts[currentType] = editor.value
+  if (inputType !== 'magic') {
+    if (state.inputDrafts[inputType] == null) state.inputDrafts[inputType] = inputSample(inputType)
+    editor.value = state.inputDrafts[inputType]
+    editor.dataset.inputType = inputType
+    editor.spellcheck = inputType === 'text'
+  }
+  editor.hidden = inputType === 'magic'
+  $('#magic-editor-shell').hidden = inputType !== 'magic'
+  $('#composer-title').textContent = inputType === 'magic'
+    ? t('magic.script', {}, 'Dialogue script')
+    : t('composer.text', {}, 'Input text')
   state.inputType = inputType
   $$('.input-type-control button').forEach((button) => {
     const active = button.dataset.inputType === inputType
@@ -464,6 +481,7 @@ function renderVoiceProfileSelect(selected = $('#voice-profile').value) {
       label: `${profile.id} (${profile.profile_type === 'cloned' ? t('clone.reference', {}, 'reference') : t('clone.directionLower', {}, 'direction')})`,
     })),
   ], selected)
+  magicEditor.setVoices(state.profiles)
   updateVoiceProfileState()
 }
 
@@ -780,9 +798,12 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
   const referenceText = usesReference && state.cloneMode === 'transcript'
     ? ($('#reference-text').value.trim() || null)
     : null
+  const generatedText = !cloning && state.inputType === 'magic'
+    ? magicEditor.toSSMLH()
+    : $(cloning ? '#design-text-input' : '#text-input').value.trim()
   const payload = {
-    text: $(cloning ? '#design-text-input' : '#text-input').value.trim(),
-    input_type: cloning ? 'text' : state.inputType,
+    text: generatedText,
+    input_type: cloning ? 'text' : (state.inputType === 'magic' ? 'ssml-h' : state.inputType),
     language: $('#language').value || 'English',
     voice: usesReference ? 'reference' : 'auto',
     voice_profile: cloning ? (usesReference ? profileId : null) : profileId,
@@ -793,7 +814,7 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
     ref_text: referenceText,
     cfg_value: Number($('#guidance').value),
     inference_timesteps: Number($('#steps').value),
-    normalize: $('#normalize-text').checked,
+    normalize: !cloning && state.inputType !== 'text' ? false : $('#normalize-text').checked,
     normalize_loudness: $('#normalize-loudness').checked,
     denoise: usesReference && $('#denoise').checked,
     seed: Number($('#seed').value || 42),
@@ -1995,24 +2016,27 @@ function resetControls() {
 }
 
 async function initialize() {
-  const [defaults, status, languages, formats, streamFormats, profiles] = await Promise.all([
+  const [defaults, status, languages, formats, streamFormats, profiles, ssmlCapabilities] = await Promise.all([
     fetchJson('/tts/defaults'),
     fetchJson('/tts/status'),
     fetchJson('/tts/languages'),
     fetchJson('/tts/formats'),
     fetchJson('/tts/stream-formats'),
     fetchJson('/tts/voice-profiles'),
+    fetchJson('/tts/ssml/capabilities'),
   ])
   state.defaults = defaults
   state.status = status
   state.formats = formats.formats || {}
   state.streamFormats = streamFormats.formats || {}
   state.profiles = profiles.data || []
+  state.ssmlCapabilities = ssmlCapabilities
 
   populateSelect($('#language'), languages.languages.map((language) => ({ value: language, label: languageLabel(language) })), defaults.language)
   populateSelect($('#device'), status.hardware || [{ value: 'auto', label: t('common.auto', {}, 'Auto') }, { value: 'cpu', label: 'CPU' }], defaults.device)
   renderVoiceProfileSelect()
   renderCloneProfileList()
+  magicEditor.setCapabilities(ssmlCapabilities)
   resetControls()
   $('#denoise').disabled = !status.load_denoiser
   $('#transcribe-reference').disabled = !status.load_asr
@@ -2057,7 +2081,11 @@ $('#design-seed-lock').addEventListener('click', () => {
 })
 $('#generate-timestamps').addEventListener('change', updateTimestampState)
 $('#sample-button').addEventListener('click', () => {
-  if (state.inputType === 'text') state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
+  if (state.inputType === 'magic' || state.inputType === 'text') state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
+  if (state.inputType === 'magic') {
+    magicEditor.loadSample(inputSample('magic'))
+    return
+  }
   $('#text-input').value = inputSample(state.inputType)
   state.inputDrafts[state.inputType] = $('#text-input').value
   updateMetrics()

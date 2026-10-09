@@ -70,6 +70,8 @@ def test_static_workspace_and_assets_are_available() -> None:
                     "/es",
                     "/static/app.js",
                     "/static/i18n.js",
+                    "/static/magic-editor.js",
+                    "/static/magic-document.js",
                     "/static/styles.css",
                     "/static/audio-editor.js",
                     "/static/locales/en.json",
@@ -147,6 +149,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="profile-audio-drop"' not in responses["/"].text
     assert 'data-input-type="ssml"' in responses["/"].text
     assert 'data-input-type="ssml-h"' in responses["/"].text
+    assert 'data-input-type="magic"' in responses["/"].text
+    assert 'id="magic-editor-shell"' in responses["/"].text
     assert 'id="profile-edit-dialog"' not in responses["/"].text
     assert "gradio" not in responses["/"].text.lower()
     assert responses["/system/gpu"].json()["gpus"] == []
@@ -164,7 +168,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "function renderGpuMonitor(" in script
     assert "function stopGpuMonitor(" in script
     assert "inputDrafts: { text: null, ssml: null, 'ssml-h': null }" in script
-    assert "input_type: cloning ? 'text' : state.inputType" in script
+    assert "state.inputType === 'magic' ? 'ssml-h' : state.inputType" in script
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
@@ -191,6 +195,7 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
     source = "\n".join(
         (
             (static_dir / "app.js").read_text(encoding="utf-8"),
+            (static_dir / "magic-editor.js").read_text(encoding="utf-8"),
             (static_dir / "index.html").read_text(encoding="utf-8"),
         )
     )

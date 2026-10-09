@@ -104,9 +104,22 @@
     <section class="content-panel">
       <section class="composer workflow-only" id="composer">
         <div class="composer-heading">
-          <div class="section-title"><i class="icon-message-square-text"></i><span data-i18n="composer.text">Input text</span></div>
-          <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format" data-i18n-aria-label="composer.inputType"><button class="active" type="button" data-input-type="text" aria-pressed="true">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span data-i18n="composer.newSample">New sample</span></button></div>
+          <div class="section-title"><i class="icon-message-square-text"></i><span id="composer-title" data-i18n="composer.text">Input text</span></div>
+          <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format" data-i18n-aria-label="composer.inputType"><button class="active" type="button" data-input-type="magic" aria-pressed="true" data-i18n="magic.title">Magic</button><button type="button" data-input-type="text" aria-pressed="false">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span data-i18n="composer.newSample">New sample</span></button></div>
         </div>
+        <section class="magic-editor-shell" id="magic-editor-shell" aria-label="Magic dialogue editor" data-i18n-aria-label="magic.editorLabel">
+          <div class="magic-toolbar" role="toolbar" aria-label="Dialogue tools" data-i18n-aria-label="magic.toolbarLabel">
+            <label class="magic-tool-field"><span data-i18n="magic.voice">Voice</span><select id="magic-voice-control"></select></label>
+            <label class="magic-tool-field"><span data-i18n="magic.direction">Direction</span><select id="magic-direction-control"></select></label>
+            <label class="magic-tool-field magic-custom-direction-field" hidden><span data-i18n="magic.customDirection">Custom direction</span><input id="magic-custom-direction" type="text" maxlength="300" placeholder="Softly, with cautious optimism" data-i18n-placeholder="magic.customDirectionPlaceholder"></label>
+            <div class="magic-toolbar-actions">
+              <button class="secondary-button compact-command" id="magic-add-pause" type="button"><i class="icon-pause"></i><span data-i18n="magic.addPause">Add pause</span></button>
+              <button class="secondary-button compact-command" id="magic-add-turn" type="button"><i class="icon-message-square-text"></i><span data-i18n="magic.addTurn">Add turn</span></button>
+            </div>
+          </div>
+          <div class="magic-canvas" id="magic-editor"></div>
+          <footer class="magic-footer"><span><i class="icon-sparkles"></i><span data-i18n="magic.footer">Turns are converted to validated SSML-H when you generate</span></span><span id="magic-summary">1 turn</span></footer>
+        </section>
         <textarea id="text-input" rows="7" spellcheck="true" aria-label="Text to synthesize" data-i18n-aria-label="composer.input" data-i18n="composer.defaultText">VoxCPM2 generates natural multilingual speech with voice design and cloning.</textarea>
       </section>
 
