@@ -21,7 +21,7 @@ Ta wersja Hangry Labs została przygotowana z myślą o prostej lokalnej pracy. 
 
 ## Co oferuje projekt
 
-- Interfejs przeglądarkowy do generowania, strumieniowania, projektowania i klonowania głosu oraz lokalnej transkrypcji
+- Interfejs przeglądarkowy do generowania, strumieniowania, projektowania i klonowania głosu, lokalnej transkrypcji oraz opcjonalnego niedestrukcyjnego dopracowania głosu
 - Trwałe profile głosowe z recepturami projektu, portretami, tagami i ponownym użyciem w różnych trybach
 - SSML i SSML-H do narracji, dialogów wielu postaci i słuchowisk
 - Natywne API HTTP dla aplikacji i lokalnych integracji

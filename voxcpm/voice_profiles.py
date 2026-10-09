@@ -16,6 +16,8 @@ PROFILE_TYPES = {"cloned", "designed"}
 PROFILE_DESIGN_SOURCES = {"reference", "direction"}
 PROFILE_CLONE_MODES = {"reference", "transcript"}
 PROFILE_OUTPUT_FORMATS = {"wav", "mp3", "flac", "ogg"}
+PROFILE_POST_PROCESSING_METHODS = {"ffmpeg"}
+PROFILE_POST_PROCESSING_PRESETS = {"clean", "studio", "custom"}
 MAX_PROFILE_SAMPLE_CHARACTERS = 50_000
 MAX_PROFILE_TAGS = 12
 MAX_PROFILE_TAG_CHARACTERS = 32
@@ -101,6 +103,36 @@ def normalize_profile_recipe(recipe: dict[str, Any] | None) -> dict[str, Any]:
         if len(value) > MAX_PROFILE_SAMPLE_CHARACTERS:
             raise ValueError(f"Voice recipe {label} must be {MAX_PROFILE_SAMPLE_CHARACTERS} characters or fewer.")
         normalized[key] = value
+
+    post_processing = recipe.get("post_processing")
+    if post_processing is not None:
+        if not isinstance(post_processing, dict):
+            raise ValueError("Voice recipe post-processing must be a JSON object.")
+        method = str(post_processing.get("method") or "").strip().lower()
+        preset = str(post_processing.get("preset") or "").strip().lower()
+        if method not in PROFILE_POST_PROCESSING_METHODS:
+            raise ValueError("Voice recipe post-processing method is unsupported.")
+        if preset not in PROFILE_POST_PROCESSING_PRESETS:
+            raise ValueError("Voice recipe post-processing preset is unsupported.")
+        normalized_post_processing: dict[str, Any] = {"method": method, "preset": preset}
+        for key, minimum, maximum in (
+            ("noise_reduction_db", 0.0, 12.0),
+            ("bass_db", -6.0, 6.0),
+            ("presence_db", -6.0, 6.0),
+        ):
+            value = float(post_processing.get(key, 0.0))
+            if not minimum <= value <= maximum:
+                raise ValueError(f"Voice recipe {key} must be between {minimum:g} and {maximum:g}.")
+            normalized_post_processing[key] = value
+        dynamics = int(post_processing.get("dynamics", 0))
+        if not 0 <= dynamics <= 100:
+            raise ValueError("Voice recipe dynamics must be between 0 and 100.")
+        normalized_post_processing["dynamics"] = dynamics
+        normalize_loudness = post_processing.get("normalize_loudness", True)
+        if not isinstance(normalize_loudness, bool):
+            raise ValueError("Voice recipe post-processing normalize_loudness must be true or false.")
+        normalized_post_processing["normalize_loudness"] = normalize_loudness
+        normalized["post_processing"] = normalized_post_processing
 
     return normalized
 

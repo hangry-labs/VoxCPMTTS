@@ -12,6 +12,10 @@ const GPU_SESSION_KEY = 'voxcpmtts-gpu-history-v1'
 const GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000
 const GPU_POLL_INTERVAL_MS = 1000
 const MAX_GENERATED_REFERENCE_CHARACTERS = 320
+const POST_PROCESSING_PRESETS = {
+  clean: { noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: true },
+  studio: { noise_reduction_db: 2, bass_db: 1, presence_db: 1, dynamics: 35, normalize_loudness: true },
+}
 const SAMPLE_TEXTS = [
   t('samples.first', {}, 'VoxCPM2 generates natural multilingual speech with voice design and cloning.'),
   t('samples.second', {}, 'A steady voice can make technical information easier to understand.'),
@@ -102,6 +106,7 @@ const state = {
   cloneMode: 'reference',
   loadingProfile: false,
   lastCloneGeneration: null,
+  selectedCloneVersion: 'original',
   quickSaveType: null,
   editingProfile: null,
   portraitFile: null,
@@ -131,6 +136,21 @@ const cloneOutput = new AudioEditor($('#clone-output'), {
   labels: AUDIO_EDITOR_LABELS,
   onChange: (file) => $('#clone-output-section').classList.toggle('is-complete', Boolean(file)),
 })
+const cloneProcessedOutput = new AudioEditor($('#clone-processed-output'), {
+  label: t('finishing.processed', {}, 'Processed voice'),
+  emptyTitle: t('output.emptyTitle', {}, 'Audio output'),
+  emptyDescription: t('finishing.ready', {}, 'Ready for processing'),
+  labels: AUDIO_EDITOR_LABELS,
+  onChange: (file) => {
+    if (file || !state.lastCloneGeneration?.processedBlob) return
+    state.lastCloneGeneration.processedBlob = null
+    state.lastCloneGeneration.postProcessing = null
+    $('#processed-preview').hidden = true
+    $('#post-processing-status').hidden = true
+    $('[data-save-version="processed"]').disabled = true
+    selectCloneVersion('original')
+  },
+})
 const referenceAudio = new AudioEditor($('#reference-audio-preview'), {
   label: t('clone.referencePreview', {}, 'Reference preview'),
   emptyTitle: t('clone.noReference', {}, 'No reference selected'),
@@ -154,7 +174,7 @@ const referenceRecorder = new AudioRecorder({
   onError: (error) => showToast(errorMessage(error)),
 })
 
-for (const editor of [generateOutput, cloneOutput, streamOutput, referenceAudio]) {
+for (const editor of [generateOutput, cloneOutput, cloneProcessedOutput, streamOutput, referenceAudio]) {
   editor.container.addEventListener('audio-error', (event) => showToast(errorMessage(event.detail)))
 }
 
@@ -477,6 +497,7 @@ function restoreProfileRecipe(profile) {
   $('#design-text-input').value = recipe.sample_text || profile.ref_text || $('#design-text-input').value
   updateDesignMetrics()
   restoreProfileGenerationSettings(profile)
+  restorePostProcessingRecipe(profile)
 }
 
 async function loadProfileReference(profile, { design = false } = {}) {
@@ -499,6 +520,7 @@ async function useProfile(profile, tab, { editing = false } = {}) {
       state.editingProfile = profile
       state.lastCloneGeneration = null
       cloneOutput.clear()
+      resetProcessedPreview({ hideFinishing: true })
       $('#design-voice-name').value = profile.id
       $('#design-voice-name').disabled = true
       $('#design-voice-tags').value = (profile.tags || []).join(', ')
@@ -952,6 +974,7 @@ async function generateAudio(workflow = 'generate') {
   const output = workflow === 'clone' ? cloneOutput : generateOutput
   if (workflow === 'clone') {
     state.lastCloneGeneration = null
+    resetProcessedPreview({ hideFinishing: true })
     renderVoiceSaveState()
   }
   setGenerationBusy(true, workflow)
@@ -961,7 +984,20 @@ async function generateAudio(workflow = 'generate') {
     const { blob, extension, seed, payload, reference } = await requestAudio({ workflow })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
     if (workflow === 'clone') {
-      state.lastCloneGeneration = { blob, extension, seed, payload, reference }
+      state.lastCloneGeneration = {
+        blob,
+        extension,
+        seed,
+        payload,
+        reference,
+        processedBlob: null,
+        processedExtension: null,
+        postProcessing: null,
+        selectedVersion: 'original',
+      }
+      state.selectedCloneVersion = 'original'
+      $('#voice-finishing').hidden = false
+      selectCloneVersion('original')
       const generatedReference = new File(
         [blob],
         `designed-voice.${extension}`,
@@ -1301,7 +1337,7 @@ async function saveProfileRequest({
 
 function generatedVoiceRecipe(generated) {
   const payload = generated.payload
-  return {
+  const recipe = {
     design_source: payload.voice === 'reference' ? 'reference' : 'direction',
     clone_mode: payload.voice === 'reference' ? payload.clone_mode : 'reference',
     seed: Number(generated.seed ?? payload.seed ?? 42),
@@ -1314,6 +1350,130 @@ function generatedVoiceRecipe(generated) {
     output_format: payload.output_format,
     sample_text: payload.text,
     reference_text: payload.ref_text || '',
+  }
+  if (generated.selectedVersion === 'processed' && generated.postProcessing) {
+    recipe.post_processing = generated.postProcessing
+  }
+  return recipe
+}
+
+function signedDecibels(value) {
+  const numeric = Number(value)
+  const formatted = numeric.toFixed(1).replace(/\.0$/, '')
+  return `${numeric > 0 ? '+' : ''}${formatted} dB`
+}
+
+function postProcessingOptions() {
+  return {
+    method: $('#post-method').value,
+    preset: $('#post-preset').value,
+    noise_reduction_db: Number($('#post-noise').value),
+    bass_db: Number($('#post-bass').value),
+    presence_db: Number($('#post-presence').value),
+    dynamics: Number($('#post-dynamics').value),
+    normalize_loudness: $('#post-normalize').checked,
+  }
+}
+
+function renderPostProcessingValues() {
+  $('#post-noise-value').textContent = `${Number($('#post-noise').value).toFixed(1).replace(/\.0$/, '')} dB`
+  $('#post-bass-value').textContent = signedDecibels($('#post-bass').value)
+  $('#post-presence-value').textContent = signedDecibels($('#post-presence').value)
+  $('#post-dynamics-value').textContent = `${$('#post-dynamics').value}%`
+}
+
+function selectCloneVersion(version) {
+  const processedAvailable = Boolean(state.lastCloneGeneration?.processedBlob)
+  state.selectedCloneVersion = version === 'processed' && processedAvailable ? 'processed' : 'original'
+  if (state.lastCloneGeneration) state.lastCloneGeneration.selectedVersion = state.selectedCloneVersion
+  $$('[data-save-version]').forEach((button) => {
+    const active = button.dataset.saveVersion === state.selectedCloneVersion
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-pressed', String(active))
+  })
+  renderVoiceSaveState()
+}
+
+function resetProcessedPreview({ hideFinishing = false } = {}) {
+  if (state.lastCloneGeneration) {
+    state.lastCloneGeneration.processedBlob = null
+    state.lastCloneGeneration.postProcessing = null
+  }
+  cloneProcessedOutput.clear()
+  $('#processed-preview').hidden = true
+  $('#post-processing-status').hidden = true
+  $('[data-save-version="processed"]').disabled = true
+  selectCloneVersion('original')
+  if (hideFinishing) $('#voice-finishing').hidden = true
+}
+
+function applyPostProcessingPreset(name, { invalidate = true } = {}) {
+  const preset = POST_PROCESSING_PRESETS[name]
+  if (!preset) return
+  $('#post-noise').value = preset.noise_reduction_db
+  $('#post-bass').value = preset.bass_db
+  $('#post-presence').value = preset.presence_db
+  $('#post-dynamics').value = preset.dynamics
+  $('#post-normalize').checked = preset.normalize_loudness
+  renderPostProcessingValues()
+  if (invalidate) resetProcessedPreview()
+}
+
+function restorePostProcessingRecipe(profile) {
+  const recipe = profile.recipe?.post_processing
+  if (!recipe) {
+    $('#post-preset').value = 'studio'
+    applyPostProcessingPreset('studio', { invalidate: false })
+    return
+  }
+  $('#post-method').value = recipe.method || 'ffmpeg'
+  $('#post-preset').value = recipe.preset || 'custom'
+  $('#post-noise').value = recipe.noise_reduction_db ?? 0
+  $('#post-bass').value = recipe.bass_db ?? 0
+  $('#post-presence').value = recipe.presence_db ?? 0
+  $('#post-dynamics').value = recipe.dynamics ?? 0
+  $('#post-normalize').checked = recipe.normalize_loudness ?? true
+  renderPostProcessingValues()
+}
+
+async function requestPostProcessedAudio(blob, extension, options) {
+  const form = new FormData()
+  form.append('audio', blob, `voxcpmtts-source.${extension || 'wav'}`)
+  form.append('options', JSON.stringify(options))
+  const response = await fetch('/tts/postprocess-upload', { method: 'POST', body: form })
+  if (!response.ok) throw new Error(await responseError(response))
+  return response.blob()
+}
+
+async function processDesignedVoice() {
+  const generated = state.lastCloneGeneration
+  if (!generated) return showToast(t('errors.generateBeforeProcess', {}, 'Generate a voice before processing it.'))
+  const button = $('#post-process-voice')
+  const status = $('#post-processing-status')
+  const options = postProcessingOptions()
+  button.disabled = true
+  status.hidden = false
+  status.dataset.tone = 'neutral'
+  status.textContent = t('status.processingVoice', {}, 'Finishing voice with FFmpeg')
+  try {
+    const blob = await requestPostProcessedAudio(generated.blob, generated.extension, options)
+    generated.processedBlob = blob
+    generated.processedExtension = 'wav'
+    generated.postProcessing = options
+    await cloneProcessedOutput.load(blob, 'voxcpmtts-processed.wav')
+    $('#processed-preview').hidden = false
+    $('[data-save-version="processed"]').disabled = false
+    selectCloneVersion('processed')
+    status.dataset.tone = 'success'
+    status.textContent = t('status.processedVoiceReady', {}, 'Processed preview ready')
+  } catch (error) {
+    resetProcessedPreview()
+    status.hidden = false
+    status.dataset.tone = 'error'
+    status.textContent = errorMessage(error)
+    showToast(errorMessage(error))
+  } finally {
+    button.disabled = false
   }
 }
 
@@ -1346,11 +1506,14 @@ async function prepareGeneratedVoiceReference() {
   if (!referenceText) throw new Error(t('errors.referenceTextMissing', {}, 'The generated input does not contain usable reference text.'))
   const originalText = generated.payload.text.replace(/\s+/g, ' ').trim()
   if (referenceText === originalText) {
+    const useProcessed = generated.selectedVersion === 'processed' && generated.processedBlob
+    const blob = useProcessed ? generated.processedBlob : generated.blob
+    const extension = useProcessed ? generated.processedExtension : generated.extension
     return {
       file: new File(
-        [generated.blob],
-        `voxcpmtts-voice-reference.${generated.extension}`,
-        { type: generated.blob.type || 'application/octet-stream' },
+        [blob],
+        `voxcpmtts-voice-reference.${extension}`,
+        { type: blob.type || 'application/octet-stream' },
       ),
       refText: referenceText,
     }
@@ -1371,8 +1534,12 @@ async function prepareGeneratedVoiceReference() {
     payloadOverride: payload,
     referenceOverride: generated.reference,
   })
+  const useProcessed = generated.selectedVersion === 'processed' && generated.postProcessing
+  const referenceBlob = useProcessed
+    ? await requestPostProcessedAudio(compact.blob, compact.extension, generated.postProcessing)
+    : compact.blob
   return {
-    file: new File([compact.blob], 'voxcpmtts-voice-reference.wav', { type: compact.blob.type || 'audio/wav' }),
+    file: new File([referenceBlob], 'voxcpmtts-voice-reference.wav', { type: referenceBlob.type || 'audio/wav' }),
     refText: referenceText,
   }
 }
@@ -1948,6 +2115,25 @@ $('#reference-audio-drop').addEventListener('drop', (event) => {
 })
 $('#clone-profile-filter').addEventListener('input', renderCloneProfileList)
 $('#cancel-voice-edit').addEventListener('click', cancelVoiceEdit)
+$('#post-preset').addEventListener('change', (event) => {
+  if (event.target.value === 'custom') return resetProcessedPreview()
+  applyPostProcessingPreset(event.target.value)
+})
+for (const control of $$('#post-noise, #post-bass, #post-presence, #post-dynamics')) {
+  control.addEventListener('input', () => {
+    $('#post-preset').value = 'custom'
+    renderPostProcessingValues()
+    resetProcessedPreview()
+  })
+}
+$('#post-normalize').addEventListener('change', () => {
+  $('#post-preset').value = 'custom'
+  resetProcessedPreview()
+})
+$('#post-process-voice').addEventListener('click', processDesignedVoice)
+$$('[data-save-version]').forEach((button) => {
+  button.addEventListener('click', () => selectCloneVersion(button.dataset.saveVersion))
+})
 $('#store-generated-voice').addEventListener('click', () => {
   if (state.editingProfile) openUpdateProfileDialog()
   else openQuickSaveDialog('clone-generated')
@@ -1979,6 +2165,7 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
     await refreshProfiles(saved.id)
     state.editingProfile = state.profiles.find((profile) => profile.id === saved.id) || saved
     state.lastCloneGeneration = null
+    resetProcessedPreview({ hideFinishing: true })
     $('#design-voice-name').value = saved.id
     $('#design-voice-name').disabled = true
     setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
@@ -2036,6 +2223,7 @@ $('#update-profile-confirm').addEventListener('click', async (event) => {
     }
     closeUpdateProfileDialog()
     state.lastCloneGeneration = null
+    resetProcessedPreview({ hideFinishing: true })
     await refreshProfiles(saved.id)
     state.editingProfile = state.profiles.find((item) => item.id === saved.id) || saved
     setDesignPortrait({ url: state.editingProfile.portrait_url || '' })
@@ -2123,6 +2311,7 @@ window.addEventListener('beforeunload', () => {
   referenceRecorder.stop()
   generateOutput.destroy()
   cloneOutput.destroy()
+  cloneProcessedOutput.destroy()
   streamOutput.destroy()
   referenceAudio.destroy()
 })

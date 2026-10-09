@@ -21,7 +21,7 @@ Esta versión de Hangry Labs está pensada para un uso local sencillo. Inicia un
 
 ## Qué ofrece el proyecto
 
-- Interfaz web para generación, transmisión, diseño y clonación de voces, además de transcripción local
+- Interfaz web para generación, transmisión, diseño y clonación de voces, transcripción local y acabado de voz no destructivo opcional
 - Perfiles de voz persistentes con recetas de diseño, retratos, etiquetas y reutilización entre flujos de trabajo
 - SSML y SSML-H para narraciones, diálogos con varios hablantes y obras de audio
 - API HTTP nativa para aplicaciones e integraciones locales

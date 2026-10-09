@@ -110,6 +110,10 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="design-portrait-input"' in responses["/"].text
     assert 'class="portrait-placeholder"' in responses["/"].text
     assert 'id="clone-output-section"' in responses["/"].text
+    assert 'id="voice-finishing"' in responses["/"].text
+    assert 'id="clone-processed-output"' in responses["/"].text
+    assert 'data-save-version="original"' in responses["/"].text
+    assert 'data-save-version="processed"' in responses["/"].text
     assert 'id="quick-profile-name"' not in responses["/"].text
     assert 'data-design-source="reference"' in responses["/"].text
     assert 'data-design-source="direction"' in responses["/"].text
@@ -165,6 +169,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "compactGeneratedReferenceText" in script
     assert "clone_mode: usesReference ? state.cloneMode : 'auto'" in script
     assert "function generatedVoiceRecipe(" in script
+    assert "async function processDesignedVoice(" in script
+    assert "requestPostProcessedAudio" in script
     assert "sample_text: payload.text" in script
     assert "design_reference_audio" in script
     assert "profile.tags" in script
@@ -378,6 +384,101 @@ def test_loudness_normalization_uses_shared_ffmpeg_target() -> None:
     assert np.allclose(result, np.array([0.25, -0.25], dtype=np.float32))
 
 
+def test_post_processing_filter_uses_bounded_voice_finishing_controls() -> None:
+    payload = runtime.PostProcessingRequest(
+        preset="custom",
+        noise_reduction_db=4.5,
+        bass_db=2.0,
+        presence_db=-1.5,
+        dynamics=40,
+        normalize_loudness=True,
+    )
+
+    audio_filter = runtime.build_post_processing_filter(payload)
+
+    assert audio_filter.startswith("highpass=f=50:p=2,afftdn=nr=4.5:nf=-50:tn=1:gs=6")
+    assert "bass=f=110:t=q:w=0.7:g=2:p=2:r=f32" in audio_filter
+    assert "treble=f=3500:t=q:w=0.7:g=-1.5:p=2:r=f32" in audio_filter
+    assert "acompressor=" in audio_filter
+    assert "mix=0.4" in audio_filter
+    assert "deesser=i=0.12:m=0.35:f=0.5" in audio_filter
+    assert "alimiter=limit=0.841:attack=5:release=50:level=disabled" in audio_filter
+    assert audio_filter.endswith(runtime.LOUDNESS_NORMALIZATION_FILTER)
+
+
+def test_ffmpeg_post_processing_produces_float_wav(tmp_path: Path) -> None:
+    sample_rate = 48_000
+    time_axis = np.arange(sample_rate, dtype=np.float32) / sample_rate
+    source = tmp_path / "source.wav"
+    sf.write(source, 0.15 * np.sin(2 * np.pi * 180 * time_axis), sample_rate, subtype="FLOAT")
+
+    processed = runtime.post_process_audio(
+        str(source),
+        runtime.PostProcessingRequest(
+            preset="studio",
+            noise_reduction_db=2,
+            bass_db=1,
+            presence_db=1,
+            dynamics=35,
+        ),
+    )
+    info = sf.info(io.BytesIO(processed))
+
+    assert info.format in {"WAV", "WAVEX"}
+    assert info.subtype == "FLOAT"
+    assert info.samplerate == sample_rate
+    assert info.channels == 1
+    assert info.frames > 0
+
+
+def test_postprocess_upload_removes_source_and_returns_recipe_headers() -> None:
+    observed: dict[str, object] = {}
+
+    def fake_post_process(path: str, payload: runtime.PostProcessingRequest) -> bytes:
+        source = Path(path)
+        observed.update(path=source, exists=source.exists(), contents=source.read_bytes(), payload=payload)
+        return b"processed-wave"
+
+    options = {
+        "method": "ffmpeg",
+        "preset": "clean",
+        "noise_reduction_db": 1,
+        "bass_db": 0,
+        "presence_db": 0.5,
+        "dynamics": 15,
+        "normalize_loudness": True,
+    }
+    with patch.object(runtime, "post_process_audio", side_effect=fake_post_process):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/postprocess-upload",
+                data={"options": json.dumps(options)},
+                files={"audio": ("generated.wav", b"source-wave", "audio/wav")},
+            )
+
+    assert response.status_code == 200
+    assert response.content == b"processed-wave"
+    assert response.headers["content-type"] == "audio/wav"
+    assert response.headers["x-voxcpm-post-processing"] == "ffmpeg"
+    assert response.headers["x-voxcpm-post-processing-preset"] == "clean"
+    assert observed["exists"] is True
+    assert observed["contents"] == b"source-wave"
+    assert observed["payload"].bass_db == 0
+    assert not observed["path"].exists()
+
+
+def test_postprocess_upload_rejects_out_of_range_controls() -> None:
+    with TestClient(runtime.app) as client:
+        response = client.post(
+            "/tts/postprocess-upload",
+            data={"options": json.dumps({"method": "ffmpeg", "preset": "custom", "bass_db": 20})},
+            files={"audio": ("generated.wav", b"source-wave", "audio/wav")},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"].startswith("Invalid post-processing options:")
+
+
 def test_defaults_enable_browser_loudness_normalization() -> None:
     with TestClient(runtime.app) as client:
         response = client.get("/tts/defaults")
@@ -507,6 +608,15 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
                             "output_format": "wav",
                             "sample_text": "A complete voice design sample.",
                             "reference_text": "This is the original recording.",
+                            "post_processing": {
+                                "method": "ffmpeg",
+                                "preset": "studio",
+                                "noise_reduction_db": 2,
+                                "bass_db": 1,
+                                "presence_db": 1,
+                                "dynamics": 35,
+                                "normalize_loudness": True,
+                            },
                         }
                     ),
                 },
@@ -535,6 +645,8 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
     assert created.json()["recipe"]["seed"] == 1234
     assert created.json()["recipe"]["clone_mode"] == "transcript"
     assert created.json()["recipe"]["sample_text"] == "A complete voice design sample."
+    assert created.json()["recipe"]["post_processing"]["method"] == "ffmpeg"
+    assert created.json()["recipe"]["post_processing"]["dynamics"] == 35
     assert created.json()["has_design_audio"] is True
     assert created.json()["has_portrait"] is True
     assert created.json()["tags"] == ["Warm", "Narrator"]

@@ -88,6 +88,7 @@ MAX_RANDOM_SEED = 2**32 - 1
 TIMESTAMP_MODEL = os.getenv("VOXCPM_TIMESTAMP_MODEL", "base")
 TIMESTAMP_DEVICE = os.getenv("VOXCPM_TIMESTAMP_DEVICE", "cpu")
 LOUDNESS_NORMALIZATION_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=11"
+POST_PROCESSING_METHODS = {"ffmpeg"}
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -487,6 +488,79 @@ def normalize_audio_loudness(audio: np.ndarray, sample_rate: int) -> np.ndarray:
     return np.frombuffer(result.stdout, dtype="<i2").astype(np.float32) / 32768.0
 
 
+def build_post_processing_filter(payload: "PostProcessingRequest") -> str:
+    filters = ["highpass=f=50:p=2"]
+    if payload.noise_reduction_db > 0:
+        filters.append(f"afftdn=nr={payload.noise_reduction_db:g}:nf=-50:tn=1:gs=6")
+    if payload.bass_db:
+        filters.append(f"bass=f=110:t=q:w=0.7:g={payload.bass_db:g}:p=2:r=f32")
+    if payload.presence_db:
+        filters.append(f"treble=f=3500:t=q:w=0.7:g={payload.presence_db:g}:p=2:r=f32")
+    if payload.dynamics:
+        wet_mix = payload.dynamics / 100.0
+        filters.append(
+            "acompressor=threshold=0.125:ratio=2:attack=20:release=250:"
+            f"knee=2.828:makeup=1.15:mix={wet_mix:g}"
+        )
+    filters.append("deesser=i=0.12:m=0.35:f=0.5")
+    filters.append("alimiter=limit=0.841:attack=5:release=50:level=disabled")
+    if payload.normalize_loudness:
+        filters.append(LOUDNESS_NORMALIZATION_FILTER)
+    return ",".join(filters)
+
+
+def post_process_audio(source_path: str, payload: "PostProcessingRequest") -> bytes:
+    if payload.method not in POST_PROCESSING_METHODS:
+        raise ValueError(f"Unsupported post-processing method: {payload.method}")
+    command = [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        source_path,
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-sn",
+        "-dn",
+        "-af",
+        build_post_processing_filter(payload),
+        "-map_metadata",
+        "-1",
+        "-ac",
+        "1",
+        "-ar",
+        "48000",
+        "-c:a",
+        "pcm_f32le",
+        "-f",
+        "wav",
+        "-threads",
+        "1",
+        "pipe:1",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=120,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("ffmpeg is required for audio post-processing") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("ffmpeg audio post-processing timed out") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"ffmpeg failed to post-process audio: {stderr}") from exc
+    if not result.stdout:
+        raise RuntimeError("ffmpeg audio post-processing produced no audio")
+    return result.stdout
+
+
 def encode_audio_bytes(audio: np.ndarray, output_format: str, sample_rate: int) -> bytes:
     normalized_format = normalize_output_format(output_format)
     wav_bytes = audio_to_wav_bytes(audio, sample_rate)
@@ -730,6 +804,16 @@ class TTSRequest(BaseModel):
 
 class StreamingTTSRequest(TTSRequest):
     stream_format: str = Field("mp3", description="Progressive response format. Supported: mp3.")
+
+
+class PostProcessingRequest(BaseModel):
+    method: Literal["ffmpeg"] = Field("ffmpeg", description="Audio finishing backend.")
+    preset: Literal["clean", "studio", "custom"] = Field("studio", description="UI preset identity.")
+    noise_reduction_db: float = Field(2.0, ge=0.0, le=12.0, description="Steady-noise attenuation in dB.")
+    bass_db: float = Field(1.0, ge=-6.0, le=6.0, description="Low-shelf gain around 110 Hz.")
+    presence_db: float = Field(1.0, ge=-6.0, le=6.0, description="High-shelf gain around 3.5 kHz.")
+    dynamics: int = Field(35, ge=0, le=100, description="Parallel compression amount from 0 to 100.")
+    normalize_loudness: bool = Field(True, description="Finish toward -16 LUFS and -1.5 dBTP.")
 
 
 class MetricsRequest(BaseModel):
@@ -1289,6 +1373,11 @@ def get_status_payload() -> dict:
         "loaded_model_devices": loaded_devices,
         "output_formats": get_supported_output_formats(),
         "stream_formats": STREAM_FORMATS,
+        "post_processing": {
+            "methods": sorted(POST_PROCESSING_METHODS),
+            "presets": ["clean", "studio", "custom"],
+            "output_format": "wav",
+        },
         "input_types": ["text", "ssml", "ssml-h"],
         "ssml": ssml_capabilities(),
         "timestamps": {
@@ -1862,6 +1951,35 @@ async def timestamps_upload(
         raise HTTPException(status_code=500, detail=f"Timestamp alignment failed: {exc}") from exc
     finally:
         Path(audio_path).unlink(missing_ok=True)
+
+
+@api.post("/tts/postprocess-upload")
+async def postprocess_upload(
+    audio: UploadFile = File(...),
+    options: str = Form(...),
+) -> Response:
+    try:
+        payload = PostProcessingRequest.model_validate_json(options)
+    except ValueError as exc:
+        await audio.close()
+        raise HTTPException(status_code=422, detail=f"Invalid post-processing options: {exc}") from exc
+
+    audio_path = await save_reference_upload(audio)
+    try:
+        processed = await asyncio.to_thread(post_process_audio, audio_path, payload)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        Path(audio_path).unlink(missing_ok=True)
+    return Response(
+        content=processed,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": 'inline; filename="voxcpmtts-processed.wav"',
+            "X-VoxCPM-Post-Processing": payload.method,
+            "X-VoxCPM-Post-Processing-Preset": payload.preset,
+        },
+    )
 
 
 @api.post("/tts/generate")

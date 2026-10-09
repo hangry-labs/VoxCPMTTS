@@ -482,6 +482,30 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .clone-store-actions { display: flex !important; grid-template-columns: none; align-items: center; gap: 8px !important; }
 #clone-output-section { transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
 #clone-output-section.is-complete { border-color: #315f46; background: #121a16; box-shadow: inset 3px 0 #55c58a; }
+.voice-finishing { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.voice-finishing[hidden], .processed-preview[hidden] { display: none; }
+.voice-finishing-heading, .save-version-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.voice-finishing-heading > div, .save-version-row > div:first-child { display: grid; gap: 4px; }
+.voice-finishing-heading small, .save-version-row small { color: var(--muted); font-size: 0.67rem; line-height: 1.4; }
+.optional-badge { padding: 3px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 0.6rem; font-weight: 750; text-transform: uppercase; }
+.finishing-toolbar { display: grid; grid-template-columns: repeat(2, minmax(150px, 220px)); gap: 10px; margin-top: 12px; }
+.finishing-control-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 13px; padding: 11px; border: 1px solid var(--line-soft); background: #17181b; }
+.finishing-control-grid .range-heading { font-size: 0.68rem; }
+.finishing-control-grid output { color: #d6d8de; font-variant-numeric: tabular-nums; }
+.finishing-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 11px; }
+.finishing-actions .toggle-field { min-width: 210px; margin: 0; }
+.finishing-actions .secondary-button { min-height: 38px; }
+.finishing-status { margin-top: 9px; padding: 8px 10px; border-left: 3px solid var(--accent); background: #211912; color: #ffc59e; font-size: 0.69rem; }
+.finishing-status[hidden] { display: none; }
+.finishing-status[data-tone="success"] { border-color: var(--green); background: #151b18; color: #bcebd2; }
+.finishing-status[data-tone="error"] { border-color: #ef6b73; background: #271719; color: #ffc2c6; }
+.processed-preview { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.processed-preview .output-heading { margin-bottom: 8px; }
+.save-version-row { margin-top: 13px; padding: 10px 11px; border: 1px solid var(--line-soft); background: #17181b; }
+.save-version-row strong { font-size: 0.73rem; }
+.save-version-control { flex: 0 0 auto; margin: 0; }
+.save-version-control button { min-width: 100px; }
+.save-version-control button:disabled { opacity: 0.42; cursor: not-allowed; }
 .reference-diagnostics { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; padding: 9px 10px; border-left: 3px solid var(--green); background: #151b18; color: #bcebd2; font-size: 0.72rem; line-height: 1.45; overflow-wrap: anywhere; }
 .reference-diagnostics[hidden] { display: none; }
 .reference-diagnostics i { flex: 0 0 auto; margin-top: 2px; }
@@ -601,6 +625,7 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 900px) {
   .api-grid { grid-template-columns: 1fr; }
   .design-grid, .advanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finishing-control-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .compact-settings { grid-column: 1 / -1; }
 }
 
@@ -687,6 +712,10 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   .clone-store-row { align-items: stretch; flex-direction: column; }
   .clone-store-row .secondary-button { width: 100%; }
   .clone-store-actions { align-items: stretch; flex-direction: column; }
+  .voice-finishing-heading, .save-version-row, .finishing-actions { align-items: stretch; flex-direction: column; }
+  .finishing-toolbar, .finishing-control-grid { grid-template-columns: 1fr; }
+  .finishing-actions .secondary-button { width: 100%; }
+  .save-version-control { width: 100%; }
   .content-panel { padding: 22px 12px 40px; }
   .panel-toolbar { align-items: stretch; flex-direction: column; gap: 14px; }
   .segmented-control { display: grid; width: 100%; }

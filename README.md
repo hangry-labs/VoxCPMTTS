@@ -21,7 +21,7 @@ This Hangry Labs fork is made for local use without the usual Python environment
 
 ## What This Project Provides
 
-- A browser UI for voice design, voice cloning, transcript-guided cloning, and local reference transcription
+- A browser UI for voice design, voice cloning, transcript-guided cloning, local reference transcription, and optional non-destructive voice finishing
 - Persistent saved voices with restorable recipes, portraits, searchable tags, and reuse across Generate, Stream, and SSML documents
 - SSML and SSML-H documents for timed narration, multi-speaker discussions, and plays
 - An HTTP API for applications and local integrations
@@ -153,7 +153,18 @@ curl -X POST "http://localhost:8808/tts/generate" \
   -o guided.mp3
 ```
 
-Clone conditioning is explicit when an application needs predictable behavior. Use `clone_mode: "reference"` with `control` to direct delivery from the reference audio, or use `clone_mode: "transcript"` with the exact `ref_text` spoken in that audio. The browser Design workspace supports those two reference modes as well as direction-only voice creation. Its compact pipeline keeps sample text to one line, provides immediate seed locking, and records the voice name, portrait, and searchable tags before generation. Missing portraits use a clickable placeholder; uploads are stored as lossless 100x100 WebP images. After generation, the result becomes the next reference automatically, and **Store voice** saves it with matching words, the original design reference, and the validated recipe. Editing restores the complete pipeline, locks the existing name, and moves the active voice to the top of the library. **Update details** changes tags or the portrait without touching audio or recipe data, while **Update voice** requires a fresh generation and named replacement confirmation.
+Clone conditioning is explicit when an application needs predictable behavior. Use `clone_mode: "reference"` with `control` to direct delivery from the reference audio, or use `clone_mode: "transcript"` with the exact `ref_text` spoken in that audio. The browser Design workspace supports those two reference modes as well as direction-only voice creation. Its compact pipeline keeps sample text to one line, provides immediate seed locking, and records the voice name, portrait, and searchable tags before generation. Missing portraits use a clickable placeholder; uploads are stored as lossless 100x100 WebP images. After generation, the original remains playable and an optional FFmpeg finishing stage can create a separate Clean, Studio, or custom preview with bounded noise cleanup, bass, presence, dynamics, and loudness controls. The user compares both versions and explicitly chooses which reference to save. **Store voice** retains the selected reference, matching words, original design input, and validated processing recipe. Editing restores the complete pipeline, locks the existing name, and moves the active voice to the top of the library. **Update details** changes tags or the portrait without touching audio or recipe data, while **Update voice** requires a fresh generation and named replacement confirmation.
+
+Post-process an audio file independently without loading VoxCPM2:
+
+```bash
+curl -X POST "http://localhost:8808/tts/postprocess-upload" \
+  -F "audio=@designed.wav" \
+  -F 'options={"method":"ffmpeg","preset":"studio","noise_reduction_db":2,"bass_db":1,"presence_db":1,"dynamics":35,"normalize_loudness":true}' \
+  -o designed-studio.wav
+```
+
+The endpoint returns mono 48 kHz float WAV. Input values are range-validated, the server constructs the FFmpeg filter graph, and the source upload is removed after processing.
 
 Transcribe an uploaded or browser-recorded reference locally before cloning:
 
@@ -201,6 +212,7 @@ Runtime discovery is available from the local API:
 - SSML and SSML-H capabilities: `GET /tts/ssml/capabilities`
 - Lazy local reference transcription with the baked multilingual Whisper Base model: `POST /tts/transcribe-upload`
 - Generated-audio alignment when `/tts/status` reports it available: `POST /tts/timestamps-upload`
+- Optional FFmpeg voice finishing without model inference: `POST /tts/postprocess-upload`
 - Supported languages: `GET /tts/languages`
 - Output formats: `GET /tts/formats`
 - Interactive API reference: `GET /tts/docs`
@@ -303,6 +315,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.
 - Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, per-turn `h:direction` control, progressive unit streaming, explicit breaks, prosody, and profile editing.
 - Added optional `-16 LUFS` output normalization for complete and progressive generation, plus a compact grouped settings panel with clearer model, seed, output-processing, and speech-timing controls.
+- Added non-destructive Voice Design finishing with side-by-side original and processed playback, Clean and Studio presets, custom noise, bass, presence, dynamics, and loudness controls, explicit save-version selection, float 48 kHz output, and restorable processing recipes.
 - Unified model caches, saved voices, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
 - Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.
 - Added generated timestamp sidecars and API/UI integration behind runtime capability discovery; standard Python 3.13 images keep alignment disabled until its backend publishes binary wheels. Reference transcription remains a separate cloning workflow.
@@ -340,6 +353,7 @@ Deferred v1.0 work belongs in this list so release scope does not disappear betw
 
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
 - Recheck Nano-vLLM-VoxCPM upstream after the planned v1.0 product work. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
+- Benchmark an optional neural voice-restoration backend such as DeepFilterNet against the shipped FFmpeg finishing stage. Add it only if Python 3.13 binary wheels, offline model licensing, image size, CPU latency, ASR fidelity, speaker similarity, and blind listening results justify the additional runtime.
 - Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
 - Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.
 

@@ -21,7 +21,7 @@ Denne Hangry Labs-versjonen er laget for enkel lokal bruk. Start én container, 
 
 ## Dette får du
 
-- Nettlesergrensesnitt for generering, strømming, stemmedesign, stemmekloning og lokal transkripsjon
+- Nettlesergrensesnitt for generering, strømming, stemmedesign, stemmekloning, lokal transkripsjon og valgfri ikke-destruktiv stemmebehandling
 - Vedvarende stemmeprofiler med designoppskrifter, portretter, tagger og gjenbruk på tvers av arbeidsflyter
 - SSML og SSML-H for fortellinger, dialoger med flere talere og skuespill
 - Native HTTP-API for applikasjoner og lokale integrasjoner
