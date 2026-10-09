@@ -49,6 +49,7 @@ Major direct runtime dependencies include:
 | Uvicorn, SoundFile, NumPy | BSD and other permissive licenses |
 | defusedxml | Python Software Foundation License |
 | Librosa | ISC |
+| Python Stretch and Signalsmith Stretch | MIT |
 | tqdm | MPL-2.0 and MIT |
 | simplejson | MIT or AFL-2.1 |
 | Matplotlib | Matplotlib license and bundled component licenses |
@@ -130,6 +131,36 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
+```
+
+### Python Stretch and Signalsmith Stretch
+
+The Signalsmith voice-finishing method uses
+[`python-stretch`](https://github.com/gregogiudici/python-stretch) 0.3.1, which
+embeds the [`Signalsmith Stretch`](https://github.com/Signalsmith-Audio/signalsmith-stretch)
+audio processing library. Both projects are distributed under the MIT License.
+
+```text
+Copyright (c) 2024 Gregorio Andrea Giudici
+Copyright (c) 2022 Geraint Luff / Signalsmith Audio Ltd.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ## Browser Libraries

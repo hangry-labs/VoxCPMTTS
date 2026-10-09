@@ -153,7 +153,7 @@ curl -X POST "http://localhost:8808/tts/generate" \
   -o guided.mp3
 ```
 
-Clone conditioning is explicit when an application needs predictable behavior. Use `clone_mode: "reference"` with `control` to direct delivery from the reference audio, or use `clone_mode: "transcript"` with the exact `ref_text` spoken in that audio. The browser Design workspace supports those two reference modes as well as direction-only voice creation. Its compact pipeline keeps sample text to one line, provides immediate seed locking, and records the voice name, portrait, and searchable tags before generation. Missing portraits use a clickable placeholder; uploads are stored as lossless 100x100 WebP images. After generation, the original remains playable and an optional FFmpeg finishing stage can create a separate Clean, Studio, or custom preview with bounded noise cleanup, bass, presence, dynamics, and loudness controls. The user compares both versions and explicitly chooses which reference to save. **Store voice** retains the selected reference, matching words, original design input, and validated processing recipe. Editing restores the complete pipeline, locks the existing name, and moves the active voice to the top of the library. **Update details** changes tags or the portrait without touching audio or recipe data, while **Update voice** requires a fresh generation and named replacement confirmation.
+Clone conditioning is explicit when an application needs predictable behavior. Use `clone_mode: "reference"` with `control` to direct delivery from the reference audio, or use `clone_mode: "transcript"` with the exact `ref_text` spoken in that audio. The browser Design workspace supports those two reference modes as well as direction-only voice creation. Its compact pipeline keeps sample text to one line, provides immediate seed locking, and records the voice name, portrait, and searchable tags before generation. Missing portraits use a clickable placeholder; uploads are stored as lossless 100x100 WebP images. After generation, the original remains playable and an optional finishing stage can create a separate Clean, Studio, or custom preview. FFmpeg Studio provides bounded noise cleanup, bass, presence, dynamics, and loudness controls; Signalsmith Voice adds independent pitch and speed shaping before the same mastering pass. The user compares both versions and explicitly chooses which reference to save. **Store voice** retains the selected reference, matching words, original design input, and validated processing recipe. Editing restores the complete pipeline, locks the existing name, and moves the active voice to the top of the library. **Update details** changes tags or the portrait without touching audio or recipe data, while **Update voice** requires a fresh generation and named replacement confirmation.
 
 Post-process an audio file independently without loading VoxCPM2:
 
@@ -164,7 +164,16 @@ curl -X POST "http://localhost:8808/tts/postprocess-upload" \
   -o designed-studio.wav
 ```
 
-The endpoint returns mono 48 kHz float WAV. Input values are range-validated, the server constructs the FFmpeg filter graph, and the source upload is removed after processing.
+Use Signalsmith Voice for independent pitch and speed shaping before the same mastering pass:
+
+```bash
+curl -X POST "http://localhost:8808/tts/postprocess-upload" \
+  -F "audio=@designed.wav" \
+  -F 'options={"method":"signalsmith","preset":"custom","pitch_semitones":-2,"speed_factor":0.95,"noise_reduction_db":2,"bass_db":1,"presence_db":1,"dynamics":35,"normalize_loudness":true}' \
+  -o designed-shaped.wav
+```
+
+The endpoint returns mono 48 kHz float WAV. Pitch is bounded to +/-6 semitones, speed to 0.75x-1.25x, all inputs are range-validated, and the source upload is removed after processing.
 
 Transcribe an uploaded or browser-recorded reference locally before cloning:
 
@@ -315,7 +324,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.
 - Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, per-turn `h:direction` control, progressive unit streaming, explicit breaks, prosody, and profile editing.
 - Added optional `-16 LUFS` output normalization for complete and progressive generation, plus a compact grouped settings panel with clearer model, seed, output-processing, and speech-timing controls.
-- Added non-destructive Voice Design finishing with side-by-side original and processed playback, Clean and Studio presets, custom noise, bass, presence, dynamics, and loudness controls, explicit save-version selection, float 48 kHz output, and restorable processing recipes.
+- Added non-destructive Voice Design finishing with side-by-side original and processed playback, FFmpeg cleanup/mastering, MIT-licensed Signalsmith pitch and speed shaping, Clean and Studio presets, custom controls, explicit save-version selection, float 48 kHz output, and restorable processing recipes.
 - Unified model caches, saved voices, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
 - Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.
 - Added generated timestamp sidecars and API/UI integration behind runtime capability discovery; standard Python 3.13 images keep alignment disabled until its backend publishes binary wheels. Reference transcription remains a separate cloning workflow.

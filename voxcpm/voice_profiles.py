@@ -16,7 +16,7 @@ PROFILE_TYPES = {"cloned", "designed"}
 PROFILE_DESIGN_SOURCES = {"reference", "direction"}
 PROFILE_CLONE_MODES = {"reference", "transcript"}
 PROFILE_OUTPUT_FORMATS = {"wav", "mp3", "flac", "ogg"}
-PROFILE_POST_PROCESSING_METHODS = {"ffmpeg"}
+PROFILE_POST_PROCESSING_METHODS = {"ffmpeg", "signalsmith"}
 PROFILE_POST_PROCESSING_PRESETS = {"clean", "studio", "custom"}
 MAX_PROFILE_SAMPLE_CHARACTERS = 50_000
 MAX_PROFILE_TAGS = 12
@@ -115,6 +115,14 @@ def normalize_profile_recipe(recipe: dict[str, Any] | None) -> dict[str, Any]:
         if preset not in PROFILE_POST_PROCESSING_PRESETS:
             raise ValueError("Voice recipe post-processing preset is unsupported.")
         normalized_post_processing: dict[str, Any] = {"method": method, "preset": preset}
+        for key, default, minimum, maximum in (
+            ("pitch_semitones", 0.0, -6.0, 6.0),
+            ("speed_factor", 1.0, 0.75, 1.25),
+        ):
+            value = float(post_processing.get(key, default))
+            if not minimum <= value <= maximum:
+                raise ValueError(f"Voice recipe {key} must be between {minimum:g} and {maximum:g}.")
+            normalized_post_processing[key] = value
         for key, minimum, maximum in (
             ("noise_reduction_db", 0.0, 12.0),
             ("bass_db", -6.0, 6.0),

@@ -88,7 +88,8 @@ MAX_RANDOM_SEED = 2**32 - 1
 TIMESTAMP_MODEL = os.getenv("VOXCPM_TIMESTAMP_MODEL", "base")
 TIMESTAMP_DEVICE = os.getenv("VOXCPM_TIMESTAMP_DEVICE", "cpu")
 LOUDNESS_NORMALIZATION_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=11"
-POST_PROCESSING_METHODS = {"ffmpeg"}
+POST_PROCESSING_METHODS = {"ffmpeg", "signalsmith"}
+POST_PROCESSING_SAMPLE_RATE = 48_000
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -509,9 +510,7 @@ def build_post_processing_filter(payload: "PostProcessingRequest") -> str:
     return ",".join(filters)
 
 
-def post_process_audio(source_path: str, payload: "PostProcessingRequest") -> bytes:
-    if payload.method not in POST_PROCESSING_METHODS:
-        raise ValueError(f"Unsupported post-processing method: {payload.method}")
+def decode_post_processing_audio(source_path: str) -> np.ndarray:
     command = [
         "ffmpeg",
         "-nostdin",
@@ -525,6 +524,97 @@ def post_process_audio(source_path: str, payload: "PostProcessingRequest") -> by
         "-vn",
         "-sn",
         "-dn",
+        "-ac",
+        "1",
+        "-ar",
+        str(POST_PROCESSING_SAMPLE_RATE),
+        "-c:a",
+        "pcm_f32le",
+        "-f",
+        "f32le",
+        "pipe:1",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=120,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("ffmpeg is required to decode audio for Signalsmith processing") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("Audio decoding for Signalsmith timed out") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"ffmpeg failed to decode audio for Signalsmith: {stderr}") from exc
+    audio = np.frombuffer(result.stdout, dtype="<f4").copy()
+    if audio.size == 0:
+        raise RuntimeError("Audio decoding for Signalsmith produced no samples")
+    return audio
+
+
+def apply_signalsmith_voice_shape(audio: np.ndarray, payload: "PostProcessingRequest") -> np.ndarray:
+    if payload.pitch_semitones == 0 and payload.speed_factor == 1:
+        return np.ascontiguousarray(audio, dtype=np.float32)
+    try:
+        import python_stretch as signalsmith
+    except ImportError as exc:
+        raise RuntimeError("Signalsmith processing is unavailable because python-stretch is not installed") from exc
+
+    try:
+        processor = signalsmith.Signalsmith.Stretch(0)
+        processor.preset(1, POST_PROCESSING_SAMPLE_RATE)
+        processor.setTransposeSemitones(
+            float(payload.pitch_semitones),
+            8_000 / POST_PROCESSING_SAMPLE_RATE,
+        )
+        processor.timeFactor = float(payload.speed_factor)
+        shaped = np.asarray(
+            processor.process(np.ascontiguousarray(audio[np.newaxis, :], dtype=np.float32)),
+            dtype=np.float32,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Signalsmith failed to shape the voice: {exc}") from exc
+    if shaped.ndim != 2 or shaped.shape[0] != 1 or shaped.shape[1] == 0:
+        raise RuntimeError("Signalsmith produced an invalid audio buffer")
+    if not np.isfinite(shaped).all():
+        raise RuntimeError("Signalsmith produced non-finite audio samples")
+    return np.ascontiguousarray(shaped[0], dtype=np.float32)
+
+
+def post_process_audio(source_path: str, payload: "PostProcessingRequest") -> bytes:
+    if payload.method not in POST_PROCESSING_METHODS:
+        raise ValueError(f"Unsupported post-processing method: {payload.method}")
+    input_bytes: bytes | None = None
+    input_args = ["-i", source_path]
+    if payload.method == "signalsmith":
+        decoded = decode_post_processing_audio(source_path)
+        shaped = apply_signalsmith_voice_shape(decoded, payload)
+        input_bytes = shaped.astype("<f4", copy=False).tobytes()
+        input_args = [
+            "-f",
+            "f32le",
+            "-ar",
+            str(POST_PROCESSING_SAMPLE_RATE),
+            "-ac",
+            "1",
+            "-i",
+            "pipe:0",
+        ]
+    command = [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        *input_args,
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-sn",
+        "-dn",
         "-af",
         build_post_processing_filter(payload),
         "-map_metadata",
@@ -532,7 +622,7 @@ def post_process_audio(source_path: str, payload: "PostProcessingRequest") -> by
         "-ac",
         "1",
         "-ar",
-        "48000",
+        str(POST_PROCESSING_SAMPLE_RATE),
         "-c:a",
         "pcm_f32le",
         "-f",
@@ -544,6 +634,7 @@ def post_process_audio(source_path: str, payload: "PostProcessingRequest") -> by
     try:
         result = subprocess.run(
             command,
+            input=input_bytes,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=True,
@@ -807,8 +898,10 @@ class StreamingTTSRequest(TTSRequest):
 
 
 class PostProcessingRequest(BaseModel):
-    method: Literal["ffmpeg"] = Field("ffmpeg", description="Audio finishing backend.")
+    method: Literal["ffmpeg", "signalsmith"] = Field("ffmpeg", description="Audio finishing backend.")
     preset: Literal["clean", "studio", "custom"] = Field("studio", description="UI preset identity.")
+    pitch_semitones: float = Field(0.0, ge=-6.0, le=6.0, description="Signalsmith pitch shift in semitones.")
+    speed_factor: float = Field(1.0, ge=0.75, le=1.25, description="Signalsmith playback-speed factor.")
     noise_reduction_db: float = Field(2.0, ge=0.0, le=12.0, description="Steady-noise attenuation in dB.")
     bass_db: float = Field(1.0, ge=-6.0, le=6.0, description="Low-shelf gain around 110 Hz.")
     presence_db: float = Field(1.0, ge=-6.0, le=6.0, description="High-shelf gain around 3.5 kHz.")

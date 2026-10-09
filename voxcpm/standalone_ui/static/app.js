@@ -13,8 +13,8 @@ const GPU_HISTORY_RETENTION_MS = 10 * 60 * 1000
 const GPU_POLL_INTERVAL_MS = 1000
 const MAX_GENERATED_REFERENCE_CHARACTERS = 320
 const POST_PROCESSING_PRESETS = {
-  clean: { noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: true },
-  studio: { noise_reduction_db: 2, bass_db: 1, presence_db: 1, dynamics: 35, normalize_loudness: true },
+  clean: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: true },
+  studio: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 2, bass_db: 1, presence_db: 1, dynamics: 35, normalize_loudness: true },
 }
 const SAMPLE_TEXTS = [
   t('samples.first', {}, 'VoxCPM2 generates natural multilingual speech with voice design and cloning.'),
@@ -1367,6 +1367,8 @@ function postProcessingOptions() {
   return {
     method: $('#post-method').value,
     preset: $('#post-preset').value,
+    pitch_semitones: Number($('#post-pitch').value),
+    speed_factor: Number($('#post-speed').value),
     noise_reduction_db: Number($('#post-noise').value),
     bass_db: Number($('#post-bass').value),
     presence_db: Number($('#post-presence').value),
@@ -1376,10 +1378,24 @@ function postProcessingOptions() {
 }
 
 function renderPostProcessingValues() {
+  const pitch = Number($('#post-pitch').value)
+  $('#post-pitch-value').textContent = `${pitch > 0 ? '+' : ''}${pitch.toFixed(1).replace(/\.0$/, '')} st`
+  $('#post-speed-value').textContent = `${Number($('#post-speed').value).toFixed(2)}x`
   $('#post-noise-value').textContent = `${Number($('#post-noise').value).toFixed(1).replace(/\.0$/, '')} dB`
   $('#post-bass-value').textContent = signedDecibels($('#post-bass').value)
   $('#post-presence-value').textContent = signedDecibels($('#post-presence').value)
   $('#post-dynamics-value').textContent = `${$('#post-dynamics').value}%`
+}
+
+function postProcessingMethodLabel(method = $('#post-method').value) {
+  return method === 'signalsmith'
+    ? t('finishing.signalsmithVoice', {}, 'Signalsmith Voice')
+    : t('finishing.ffmpegStudio', {}, 'FFmpeg Studio')
+}
+
+function renderPostProcessingMethod() {
+  $('#signalsmith-controls').hidden = $('#post-method').value !== 'signalsmith'
+  $('#processed-method-badge').textContent = postProcessingMethodLabel()
 }
 
 function selectCloneVersion(version) {
@@ -1410,6 +1426,8 @@ function resetProcessedPreview({ hideFinishing = false } = {}) {
 function applyPostProcessingPreset(name, { invalidate = true } = {}) {
   const preset = POST_PROCESSING_PRESETS[name]
   if (!preset) return
+  $('#post-pitch').value = preset.pitch_semitones
+  $('#post-speed').value = preset.speed_factor
   $('#post-noise').value = preset.noise_reduction_db
   $('#post-bass').value = preset.bass_db
   $('#post-presence').value = preset.presence_db
@@ -1422,17 +1440,22 @@ function applyPostProcessingPreset(name, { invalidate = true } = {}) {
 function restorePostProcessingRecipe(profile) {
   const recipe = profile.recipe?.post_processing
   if (!recipe) {
+    $('#post-method').value = 'ffmpeg'
     $('#post-preset').value = 'studio'
     applyPostProcessingPreset('studio', { invalidate: false })
+    renderPostProcessingMethod()
     return
   }
   $('#post-method').value = recipe.method || 'ffmpeg'
   $('#post-preset').value = recipe.preset || 'custom'
+  $('#post-pitch').value = recipe.pitch_semitones ?? 0
+  $('#post-speed').value = recipe.speed_factor ?? 1
   $('#post-noise').value = recipe.noise_reduction_db ?? 0
   $('#post-bass').value = recipe.bass_db ?? 0
   $('#post-presence').value = recipe.presence_db ?? 0
   $('#post-dynamics').value = recipe.dynamics ?? 0
   $('#post-normalize').checked = recipe.normalize_loudness ?? true
+  renderPostProcessingMethod()
   renderPostProcessingValues()
 }
 
@@ -1454,7 +1477,7 @@ async function processDesignedVoice() {
   button.disabled = true
   status.hidden = false
   status.dataset.tone = 'neutral'
-  status.textContent = t('status.processingVoice', {}, 'Finishing voice with FFmpeg')
+  status.textContent = t('status.processingVoice', { method: postProcessingMethodLabel(options.method) }, 'Finishing voice with {method}')
   try {
     const blob = await requestPostProcessedAudio(generated.blob, generated.extension, options)
     generated.processedBlob = blob
@@ -2115,11 +2138,15 @@ $('#reference-audio-drop').addEventListener('drop', (event) => {
 })
 $('#clone-profile-filter').addEventListener('input', renderCloneProfileList)
 $('#cancel-voice-edit').addEventListener('click', cancelVoiceEdit)
+$('#post-method').addEventListener('change', () => {
+  renderPostProcessingMethod()
+  resetProcessedPreview()
+})
 $('#post-preset').addEventListener('change', (event) => {
   if (event.target.value === 'custom') return resetProcessedPreview()
   applyPostProcessingPreset(event.target.value)
 })
-for (const control of $$('#post-noise, #post-bass, #post-presence, #post-dynamics')) {
+for (const control of $$('#post-pitch, #post-speed, #post-noise, #post-bass, #post-presence, #post-dynamics')) {
   control.addEventListener('input', () => {
     $('#post-preset').value = 'custom'
     renderPostProcessingValues()

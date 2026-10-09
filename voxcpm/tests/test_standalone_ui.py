@@ -111,6 +111,10 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'class="portrait-placeholder"' in responses["/"].text
     assert 'id="clone-output-section"' in responses["/"].text
     assert 'id="voice-finishing"' in responses["/"].text
+    assert '<option value="signalsmith"' in responses["/"].text
+    assert 'id="signalsmith-controls"' in responses["/"].text
+    assert 'id="post-pitch"' in responses["/"].text
+    assert 'id="post-speed"' in responses["/"].text
     assert 'id="clone-processed-output"' in responses["/"].text
     assert 'data-save-version="original"' in responses["/"].text
     assert 'data-save-version="processed"' in responses["/"].text
@@ -431,6 +435,35 @@ def test_ffmpeg_post_processing_produces_float_wav(tmp_path: Path) -> None:
     assert info.frames > 0
 
 
+def test_signalsmith_post_processing_changes_pitch_and_speed(tmp_path: Path) -> None:
+    sample_rate = 48_000
+    time_axis = np.arange(sample_rate, dtype=np.float32) / sample_rate
+    source = tmp_path / "source.wav"
+    sf.write(source, 0.15 * np.sin(2 * np.pi * 220 * time_axis), sample_rate, subtype="FLOAT")
+
+    processed = runtime.post_process_audio(
+        str(source),
+        runtime.PostProcessingRequest(
+            method="signalsmith",
+            preset="custom",
+            pitch_semitones=3,
+            speed_factor=1.25,
+            noise_reduction_db=0,
+            bass_db=0,
+            presence_db=0,
+            dynamics=0,
+            normalize_loudness=False,
+        ),
+    )
+    audio, output_rate = sf.read(io.BytesIO(processed), dtype="float32")
+    frequencies = np.fft.rfftfreq(audio.size, 1 / output_rate)
+    peak_frequency = frequencies[int(np.argmax(np.abs(np.fft.rfft(audio * np.hanning(audio.size)))))]
+
+    assert output_rate == sample_rate
+    assert 0.78 <= audio.size / sample_rate <= 0.82
+    assert 255 <= peak_frequency <= 268
+
+
 def test_postprocess_upload_removes_source_and_returns_recipe_headers() -> None:
     observed: dict[str, object] = {}
 
@@ -482,9 +515,12 @@ def test_postprocess_upload_rejects_out_of_range_controls() -> None:
 def test_defaults_enable_browser_loudness_normalization() -> None:
     with TestClient(runtime.app) as client:
         response = client.get("/tts/defaults")
+        status = client.get("/tts/status")
 
     assert response.status_code == 200
     assert response.json()["normalize_loudness"] is True
+    assert status.status_code == 200
+    assert status.json()["post_processing"]["methods"] == ["ffmpeg", "signalsmith"]
 
 
 def test_transcribe_upload_uses_and_removes_temporary_audio() -> None:
@@ -609,8 +645,10 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
                             "sample_text": "A complete voice design sample.",
                             "reference_text": "This is the original recording.",
                             "post_processing": {
-                                "method": "ffmpeg",
-                                "preset": "studio",
+                                "method": "signalsmith",
+                                "preset": "custom",
+                                "pitch_semitones": -2.5,
+                                "speed_factor": 0.9,
                                 "noise_reduction_db": 2,
                                 "bass_db": 1,
                                 "presence_db": 1,
@@ -645,7 +683,9 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
     assert created.json()["recipe"]["seed"] == 1234
     assert created.json()["recipe"]["clone_mode"] == "transcript"
     assert created.json()["recipe"]["sample_text"] == "A complete voice design sample."
-    assert created.json()["recipe"]["post_processing"]["method"] == "ffmpeg"
+    assert created.json()["recipe"]["post_processing"]["method"] == "signalsmith"
+    assert created.json()["recipe"]["post_processing"]["pitch_semitones"] == -2.5
+    assert created.json()["recipe"]["post_processing"]["speed_factor"] == 0.9
     assert created.json()["recipe"]["post_processing"]["dynamics"] == 35
     assert created.json()["has_design_audio"] is True
     assert created.json()["has_portrait"] is True

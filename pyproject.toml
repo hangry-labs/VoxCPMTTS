@@ -42,6 +42,7 @@ dependencies = [
     "sortedcontainers",
     "soundfile",
     "librosa",
+    "python-stretch==0.3.1",
     "matplotlib",
     "spaces",
     "safetensors",
