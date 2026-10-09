@@ -153,6 +153,12 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="magic-editor-shell"' in responses["/"].text
     assert 'id="magic-expression-control"' in responses["/"].text
     assert 'id="magic-character-dialog"' in responses["/"].text
+    assert 'id="script-list"' in responses["/"].text
+    assert 'id="script-import-input"' in responses["/"].text
+    assert 'id="script-download"' in responses["/"].text
+    assert 'id="edit-script-dialog"' in responses["/"].text
+    assert 'id="update-script-dialog"' in responses["/"].text
+    assert 'id="delete-script-dialog"' in responses["/"].text
     assert 'id="profile-edit-dialog"' not in responses["/"].text
     assert "gradio" not in responses["/"].text.lower()
     assert responses["/system/gpu"].json()["gpus"] == []
@@ -174,6 +180,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "async function generateMagicPreview(" in script
     assert "async function openMagicCharacterDialog(" in script
     assert "magicEditor.markFullGeneration" in script
+    assert "fetchJson('/tts/dialogue-scripts')" in script
+    assert "magicEditor.loadSSMLH" in script
+    assert "downloadDocument" in script
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
@@ -714,6 +723,79 @@ def test_saved_clone_profile_can_be_listed_resolved_and_deleted(tmp_path: Path) 
     assert missing.status_code == 404
     assert missing_design.status_code == 404
     assert missing_portrait.status_code == 404
+
+
+def test_dialogue_script_can_be_saved_updated_downloaded_and_deleted(tmp_path: Path) -> None:
+    first_document = """<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+      xmlns:h="https://hangrylabs.app/ns/ssml-h/1.0" xml:lang="en-US">
+      <voice name="captain" h:direction="Calm and precise">Ready for launch.</voice>
+      <break time="300ms"/>
+      <voice name="engineer">All systems are ready.</voice>
+    </speak>"""
+    updated_document = first_document.replace("All systems are ready.", "The final checks are complete.")
+
+    with patch.object(runtime, "DIALOGUE_SCRIPT_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            created = client.post(
+                "/tts/dialogue-scripts",
+                json={
+                    "name": "Launch Dialogue",
+                    "document": first_document,
+                    "description": "A short launch sequence",
+                    "tags": ["launch", "English"],
+                },
+            )
+            duplicate = client.post(
+                "/tts/dialogue-scripts",
+                json={"name": "Launch Dialogue", "document": first_document},
+            )
+            listed = client.get("/tts/dialogue-scripts")
+            loaded = client.get("/tts/dialogue-scripts/launch-dialogue")
+            downloaded = client.get("/tts/dialogue-scripts/launch-dialogue/download")
+            updated = client.put(
+                "/tts/dialogue-scripts/launch-dialogue",
+                json={
+                    "name": "Launch Dialogue",
+                    "document": updated_document,
+                    "description": "Updated launch sequence",
+                    "tags": ["launch", "dramatic"],
+                },
+            )
+            deleted = client.delete("/tts/dialogue-scripts/launch-dialogue")
+            missing = client.get("/tts/dialogue-scripts/launch-dialogue")
+
+    assert created.status_code == 200
+    assert created.json()["id"] == "launch-dialogue"
+    assert created.json()["turns"] == 2
+    assert created.json()["words"] == 7
+    assert created.json()["tags"] == ["launch", "English"]
+    assert duplicate.status_code == 400
+    assert listed.status_code == 200
+    assert listed.headers["cache-control"] == "no-store"
+    assert listed.json()["count"] == 1
+    assert listed.json()["data"][0]["description"] == "A short launch sequence"
+    assert listed.json()["data"][0]["tags"] == ["launch", "English"]
+    assert loaded.json()["document"].strip() == first_document.strip()
+    assert downloaded.headers["content-type"].startswith("application/ssml+xml")
+    assert "filename=\"launch-dialogue.ssml\"" in downloaded.headers["content-disposition"]
+    assert updated.status_code == 200
+    assert "final checks" in updated.json()["document"]
+    assert updated.json()["description"] == "Updated launch sequence"
+    assert updated.json()["tags"] == ["launch", "dramatic"]
+    assert deleted.json() == {"deleted": "launch-dialogue"}
+    assert missing.status_code == 404
+    assert not list(tmp_path.glob("script-*.ssml"))
+
+
+def test_dialogue_script_rejects_invalid_ssml_h(tmp_path: Path) -> None:
+    with patch.object(runtime, "DIALOGUE_SCRIPT_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/dialogue-scripts",
+                json={"name": "Broken", "document": "<speak>not closed"},
+            )
+
+    assert response.status_code == 400
 
 
 def test_saved_clone_profile_can_switch_from_transcript_to_directed_reference_mode(tmp_path: Path) -> None:

@@ -104,6 +104,12 @@ const state = {
   defaults: {},
   status: {},
   profiles: [],
+  scripts: [],
+  activeScript: null,
+  scriptDirty: false,
+  pendingDeleteScript: null,
+  editingScriptDetails: null,
+  suppressScriptDirty: false,
   designSource: 'reference',
   cloneMode: 'reference',
   loadingProfile: false,
@@ -123,11 +129,12 @@ const state = {
 }
 
 const magicEditor = new MagicEditor($('#magic-editor-shell'), {
-  onChange: updateMetrics,
+  onChange: handleMagicChange,
   onPreview: generateMagicPreview,
   onSaveCharacter: openMagicCharacterDialog,
   onError: (error) => showToast(errorMessage(error)),
 })
+state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
 
 const generateOutput = new AudioEditor($('#generate-output'), {
   label: t('output.generated', {}, 'Generated audio'),
@@ -326,13 +333,31 @@ function inputSample(inputType) {
   return INPUT_SAMPLES[inputType][0]
 }
 
-function setInputType(inputType) {
+function setInputType(inputType, { syncSsmlH = true } = {}) {
   if (!['magic', 'text', 'ssml', 'ssml-h'].includes(inputType)) return
   const editor = $('#text-input')
   const currentType = state.inputType
   if (currentType !== 'magic') state.inputDrafts[currentType] = editor.value
+  if (currentType === 'ssml-h' && inputType === 'magic' && syncSsmlH) {
+    const dirty = state.scriptDirty
+    try {
+      state.suppressScriptDirty = true
+      magicEditor.loadSSMLH(editor.value)
+      state.scriptDirty = dirty
+    } catch (error) {
+      showToast(errorMessage(error))
+      return
+    } finally {
+      state.suppressScriptDirty = false
+    }
+  }
+  if (currentType === 'magic' && inputType === 'ssml-h') {
+    state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
+  }
   if (inputType !== 'magic') {
-    if (state.inputDrafts[inputType] == null) state.inputDrafts[inputType] = inputSample(inputType)
+    if (state.inputDrafts[inputType] == null) {
+      state.inputDrafts[inputType] = inputType === 'ssml-h' ? magicEditor.toSSMLH() : inputSample(inputType)
+    }
     editor.value = state.inputDrafts[inputType]
     editor.dataset.inputType = inputType
     editor.spellcheck = inputType === 'text'
@@ -350,6 +375,208 @@ function setInputType(inputType) {
   })
   updateMetrics()
   persistUiState()
+}
+
+function handleMagicChange(editorInstance) {
+  state.inputDrafts['ssml-h'] = editorInstance.toSSMLH()
+  if (!state.suppressScriptDirty && state.activeScript) {
+    state.scriptDirty = true
+    renderScriptLibrary()
+  }
+  updateMetrics()
+}
+
+function normalizedScriptName(value) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^[-_]+|[-_]+$/g, '').slice(0, 80)
+}
+
+function renderScriptSaveState() {
+  const scriptId = normalizedScriptName($('#script-name').value)
+  const updating = Boolean(scriptId && scriptId === state.activeScript?.id)
+  $('#script-save').hidden = !scriptId
+  const label = $('span', $('#script-save'))
+  label.textContent = updating ? t('scripts.updateShort', {}, 'Update') : t('scripts.saveShort', {}, 'Save')
+}
+
+function renderScriptLibrary() {
+  const query = $('#script-filter').value.trim().toLowerCase()
+  const scripts = state.scripts
+    .filter((script) => !query || [script.name, script.description || '', ...(script.tags || [])].join(' ').toLowerCase().includes(query))
+    .sort((left, right) => {
+      if (left.id === state.activeScript?.id) return -1
+      if (right.id === state.activeScript?.id) return 1
+      return left.name.localeCompare(right.name)
+    })
+  $('#script-count').textContent = String(state.scripts.length)
+  $('#script-list').innerHTML = scripts.length
+    ? scripts.map((script) => {
+      const active = script.id === state.activeScript?.id
+      return `
+        <article class="script-card${active ? ' active' : ''}" data-script-id="${escapeHtml(script.id)}">
+          <div class="script-card-copy">
+            <strong>${escapeHtml(script.name)}${active && state.scriptDirty ? `<span class="script-dirty-badge">${escapeHtml(t('scripts.unsaved', {}, 'Unsaved changes'))}</span>` : ''}</strong>
+            <span>${escapeHtml(script.description || t('scripts.storedDialogue', {}, 'Stored SSML-H dialogue'))}</span>
+            <div class="script-card-metadata">
+              <span>${escapeHtml(t('scripts.turnCount', { count: script.turns }, `${script.turns} turns`))}</span>
+              <span>${escapeHtml(t('scripts.wordCount', { count: script.words }, `${script.words} words`))}</span>
+              ${(script.tags || []).map((tag) => `<span>#${escapeHtml(tag)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="script-card-actions">
+            <button class="secondary-button" type="button" data-script-action="use" ${active ? 'disabled' : ''}>${active ? `<i class="icon-check"></i><span>${escapeHtml(t('scripts.selected', {}, 'Selected'))}</span>` : `<i class="icon-book-open"></i><span>${escapeHtml(t('scripts.use', {}, 'Use script'))}</span>`}</button>
+            <button class="icon-button bordered" type="button" data-script-action="edit" title="${escapeHtml(t('scripts.editNamed', { name: script.name }, `Edit ${script.name}`))}" aria-label="${escapeHtml(t('scripts.editNamed', { name: script.name }, `Edit ${script.name}`))}"><i class="icon-sliders-horizontal"></i></button>
+            <button class="icon-button bordered danger-icon" type="button" data-script-action="delete" title="${escapeHtml(t('common.delete', {}, 'Delete'))}" aria-label="${escapeHtml(t('scripts.deleteNamed', { name: script.name }, `Delete ${script.name}`))}"><i class="icon-x"></i></button>
+          </div>
+        </article>`
+    }).join('')
+    : `<div class="script-empty">${escapeHtml(t(query ? 'scripts.noMatches' : 'scripts.empty', {}, query ? 'No matching scripts.' : 'No saved scripts yet.'))}</div>`
+  renderScriptSaveState()
+}
+
+async function refreshScripts(selectedId = state.activeScript?.id) {
+  const payload = await fetchJson('/tts/dialogue-scripts')
+  state.scripts = payload.data || []
+  if (selectedId) state.activeScript = state.scripts.find((script) => script.id === selectedId) || null
+  renderScriptLibrary()
+}
+
+function currentScriptDocument() {
+  if (state.inputType === 'ssml-h') {
+    const dirty = state.scriptDirty
+    state.suppressScriptDirty = true
+    try {
+      magicEditor.loadSSMLH($('#text-input').value)
+      state.scriptDirty = dirty
+    } finally {
+      state.suppressScriptDirty = false
+    }
+  }
+  return magicEditor.toSSMLH()
+}
+
+function downloadDocument(documentText, filename) {
+  const url = URL.createObjectURL(new Blob([documentText], { type: 'application/ssml+xml;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.append(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function downloadCurrentScript() {
+  try {
+    const documentText = currentScriptDocument()
+    const name = state.activeScript?.id || normalizedScriptName($('#script-name').value) || 'voxcpm-dialogue'
+    downloadDocument(documentText, `${name}.ssml`)
+  } catch (error) {
+    showToast(errorMessage(error))
+  }
+}
+
+function startNewScript() {
+  state.activeScript = null
+  state.scriptDirty = false
+  $('#script-name').value = ''
+  setInputType('magic', { syncSsmlH: false })
+  state.suppressScriptDirty = true
+  magicEditor.newDocument()
+  state.suppressScriptDirty = false
+  state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
+  renderScriptLibrary()
+  magicEditor.canvas.querySelector('textarea')?.focus()
+}
+
+async function loadSavedScript(scriptId) {
+  const record = await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(scriptId)}`)
+  setInputType('magic', { syncSsmlH: false })
+  state.suppressScriptDirty = true
+  try {
+    magicEditor.loadSSMLH(record.document)
+  } finally {
+    state.suppressScriptDirty = false
+  }
+  state.activeScript = record
+  state.scriptDirty = false
+  $('#script-name').value = record.name
+  state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
+  renderScriptLibrary()
+  showToast(t('scripts.loaded', { name: record.name }, `Loaded ${record.name}.`), 'success')
+}
+
+async function persistCurrentScript({ overwrite = false } = {}) {
+  const name = $('#script-name').value.trim()
+  if (!normalizedScriptName(name)) throw new Error(t('scripts.nameRequired', {}, 'Enter a script name before saving.'))
+  const documentText = currentScriptDocument()
+  const path = overwrite ? `/tts/dialogue-scripts/${encodeURIComponent(state.activeScript.id)}` : '/tts/dialogue-scripts'
+  const saved = await fetchJson(path, {
+    method: overwrite ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      document: documentText,
+      description: state.activeScript?.description || '',
+      tags: state.activeScript?.tags || [],
+    }),
+  })
+  state.activeScript = saved
+  state.scriptDirty = false
+  $('#script-name').value = saved.name
+  await refreshScripts(saved.id)
+  showToast(t(overwrite ? 'scripts.updatedNamed' : 'scripts.savedNamed', { name: saved.name }, `${overwrite ? 'Updated' : 'Saved'} ${saved.name}.`), 'success')
+}
+
+async function openEditScriptDialog(script) {
+  const record = await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(script.id)}`)
+  state.editingScriptDetails = record
+  $('#edit-script-name').textContent = record.name
+  $('#edit-script-tags').value = (record.tags || []).join(', ')
+  $('#edit-script-description').value = record.description || ''
+  $('#edit-script-dialog').showModal()
+}
+
+function closeEditScriptDialog() {
+  $('#edit-script-dialog').close()
+  state.editingScriptDetails = null
+}
+
+async function updateScriptDetails() {
+  const record = state.editingScriptDetails
+  if (!record) return
+  const saved = await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(record.id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: record.name,
+      document: record.document,
+      description: $('#edit-script-description').value.trim(),
+      tags: commaSeparatedTags($('#edit-script-tags').value),
+    }),
+  })
+  if (state.activeScript?.id === saved.id) state.activeScript = saved
+  closeEditScriptDialog()
+  await refreshScripts(state.activeScript?.id)
+  showToast(t('scripts.detailsUpdatedNamed', { name: saved.name }, `Updated ${saved.name} details.`), 'success')
+}
+
+async function importScriptFile(file) {
+  if (!file) return
+  if (file.size > 1_000_000) throw new Error(t('scripts.importSize', {}, 'SSML-H scripts must be 1 MB or smaller.'))
+  const source = await file.text()
+  state.activeScript = null
+  state.scriptDirty = false
+  setInputType('magic', { syncSsmlH: false })
+  state.suppressScriptDirty = true
+  try {
+    magicEditor.loadSSMLH(source)
+  } finally {
+    state.suppressScriptDirty = false
+  }
+  $('#script-name').value = file.name.replace(/\.(ssml|xml)$/i, '').slice(0, 80)
+  state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
+  renderScriptLibrary()
+  showToast(t('scripts.imported', { name: file.name }, `Imported ${file.name}.`), 'success')
 }
 
 function setGenerationMode(mode, { persist = true } = {}) {
@@ -2068,6 +2295,7 @@ function activateTab(tab) {
   $$('.tab-panel').forEach((panel) => { panel.hidden = panel.dataset.panel !== tab })
   $('#inference-settings').hidden = !workflowActive
   $('#composer').hidden = tab !== 'generate'
+  $('#generate-authoring').hidden = tab !== 'generate'
   updateWorkflowControls()
   if (tab !== 'clone') referenceRecorder.stop()
   else requestAnimationFrame(() => referenceRecorder.refresh())
@@ -2118,13 +2346,14 @@ function resetControls() {
 }
 
 async function initialize() {
-  const [defaults, status, languages, formats, streamFormats, profiles, ssmlCapabilities] = await Promise.all([
+  const [defaults, status, languages, formats, streamFormats, profiles, scripts, ssmlCapabilities] = await Promise.all([
     fetchJson('/tts/defaults'),
     fetchJson('/tts/status'),
     fetchJson('/tts/languages'),
     fetchJson('/tts/formats'),
     fetchJson('/tts/stream-formats'),
     fetchJson('/tts/voice-profiles'),
+    fetchJson('/tts/dialogue-scripts'),
     fetchJson('/tts/ssml/capabilities'),
   ])
   state.defaults = defaults
@@ -2132,12 +2361,14 @@ async function initialize() {
   state.formats = formats.formats || {}
   state.streamFormats = streamFormats.formats || {}
   state.profiles = profiles.data || []
+  state.scripts = scripts.data || []
   state.ssmlCapabilities = ssmlCapabilities
 
   populateSelect($('#language'), languages.languages.map((language) => ({ value: language, label: languageLabel(language) })), defaults.language)
   populateSelect($('#device'), status.hardware || [{ value: 'auto', label: t('common.auto', {}, 'Auto') }, { value: 'cpu', label: 'CPU' }], defaults.device)
   renderVoiceProfileSelect()
   renderCloneProfileList()
+  renderScriptLibrary()
   magicEditor.setCapabilities(ssmlCapabilities)
   resetControls()
   $('#denoise').disabled = !status.load_denoiser
@@ -2161,7 +2392,14 @@ async function initialize() {
   activateTab(state.activeTab)
 }
 
-$('#text-input').addEventListener('input', updateMetrics)
+$('#text-input').addEventListener('input', () => {
+  if (state.inputType !== 'magic') state.inputDrafts[state.inputType] = $('#text-input').value
+  if (state.inputType === 'ssml-h' && state.activeScript) {
+    state.scriptDirty = true
+    renderScriptLibrary()
+  }
+  updateMetrics()
+})
 $('#design-text-input').addEventListener('input', updateDesignMetrics)
 $('#design-voice-name').addEventListener('input', updateDesignCompletion)
 $('#design-voice-tags').addEventListener('input', renderVoiceSaveState)
@@ -2468,6 +2706,83 @@ $('#delete-profile-confirm').addEventListener('click', async (event) => {
     if (state.editingProfile?.id === profile.id) cancelVoiceEdit()
     await refreshProfiles()
     showToast(t('profiles.deletedNamed', { name: profile.id }, `Deleted ${profile.id}.`), 'success')
+  } catch (error) {
+    showToast(errorMessage(error))
+  } finally {
+    button.disabled = false
+  }
+})
+$('#script-import').addEventListener('click', () => $('#script-import-input').click())
+$('#script-import-input').addEventListener('change', async (event) => {
+  const file = event.target.files[0]
+  event.target.value = ''
+  try {
+    await importScriptFile(file)
+  } catch (error) {
+    showToast(errorMessage(error))
+  }
+})
+$('#script-download').addEventListener('click', downloadCurrentScript)
+$('#script-name').addEventListener('input', renderScriptSaveState)
+$('#script-filter').addEventListener('input', renderScriptLibrary)
+$('#script-save').addEventListener('click', () => {
+  const updating = normalizedScriptName($('#script-name').value) === state.activeScript?.id
+  if (updating) {
+    $('#update-script-name').textContent = state.activeScript.name
+    $('#update-script-dialog').showModal()
+    return
+  }
+  persistCurrentScript().catch((error) => showToast(errorMessage(error)))
+})
+$('#script-list').addEventListener('click', (event) => {
+  const action = event.target.closest('[data-script-action]')?.dataset.scriptAction
+  const scriptId = event.target.closest('[data-script-id]')?.dataset.scriptId
+  if (!action || !scriptId) return
+  const script = state.scripts.find((item) => item.id === scriptId)
+  if (!script) return
+  if (action === 'use') loadSavedScript(scriptId).catch((error) => showToast(errorMessage(error)))
+  if (action === 'edit') openEditScriptDialog(script).catch((error) => showToast(errorMessage(error)))
+  if (action === 'delete') {
+    state.pendingDeleteScript = script
+    $('#delete-script-name').textContent = script.name
+    $('#delete-script-dialog').showModal()
+  }
+})
+$('#edit-script-close').addEventListener('click', closeEditScriptDialog)
+$('#edit-script-cancel').addEventListener('click', closeEditScriptDialog)
+$('#edit-script-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeEditScriptDialog() })
+$('#edit-script-form').addEventListener('submit', (event) => {
+  event.preventDefault()
+  updateScriptDetails().catch((error) => showToast(errorMessage(error)))
+})
+$('#update-script-close').addEventListener('click', () => $('#update-script-dialog').close())
+$('#update-script-cancel').addEventListener('click', () => $('#update-script-dialog').close())
+$('#update-script-confirm').addEventListener('click', async (event) => {
+  const button = event.currentTarget
+  button.disabled = true
+  try {
+    await persistCurrentScript({ overwrite: true })
+    $('#update-script-dialog').close()
+  } catch (error) {
+    showToast(errorMessage(error))
+  } finally {
+    button.disabled = false
+  }
+})
+$('#delete-script-close').addEventListener('click', () => $('#delete-script-dialog').close())
+$('#delete-script-cancel').addEventListener('click', () => $('#delete-script-dialog').close())
+$('#delete-script-confirm').addEventListener('click', async (event) => {
+  const script = state.pendingDeleteScript
+  if (!script) return
+  const button = event.currentTarget
+  button.disabled = true
+  try {
+    await fetchJson(`/tts/dialogue-scripts/${encodeURIComponent(script.id)}`, { method: 'DELETE' })
+    $('#delete-script-dialog').close()
+    state.pendingDeleteScript = null
+    if (state.activeScript?.id === script.id) startNewScript()
+    await refreshScripts()
+    showToast(t('scripts.deletedNamed', { name: script.name }, `Deleted ${script.name}.`), 'success')
   } catch (error) {
     showToast(errorMessage(error))
   } finally {

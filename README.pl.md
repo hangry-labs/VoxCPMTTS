@@ -22,7 +22,7 @@ Ta wersja Hangry Labs została przygotowana z myślą o prostej lokalnej pracy. 
 ## Co oferuje projekt
 
 - Interfejs przeglądarkowy do generowania, strumieniowania, projektowania i klonowania głosu, lokalnej transkrypcji oraz opcjonalnego niedestrukcyjnego dopracowania głosu
-- Trwałe profile głosowe z recepturami projektu, portretami, tagami i ponownym użyciem w różnych trybach
+- Trwałe profile głosowe i skrypty dialogów z recepturami, portretami, wyszukiwaniem, importem i eksportem SSML-H oraz ponownym użyciem między sesjami
 - SSML i SSML-H do narracji, dialogów wielu postaci i słuchowisk
 - Natywne API HTTP dla aplikacji i lokalnych integracji
 - Generowanie w 30 językach obsługiwanych przez VoxCPM2

@@ -1,5 +1,5 @@
 import { t } from './i18n.js'
-import { serializeMagicDocument } from './magic-document.js'
+import { parseMagicDocument, serializeMagicDocument } from './magic-document.js'
 
 const DEFAULT_BREAK_MS = 300
 
@@ -64,6 +64,7 @@ export class MagicEditor {
     this.maxBreakMs = 10_000
     this.supportsVoice = true
     this.supportsDirection = true
+    this.documentMeta = { metadataXml: '', language: '' }
     this.blocks = [this.createSpeech(t('composer.defaultText', {}, 'VoxCPM2 generates natural multilingual speech with voice design and cloning.'))]
     this.activeId = this.blocks[0].id
     this.bind()
@@ -189,6 +190,7 @@ export class MagicEditor {
 
   loadSample(text) {
     this.blocks.forEach((block) => this.clearPreview(block))
+    this.documentMeta = { metadataXml: '', language: '' }
     const first = this.voices[0]?.id || ''
     const second = this.voices[1]?.id || first
     if (first) {
@@ -199,6 +201,36 @@ export class MagicEditor {
       ]
     } else {
       this.blocks = [this.createSpeech(text)]
+    }
+    this.activeId = this.blocks[0].id
+    this.render()
+    this.changed()
+  }
+
+  newDocument() {
+    this.blocks.forEach((block) => this.clearPreview(block))
+    this.documentMeta = { metadataXml: '', language: '' }
+    this.blocks = [this.createSpeech('')]
+    this.activeId = this.blocks[0].id
+    this.render()
+    this.changed()
+  }
+
+  loadSSMLH(source) {
+    const parsed = parseMagicDocument(source)
+    this.blocks.forEach((block) => this.clearPreview(block))
+    this.documentMeta = { metadataXml: parsed.metadataXml, language: parsed.language }
+    this.blocks = parsed.blocks.map((block) => (
+      block.type === 'break'
+        ? this.createBreak(block.milliseconds)
+        : { ...this.createSpeech(block.text), voice: block.voice, direction: block.direction }
+    ))
+    const known = new Set(this.voices.map((voice) => voice.id))
+    for (const block of this.blocks) {
+      if (block.type === 'speech' && block.voice && !known.has(block.voice)) {
+        this.voices.push({ id: block.voice, label: block.voice, portraitUrl: '', version: 'current' })
+        known.add(block.voice)
+      }
     }
     this.activeId = this.blocks[0].id
     this.render()
@@ -597,6 +629,6 @@ export class MagicEditor {
   }
 
   toSSMLH(blocks = this.blocks) {
-    return serializeMagicDocument(blocks)
+    return serializeMagicDocument(blocks, this.documentMeta)
   }
 }

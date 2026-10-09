@@ -22,7 +22,7 @@
 ## 项目功能
 
 - 支持语音生成、流式输出、声音设计、声音克隆、本地转写和可选非破坏性声音处理的浏览器界面
-- 持久化声音配置，保存设计参数、头像和标签，并可在不同工作流程中重复使用
+- 持久化声音配置和对话脚本，支持设计参数、头像、搜索、SSML-H 导入导出以及跨会话重复使用
 - 使用 SSML 和 SSML-H 创建旁白、多角色对话和广播剧
 - 面向应用程序和本地集成的原生 HTTP API
 - 支持 VoxCPM2 的 30 种语言
@@ -47,7 +47,7 @@ docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e 
 - API 文档：[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)
 - [语言和声音示例](https://hangry-labs.github.io/VoxCPMTTS/examples/)
 
-`voxcpmtts_data` 卷会在容器替换后保留模型缓存、声音配置、参考音频和未来的设置。完整镜像包含固定的模型资源，下载后可在无网络环境下进行常规推理。
+`voxcpmtts_data` 卷会在容器替换后保留模型缓存、声音配置、对话脚本、参考音频和未来的设置。完整镜像包含固定的模型资源，下载后可在无网络环境下进行常规推理。
 
 已发布的 GitHub Release 及其 Git 标签不可变。带版本号的 Docker 标签同样不可变，而 `latest` 和 `latest_tiny` 会按设计指向最新快照。
 

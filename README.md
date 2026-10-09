@@ -22,7 +22,7 @@ This Hangry Labs fork is made for local use without the usual Python environment
 ## What This Project Provides
 
 - A browser UI for voice design, voice cloning, transcript-guided cloning, local reference transcription, and optional non-destructive voice finishing
-- Persistent saved voices with restorable recipes, portraits, searchable tags, and reuse across Generate, Stream, and SSML documents
+- Persistent saved voices and dialogue scripts with restorable recipes, portraits, search, SSML-H import/export, and reuse across sessions
 - SSML and SSML-H documents for timed narration, multi-speaker discussions, and plays
 - An HTTP API for applications and local integrations
 - Multilingual generation across 30 VoxCPM2 languages
@@ -57,7 +57,7 @@ docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e 
 
 Then open **[http://localhost:8808](http://localhost:8808)**. Interactive API documentation is available at **[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)**.
 
-The unified `voxcpmtts_data` volume stores model caches, saved voice profiles, reference audio, and future application settings across container replacement. The full image seeds its baked model assets into this volume on startup; the tiny image downloads into the same volume on first online use.
+The unified `voxcpmtts_data` volume stores model caches, saved voice profiles, dialogue scripts, reference audio, and future application settings across container replacement. The full image seeds its baked model assets into this volume on startup; the tiny image downloads into the same volume on first online use.
 
 To select another physical GPU, change `CUDA_VISIBLE_DEVICES`. Keep one VoxCPMTTS model-serving container per GPU.
 
@@ -218,6 +218,7 @@ Runtime discovery is available from the local API:
 - Status and loaded backend: `GET /tts/status`
 - Current generation stage: `GET /tts/activity`
 - Saved voices: `GET` and `POST /tts/voice-profiles`; `PUT` and `DELETE /tts/voice-profiles/{name}`
+- Saved dialogue scripts: `GET` and `POST /tts/dialogue-scripts`; `GET`, `PUT`, and `DELETE /tts/dialogue-scripts/{name}`; downloadable SSML-H at `GET /tts/dialogue-scripts/{name}/download`
 - SSML and SSML-H capabilities: `GET /tts/ssml/capabilities`
 - Lazy local reference transcription with the baked multilingual Whisper Base model: `POST /tts/transcribe-upload`
 - Generated-audio alignment when `/tts/status` reports it available: `POST /tts/timestamps-upload`
@@ -323,10 +324,10 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Fixed saved-voice selection in Generate and Stream so the chosen profile reaches inference and visibly restores its language, locked seed, guidance, steps, and output-processing recipe.
 - Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.
 - Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, per-turn `h:direction` control, progressive unit streaming, explicit breaks, prosody, and profile editing.
-- Added Magic as the default structured dialogue editor, with ordered speech and pause blocks, saved-voice assignment, portraits, exact-seed turn previews, one-click capture of generated voices as reusable characters, preset or custom per-turn direction, experimental inline vocal cues, compact block reordering, and capability-driven SSML-H generation without exposing markup. Inline cues remain explicitly experimental because VoxCPM2 does not publish a stable supported-tag contract; use per-turn direction for dependable style control.
+- Added Magic as the default structured dialogue editor, with ordered speech and pause blocks, saved-voice assignment, portraits, exact-seed turn previews, one-click capture of generated voices as reusable characters, preset or custom per-turn direction, experimental inline vocal cues, compact block reordering, live SSML-H synchronization, guarded SSML-H import, document download, and a searchable persistent script library with confirmed updates. Inline cues remain explicitly experimental because VoxCPM2 does not publish a stable supported-tag contract; use per-turn direction for dependable style control.
 - Added optional `-16 LUFS` output normalization for complete and progressive generation, plus a compact grouped settings panel with clearer model, seed, output-processing, and speech-timing controls.
 - Added non-destructive Voice Design finishing with side-by-side original and processed playback, FFmpeg cleanup/mastering, MIT-licensed Signalsmith pitch and speed shaping, Clean and Studio presets, custom controls, explicit save-version selection, float 48 kHz output, and restorable processing recipes.
-- Unified model caches, saved voices, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
+- Unified model caches, saved voices, dialogue scripts, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
 - Added reproducible 32-bit generation seeds across the UI, API, CLI, native backend, and Nano backend, including the used-seed response header.
 - Added generated timestamp sidecars and API/UI integration behind runtime capability discovery; standard Python 3.13 images keep alignment disabled until its backend publishes binary wheels. Reference transcription remains a separate cloning workflow.
 - Added lazy multilingual reference transcription with a pinned Whisper Base model. The baked image works offline; the tiny image downloads the same pinned assets on first use.
@@ -364,7 +365,7 @@ Deferred v1.0 work belongs in this list so release scope does not disappear betw
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
 - Recheck Nano-vLLM-VoxCPM upstream after the planned v1.0 product work. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
 - Benchmark an optional neural voice-restoration backend such as DeepFilterNet against the shipped FFmpeg finishing stage. Add it only if Python 3.13 binary wheels, offline model licensing, image size, CPU latency, ASR fidelity, speaker similarity, and blind listening results justify the additional runtime.
-- Extend Magic with the remaining capability-advertised controls: turn-level prosody and language, inline `say-as` and substitution ranges, dynamic SSML-H voice definitions, drag reordering, and guarded raw SSML-H import without flattening unsupported structures.
+- Extend Magic with the remaining capability-advertised controls: turn-level prosody and language, inline `say-as` and substitution ranges, editable dynamic SSML-H voice definitions, and drag reordering.
 - Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
 - Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.
 

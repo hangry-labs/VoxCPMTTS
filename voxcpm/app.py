@@ -24,6 +24,13 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Response, U
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from voxcpm.dialogue_scripts import (
+    delete_dialogue_script,
+    load_dialogue_scripts,
+    normalize_script_name,
+    resolve_dialogue_script,
+    save_dialogue_script,
+)
 from voxcpm.standalone_ui.gpu import GPU_MONITOR
 from voxcpm.standalone_ui.server import attach_ui
 from voxcpm.ssml import (
@@ -83,6 +90,7 @@ REFERENCE_AUDIO_TRANSCODE_SUFFIXES = {".m4a", ".aac", ".webm"}
 MAX_PORTRAIT_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_PORTRAIT_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 PORTRAIT_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 VOICE_PROFILE_DIR = Path(os.getenv("VOXCPM_VOICE_PROFILE_DIR", "/app/persistent/voices"))
+DIALOGUE_SCRIPT_DIR = Path(os.getenv("VOXCPM_DIALOGUE_SCRIPT_DIR", "/app/persistent/scripts"))
 SSML_STAGING_DIR = Path(os.getenv("VOXCPM_SSML_STAGING_DIR", "/tmp/voxcpmtts-ssml"))
 MAX_RANDOM_SEED = 2**32 - 1
 TIMESTAMP_MODEL = os.getenv("VOXCPM_TIMESTAMP_MODEL", "base")
@@ -915,6 +923,13 @@ class MetricsRequest(BaseModel):
     language: str = "English"
 
 
+class DialogueScriptRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    document: str = Field(..., min_length=1, max_length=1_000_000)
+    description: str = Field("", max_length=240)
+    tags: list[str] = Field(default_factory=list, max_length=12)
+
+
 class PurgeRequest(BaseModel):
     device: Optional[str] = Field(None, description="Optional cached device to clear. Omit to clear all cached models.")
 
@@ -1512,6 +1527,36 @@ def voice_profile_payloads() -> list[dict[str, Any]]:
     ]
 
 
+def dialogue_script_payload(name: str, script: dict[str, Any], *, include_document: bool = False) -> dict[str, Any]:
+    payload = {
+        "id": name,
+        "name": script["title"],
+        "description": script["description"],
+        "tags": script["tags"],
+        "turns": script["turns"],
+        "words": script["words"],
+        "created_at": script["created_at"],
+        "updated_at": script["updated_at"],
+        "download_url": f"/tts/dialogue-scripts/{name}/download",
+    }
+    if include_document:
+        _, _, path = resolve_dialogue_script(DIALOGUE_SCRIPT_DIR, name)
+        payload["document"] = path.read_text(encoding="utf-8")
+    return payload
+
+
+def dialogue_script_payloads() -> list[dict[str, Any]]:
+    scripts = load_dialogue_scripts(DIALOGUE_SCRIPT_DIR)
+    return [dialogue_script_payload(name, script) for name, script in sorted(scripts.items())]
+
+
+def validate_dialogue_script(document: str) -> tuple[int, int]:
+    plan = compile_ssml(document, "ssml-h")
+    speech = [unit for unit in plan.units if unit.kind == "speech"]
+    words = sum(len(str(getattr(unit, "text", "") or "").split()) for unit in speech)
+    return len(speech), words
+
+
 async def save_reference_upload(upload: UploadFile) -> str:
     suffix = Path(upload.filename or "reference.wav").suffix.lower()
     if suffix not in REFERENCE_AUDIO_SUFFIXES:
@@ -1938,6 +1983,81 @@ def voice_profile_portrait(profile_name: str) -> FileResponse:
 def remove_voice_profile(profile_name: str) -> dict[str, str]:
     try:
         deleted = delete_voice_profile(VOICE_PROFILE_DIR, profile_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"deleted": deleted}
+
+
+@api.get("/tts/dialogue-scripts")
+def dialogue_scripts(response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    scripts = dialogue_script_payloads()
+    return {"object": "list", "data": scripts, "count": len(scripts)}
+
+
+@api.post("/tts/dialogue-scripts")
+def create_dialogue_script(payload: DialogueScriptRequest) -> dict:
+    try:
+        turns, words = validate_dialogue_script(payload.document)
+        script_name, script = save_dialogue_script(
+            DIALOGUE_SCRIPT_DIR,
+            name=payload.name,
+            document=payload.document,
+            description=payload.description,
+            tags=payload.tags,
+            turns=turns,
+            words=words,
+            overwrite=False,
+        )
+    except (SSMLValidationError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return dialogue_script_payload(script_name, script, include_document=True)
+
+
+@api.get("/tts/dialogue-scripts/{script_name}")
+def get_dialogue_script(script_name: str) -> dict:
+    try:
+        name, script, _ = resolve_dialogue_script(DIALOGUE_SCRIPT_DIR, script_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return dialogue_script_payload(name, script, include_document=True)
+
+
+@api.put("/tts/dialogue-scripts/{script_name}")
+def edit_dialogue_script(script_name: str, payload: DialogueScriptRequest) -> dict:
+    try:
+        normalized_name, _, _ = resolve_dialogue_script(DIALOGUE_SCRIPT_DIR, script_name)
+        if normalize_script_name(payload.name) != normalized_name:
+            raise ValueError("Create a new script to use a different name.")
+        turns, words = validate_dialogue_script(payload.document)
+        name, script = save_dialogue_script(
+            DIALOGUE_SCRIPT_DIR,
+            name=payload.name,
+            document=payload.document,
+            description=payload.description,
+            tags=payload.tags,
+            turns=turns,
+            words=words,
+            overwrite=True,
+        )
+    except (SSMLValidationError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return dialogue_script_payload(name, script, include_document=True)
+
+
+@api.get("/tts/dialogue-scripts/{script_name}/download")
+def download_dialogue_script(script_name: str) -> FileResponse:
+    try:
+        name, _, path = resolve_dialogue_script(DIALOGUE_SCRIPT_DIR, script_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(path, filename=f"{name}.ssml", media_type="application/ssml+xml")
+
+
+@api.delete("/tts/dialogue-scripts/{script_name}")
+def remove_dialogue_script(script_name: str) -> dict[str, str]:
+    try:
+        deleted = delete_dialogue_script(DIALOGUE_SCRIPT_DIR, script_name)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"deleted": deleted}
