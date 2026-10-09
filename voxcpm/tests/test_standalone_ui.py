@@ -2,16 +2,56 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import numpy as np
+import pytest
+import soundfile as sf
 from fastapi.testclient import TestClient
 from fastapi.responses import StreamingResponse
 
 import voxcpm.app as runtime
 
 TEST_PORTRAIT_WEBP = (Path(__file__).parents[2] / "assets" / "voxcpmtts_mascot.webp").read_bytes()
+
+
+def encoded_reference_audio(tmp_path: Path, suffix: str) -> bytes:
+    sample_rate = 48_000
+    duration = 0.2
+    samples = np.arange(int(sample_rate * duration), dtype=np.float32) / sample_rate
+    mono = 0.2 * np.sin(2 * np.pi * 440 * samples)
+    stereo = np.column_stack((mono, mono * 0.5))
+    source = tmp_path / f"source-{suffix.removeprefix('.')}"
+    source = source.with_suffix(".wav")
+    target = tmp_path / f"reference{suffix}"
+    sf.write(source, stereo, sample_rate, subtype="PCM_16")
+
+    codec_args = {
+        ".m4a": ["-c:a", "aac", "-b:a", "128k"],
+        ".aac": ["-c:a", "aac", "-b:a", "128k", "-f", "adts"],
+        ".webm": ["-c:a", "libopus", "-b:a", "128k"],
+    }[suffix]
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            *codec_args,
+            str(target),
+        ],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    return target.read_bytes()
 
 
 def test_static_workspace_and_assets_are_available() -> None:
@@ -153,6 +193,78 @@ def test_generate_upload_passes_a_temporary_reference_and_removes_it() -> None:
     assert not observed["path"].exists()
 
 
+@pytest.mark.parametrize("suffix", [".m4a", ".aac", ".webm"])
+def test_reference_audio_normalization_produces_lossless_pcm_without_downmixing(
+    tmp_path: Path,
+    suffix: str,
+) -> None:
+    source = tmp_path / f"reference{suffix}"
+    source.write_bytes(encoded_reference_audio(tmp_path, suffix))
+
+    normalized_path = Path(runtime.normalize_reference_audio(str(source)))
+    try:
+        info = sf.info(io.BytesIO(normalized_path.read_bytes()))
+        assert normalized_path.suffix == ".wav"
+        assert info.format == "WAV"
+        assert info.subtype == "FLOAT"
+        assert info.samplerate == 48_000
+        assert info.channels == 2
+    finally:
+        normalized_path.unlink(missing_ok=True)
+
+
+def test_m4a_clone_upload_is_normalized_and_removed(tmp_path: Path) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_response(payload, route_name):
+        path = Path(payload.ref_audio)
+        info = sf.info(io.BytesIO(path.read_bytes()))
+        observed.update(path=path, suffix=path.suffix, info=info, route=route_name)
+        return StreamingResponse(io.BytesIO(b"audio"), media_type="audio/mpeg")
+
+    request = {"text": "Clone this voice.", "ref_text": "Reference speech."}
+    m4a_bytes = encoded_reference_audio(tmp_path, ".m4a")
+    with patch.object(runtime, "stream_audio_response", side_effect=fake_response):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/generate-upload",
+                data={"payload": json.dumps(request)},
+                files={"reference_audio": ("reference.m4a", m4a_bytes, "audio/mp4")},
+            )
+
+    assert response.status_code == 200
+    assert observed["suffix"] == ".wav"
+    assert observed["info"].format == "WAV"
+    assert observed["info"].subtype == "FLOAT"
+    assert observed["route"] == "/tts/generate-upload"
+    assert not observed["path"].exists()
+
+
+def test_malformed_m4a_upload_is_rejected() -> None:
+    with TestClient(runtime.app) as client:
+        response = client.post(
+            "/tts/generate-upload",
+            data={"payload": json.dumps({"text": "Hello"})},
+            files={"reference_audio": ("reference.m4a", b"not-an-audio-file", "audio/mp4")},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"].startswith("Unable to process reference audio:")
+
+
+def test_reference_upload_limit_is_checked_before_transcoding() -> None:
+    with patch.object(runtime, "MAX_REFERENCE_UPLOAD_BYTES", 4):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/generate-upload",
+                data={"payload": json.dumps({"text": "Hello"})},
+                files={"reference_audio": ("reference.m4a", b"too-large", "audio/mp4")},
+            )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Reference audio exceeds the upload limit"
+
+
 def test_stream_upload_applies_stream_format() -> None:
     observed: dict[str, object] = {}
 
@@ -246,6 +358,34 @@ def test_transcribe_upload_uses_and_removes_temporary_audio() -> None:
     assert response.json()["text"] == "Reference transcript"
     assert observed["exists"] is True
     assert observed["language"] == "auto"
+    assert not observed["path"].exists()
+
+
+def test_m4a_transcription_receives_normalized_audio(tmp_path: Path) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_transcribe(path, language):
+        audio_path = Path(path)
+        observed.update(
+            path=audio_path,
+            suffix=audio_path.suffix,
+            info=sf.info(io.BytesIO(audio_path.read_bytes())),
+        )
+        return "Reference transcript"
+
+    m4a_bytes = encoded_reference_audio(tmp_path, ".m4a")
+    with patch.object(runtime, "transcribe_reference_audio", side_effect=fake_transcribe):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/transcribe-upload",
+                data={"language": "auto"},
+                files={"reference_audio": ("reference.m4a", m4a_bytes, "audio/mp4")},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["text"] == "Reference transcript"
+    assert observed["suffix"] == ".wav"
+    assert observed["info"].format == "WAV"
     assert not observed["path"].exists()
 
 

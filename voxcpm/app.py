@@ -79,6 +79,7 @@ BUILD_DATE = os.getenv("VOXCPMTTS_BUILD_DATE", "unknown")
 VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
 MAX_REFERENCE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_REFERENCE_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 REFERENCE_AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".webm"}
+REFERENCE_AUDIO_TRANSCODE_SUFFIXES = {".m4a", ".aac", ".webm"}
 MAX_PORTRAIT_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_PORTRAIT_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 PORTRAIT_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 VOICE_PROFILE_DIR = Path(os.getenv("VOXCPM_VOICE_PROFILE_DIR", "/app/persistent/voices"))
@@ -1344,6 +1345,11 @@ async def save_reference_upload(upload: UploadFile) -> str:
                 if total > MAX_REFERENCE_UPLOAD_BYTES:
                     raise HTTPException(status_code=413, detail="Reference audio exceeds the upload limit")
                 output.write(chunk)
+        if suffix in REFERENCE_AUDIO_TRANSCODE_SUFFIXES:
+            normalized_path = await asyncio.to_thread(normalize_reference_audio, path)
+            original_path = path
+            path = normalized_path
+            Path(original_path).unlink(missing_ok=True)
     except Exception:
         if path:
             Path(path).unlink(missing_ok=True)
@@ -1351,6 +1357,43 @@ async def save_reference_upload(upload: UploadFile) -> str:
     finally:
         await upload.close()
     return path
+
+
+def normalize_reference_audio(source_path: str) -> str:
+    output = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    output_path = output.name
+    output.close()
+    command = [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        source_path,
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-sn",
+        "-dn",
+        "-map_metadata",
+        "-1",
+        "-c:a",
+        "pcm_f32le",
+        "-threads",
+        "1",
+        output_path,
+    ]
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        if not Path(output_path).is_file() or Path(output_path).stat().st_size == 0:
+            raise ValueError("Reference audio conversion produced no audio.")
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as exc:
+        Path(output_path).unlink(missing_ok=True)
+        detail = exc.stderr.decode("utf-8", errors="replace").strip() if isinstance(exc, subprocess.CalledProcessError) else str(exc)
+        raise HTTPException(status_code=400, detail=f"Unable to process reference audio: {detail}") from exc
+    return output_path
 
 
 async def save_portrait_upload(upload: UploadFile) -> str:
