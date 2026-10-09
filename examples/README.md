@@ -16,6 +16,7 @@ This directory contains the static project page and browser-side examples for Ha
 - `assets/<language>/random/` contains 10 native-language voice-design samples.
 - `assets/<language>/intro/` contains 3 translated project intro samples.
 - `assets/<language>/clone/` contains 1 translated clone sample using `original_clone.mp3`.
+- `assets/featured/` contains curated product demonstrations that pair generated audio with the UI used to create it.
 
 ## SSML-H Documents
 

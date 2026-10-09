@@ -488,11 +488,11 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
 .clone-conditioning-heading strong { font-size: 0.76rem; }
 .clone-conditioning-heading small { color: var(--muted); font-size: 0.66rem; }
 .clone-mode-control { min-width: 220px; }
-.conditioning-panel { padding: 9px; border: 1px solid transparent; background: transparent; transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
+.conditioning-panel { padding: 9px 5px; border: 1px solid transparent; background: transparent; transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
 .conditioning-panel.is-complete { border-color: #315f46; background: #121a16; box-shadow: inset 3px 0 #55c58a; }
-.clone-conditioning-panel { margin-top: 7px; padding: 6px; border: 1px solid transparent; background: transparent; transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
-.clone-conditioning-panel textarea { min-height: 78px; }
-.clone-conditioning-panel.is-complete { border-color: #315f46; background: #141c18; box-shadow: inset 3px 0 #55c58a; }
+.clone-conditioning-panel { margin-top: 7px; padding: 0; border: 0; background: transparent; }
+.clone-conditioning-panel textarea { min-height: 78px; transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
+.clone-conditioning-panel.is-complete textarea { border-color: #315f46; background: #141c18; box-shadow: inset 3px 0 #55c58a; }
 .clone-conditioning-panel[hidden] { display: none; }
 .clone-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .clone-field-heading label { color: var(--muted); font-size: 0.75rem; font-weight: 700; }

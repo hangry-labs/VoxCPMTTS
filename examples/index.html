@@ -415,6 +415,22 @@
         border-color: rgba(255, 176, 118, 0.58);
       }
 
+      .featured-card {
+        background:
+          linear-gradient(135deg, rgba(255, 107, 0, 0.2), rgba(20, 20, 20, 0.96) 42%),
+          rgba(20, 20, 20, 0.94);
+        border-color: rgba(255, 176, 118, 0.58);
+      }
+
+      .featured-media {
+        aspect-ratio: 2135 / 632;
+        border: 1px solid rgba(255, 107, 0, 0.3);
+        border-radius: 6px;
+        display: block;
+        object-fit: cover;
+        width: 100%;
+      }
+
       a {
         color: #ff6b00;
       }
@@ -494,10 +510,11 @@
                 VoxCPMTTS examples
               </h1>
               <p class="mt-5 max-w-3xl text-base leading-7 text-[#ffb076] sm:text-lg">
-                Listen to multilingual VoxCPMTTS samples generated with voice design, translated introductions, and cross-language voice cloning.
+                Listen to Magic multi-character dialogue, multilingual voice design, translated introductions, and cross-language voice cloning.
               </p>
               <div class="mt-5 flex flex-wrap gap-2">
                 <span class="pill px-3 py-1 text-sm font-semibold">30 languages</span>
+                <span class="pill px-3 py-1 text-sm font-semibold">Magic dialogue</span>
                 <span class="pill px-3 py-1 text-sm font-semibold">10 voice-variety samples each</span>
                 <span class="pill px-3 py-1 text-sm font-semibold">translated intro demos</span>
                 <span class="pill px-3 py-1 text-sm font-semibold">cross-language clone demos</span>
@@ -511,6 +528,8 @@
             </div>
           </div>
         </header>
+
+        <section class="mb-8" aria-label="Featured Magic dialogue" data-featured-examples></section>
 
         <section class="mb-4" aria-label="Choose a language">
           <div class="mb-3 status-strip">

@@ -4,7 +4,21 @@
   "ref_audio": "/tmp/original_clone.mp3",
   "format": "mp3",
   "inference_timesteps": 8,
-  "notes": "Generated with VoxCPMTTS. Random samples rotate conservative adult voice-design controls. No non-verbal tags are used.",
+  "notes": "Generated with VoxCPMTTS. Language comparison samples rotate conservative adult voice-design controls and do not use non-verbal tags.",
+  "featured_examples": [
+    {
+      "eyebrow": "Magic editor showcase",
+      "title": "Three voices, directions, and an expressive cue",
+      "description": "A custom three-character scene created in the Magic dialogue editor. It combines saved voices, per-turn direction, and an experimental sigh cue in one generation.",
+      "file": "featured/magic-dialogue.mp3",
+      "image": "featured/magic-dialogue-ui.webp",
+      "image_alt": "Magic dialogue editor showing three character turns with voice and direction controls",
+      "label": "Magic multi-character dialogue",
+      "badge": "Magic",
+      "bytes": 451628,
+      "duration_seconds": 18.816
+    }
+  ],
   "voice_profiles": [
     {
       "name": "warm_female_narrator",

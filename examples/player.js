@@ -182,7 +182,7 @@ function renderLanguageButtons() {
   });
 }
 
-function renderAudioCard({ classes = "", eyebrow, title, description, file, label, badge = "" }) {
+function renderAudioCard({ classes = "", eyebrow, title, description, file, label, badge = "", image = "", imageAlt = "" }) {
   return `
     <article class="brand-card p-5 ${classes}" data-audio-card data-audio-label="${escapeHtml(label)}">
       <div class="mb-4 flex items-start justify-between gap-3 border-b border-orange-500/20 pb-3">
@@ -192,10 +192,46 @@ function renderAudioCard({ classes = "", eyebrow, title, description, file, labe
         </div>
         ${badge ? `<span class="rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-xs font-semibold uppercase text-gray-300">${escapeHtml(badge)}</span>` : ""}
       </div>
+      ${image ? `<img class="featured-media mb-4" src="${escapeHtml(assetUrl(image))}" alt="${escapeHtml(imageAlt)}">` : ""}
       <p class="mb-4 text-sm leading-6 text-[#ffd0a3]">${escapeHtml(description)}</p>
       <audio preload="metadata" src="${escapeHtml(assetUrl(file))}"></audio>
     </article>
   `;
+}
+
+function renderFeaturedExamples() {
+  const target = document.querySelector("[data-featured-examples]");
+  const examples = state.manifest.featured_examples || [];
+  if (!target || !examples.length) {
+    target?.setAttribute("hidden", "");
+    return;
+  }
+
+  target.innerHTML = `
+    <div class="mb-3">
+      <p class="text-xs font-extrabold uppercase tracking-[0.2em] text-orange-300">Built with Magic</p>
+      <h2 class="mt-1 text-2xl font-extrabold text-orange-100">Multi-character dialogue</h2>
+    </div>
+    <div class="grid grid-cols-1 gap-4">
+      ${examples
+        .map((sample) =>
+          renderAudioCard({
+            classes: "featured-card",
+            eyebrow: sample.eyebrow,
+            title: sample.title,
+            description: sample.description,
+            file: sample.file,
+            label: sample.label,
+            badge: sample.badge,
+            image: sample.image,
+            imageAlt: sample.image_alt,
+          }),
+        )
+        .join("")}
+    </div>
+  `;
+
+  enhanceAudioCards(target);
 }
 
 function renderSelectedLanguage() {
@@ -297,9 +333,11 @@ function warmAudio(audio) {
 }
 
 function enhanceAudioCards(container) {
-  state.cardAudios = Array.from(container.querySelectorAll("[data-audio-card] audio"));
+  const cardAudios = Array.from(container.querySelectorAll("[data-audio-card] audio"));
+  const connectedAudios = state.cardAudios.filter((audio) => audio.isConnected);
+  state.cardAudios = [...new Set([...connectedAudios, ...cardAudios])];
 
-  state.cardAudios.forEach((audio) => {
+  cardAudios.forEach((audio) => {
     const card = audio.closest("[data-audio-card]");
     const label = card?.dataset.audioLabel || "voice sample";
     applyAudioVolume(audio);
@@ -455,6 +493,7 @@ function initExamples() {
       status.textContent = `${state.manifest.languages.length} languages loaded`;
     }
     initVolumeControl();
+    renderFeaturedExamples();
     renderLanguageButtons();
     chooseLanguage("english", false);
   } catch (error) {
