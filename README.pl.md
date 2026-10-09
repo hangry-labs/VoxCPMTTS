@@ -24,9 +24,9 @@ Ta wersja Hangry Labs została przygotowana z myślą o prostej lokalnej pracy. 
 - Interfejs przeglądarkowy do generowania, strumieniowania, projektowania i klonowania głosu, lokalnej transkrypcji oraz opcjonalnego niedestrukcyjnego dopracowania głosu
 - Trwałe profile głosowe i skrypty dialogów z recepturami, portretami, wyszukiwaniem, importem i eksportem SSML-H oraz ponownym użyciem między sesjami
 - SSML i SSML-H do narracji, dialogów wielu postaci i słuchowisk
-- Natywne API HTTP dla aplikacji i lokalnych integracji
+- API mowy zgodne z OpenAI (`/v1/audio/speech`) oraz natywne API HTTP dla aplikacji i lokalnych integracji
 - Generowanie w 30 językach obsługiwanych przez VoxCPM2
-- Format WAV, MP3, FLAC i OGG
+- Formaty WAV, MP3, FLAC, OGG, Opus, AAC i PCM
 - Nano-vLLM z akceleracją grafów CUDA
 - Pełny obraz Docker zawierający zasoby modelu potrzebne do pracy offline
 

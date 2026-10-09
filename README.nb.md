@@ -24,9 +24,9 @@ Denne Hangry Labs-versjonen er laget for enkel lokal bruk. Start én container, 
 - Nettlesergrensesnitt for generering, strømming, stemmedesign, stemmekloning, lokal transkripsjon og valgfri ikke-destruktiv stemmebehandling
 - Vedvarende stemmeprofiler og dialogmanus med designoppskrifter, portretter, søk, SSML-H-import og -eksport samt gjenbruk på tvers av økter
 - SSML og SSML-H for fortellinger, dialoger med flere talere og skuespill
-- Native HTTP-API for applikasjoner og lokale integrasjoner
+- OpenAI-kompatibelt tale-API (`/v1/audio/speech`) og native HTTP-API for applikasjoner og lokale integrasjoner
 - Generering på 30 språk støttet av VoxCPM2
-- WAV-, MP3-, FLAC- og OGG-utgang
+- WAV-, MP3-, FLAC-, OGG-, Opus-, AAC- og PCM-utgang
 - Nano-vLLM med CUDA-grafakselerasjon
 - Et komplett Docker-bilde med modellressursene som kreves for frakoblet inferens
 

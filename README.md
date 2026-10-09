@@ -24,7 +24,7 @@ This Hangry Labs fork is made for local use without the usual Python environment
 - A browser UI for voice design, voice cloning, transcript-guided cloning, local reference transcription, and optional non-destructive voice finishing
 - Persistent saved voices and dialogue scripts with restorable recipes, portraits, search, SSML-H import/export, and reuse across sessions
 - SSML and SSML-H documents for timed narration, multi-speaker discussions, and plays
-- An HTTP API for applications and local integrations
+- An OpenAI-compatible speech API plus the complete native API for applications and local integrations
 - Multilingual generation across 30 VoxCPM2 languages
 - WAV, MP3, FLAC, and OGG output
 - Nano-vLLM inference with CUDA graph acceleration
@@ -104,7 +104,44 @@ Reference transcription lazy-loads the pinned multilingual `openai/whisper-base`
 
 ## API Usage
 
-Default generation returns WAV:
+### OpenAI-compatible speech
+
+Point an OpenAI client at `http://localhost:8808/v1` or call the standard speech route directly:
+
+```bash
+curl -X POST "http://localhost:8808/v1/audio/speech" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"tts-1","input":"Hello from Hangry Labs VoxCPMTTS.","voice":"alloy","response_format":"mp3"}' \
+  -o hello.mp3
+```
+
+The official Python client works by changing only its base URL:
+
+```python
+from pathlib import Path
+
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8808/v1", api_key="local")
+with client.audio.speech.with_streaming_response.create(
+    model="gpt-4o-mini-tts",
+    voice="coral",
+    input="This request uses the OpenAI speech interface.",
+    instructions="Warm, clear, and conversational.",
+    response_format="mp3",
+) as response:
+    response.stream_to_file(Path("speech.mp3"))
+```
+
+Supported model aliases include `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, `voxcpm2`, and `openbmb/VoxCPM2`. Standard voice names map to stable VoxCPM voice designs with fixed seeds, while any saved VoxCPMTTS voice profile can be passed as `voice`. Discover them through `GET /v1/audio/voices`; model discovery is available at `GET /v1/models`.
+
+The standard `instructions`, `speed`, and `response_format` fields are supported. Output formats are `mp3`, `opus`, `aac`, `flac`, `wav`, and raw 24 kHz `pcm`. VoxCPMTTS extensions include `voice_profile`, `language`, `seed`, `randomize_seed`, `normalize_text`, `normalize_loudness`, `cfg_value`, `inference_timesteps`, `device`, `denoise`, `ref_audio`, `ref_text`, and `clone_mode`. Binary audio responses are supported; `stream_format: "sse"` is rejected explicitly because speech-event streaming is not implemented. Use the native endpoints for progressive model-chunk streaming, uploads, SSML, and SSML-H.
+
+Authentication is optional for local use. Set `VOXCPMTTS_API_KEY` on the container to require `Authorization: Bearer <key>` on `/v1` routes. The placeholder `api_key="local"` above is accepted when server-side authentication is not configured.
+
+### Native API
+
+Default native generation returns WAV:
 
 ```bash
 curl -X POST "http://localhost:8808/tts/generate" \
@@ -215,6 +252,9 @@ curl http://localhost:8808/tts/ping
 
 Runtime discovery is available from the local API:
 
+- OpenAI-compatible models: `GET /v1/models`
+- OpenAI-compatible voices and saved profiles: `GET /v1/audio/voices`
+- OpenAI-compatible speech synthesis: `POST /v1/audio/speech`
 - Status and loaded backend: `GET /tts/status`
 - Current generation stage: `GET /tts/activity`
 - Saved voices: `GET` and `POST /tts/voice-profiles`; `PUT` and `DELETE /tts/voice-profiles/{name}`
@@ -320,6 +360,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Promoted the VoxCPM2 Nano-vLLM backend to the standard runtime with CUDA graph acceleration and ten-step generation.
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
 - Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
+- Added an OpenAI-compatible `/v1/audio/speech` API with official request fields, stable voice aliases, saved-profile selection, model and voice discovery, optional bearer authentication, OpenAI error envelopes, six standard output formats, and native VoxCPMTTS extensions.
 - Added a unified Design workspace for direction-only creation and reference cloning, with a compact step-completion pipeline, direct seed locking, voice names, lossless normalized portraits, searchable tags, metadata-only profile updates, a full-height saved-voice library, automatic generated-reference reuse, original design-reference retention, exact matching transcripts, fully restorable fixed-seed recipes, in-workspace refinement with confirmed replacement, drag-and-drop reference audio, truthful generation stages, recording waveforms, and persistent playback volume.
 - Fixed saved-voice selection in Generate and Stream so the chosen profile reaches inference and visibly restores its language, locked seed, guidance, steps, and output-processing recipe.
 - Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.

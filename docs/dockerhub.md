@@ -61,17 +61,30 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 ## What You Get
 
 - Offline browser Design workspace for direction-only creation, controllable cloning, transcript-guided cloning, local reference transcription, recording, upload, waveform trimming, restorable design recipes, and reusable saved voices
-- HTTP API for applications and automation
+- OpenAI-compatible speech API plus the complete native API for applications and automation
 - SSML and SSML-H for multi-speaker discussions, plays, saved clone voices, and designed speakers
 - VoxCPM2 multilingual generation across 30 officially supported languages
 - 48 kHz output when using the VoxCPM2 AudioVAE V2 model
-- WAV, MP3, FLAC, and OGG output support
+- WAV, MP3, FLAC, OGG, Opus, AAC, and raw PCM output support
 - GPU support when Docker/NVIDIA support is available
 - Nano-vLLM inference with a single cached GPU engine
 - Offline-friendly usage with the standard full image once it is available locally
 - Common TTS compatibility fields such as `voice`, `use_gpu`, `/tts/voices`, `/tts/speakers`, `/tts/stream-formats`, and `/tts/stream`
 
 ## API Example
+
+OpenAI-compatible clients can use `http://localhost:8808/v1` as their base URL. A direct request uses the standard speech payload:
+
+```bash
+curl -X POST "http://localhost:8808/v1/audio/speech" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"tts-1","input":"Hello from Hangry Labs VoxCPMTTS.","voice":"alloy","response_format":"mp3"}' \
+  -o hello.mp3
+```
+
+The compatibility API accepts standard model and voice aliases, `instructions`, `speed`, and `mp3`, `opus`, `aac`, `flac`, `wav`, or raw `pcm` output. Saved VoxCPMTTS voice names also work as `voice`. Discovery routes are `GET /v1/models` and `GET /v1/audio/voices`. Set `VOXCPMTTS_API_KEY` to require bearer authentication on `/v1` routes. Use the native API below for uploads, SSML, SSML-H, and progressive model-chunk streaming.
+
+### Native API
 
 Default API behavior returns WAV:
 

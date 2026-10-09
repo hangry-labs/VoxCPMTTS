@@ -20,9 +20,12 @@ from typing import Any, Literal, Optional
 import numpy as np
 import torch
 import uvicorn
-from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from voxcpm.dialogue_scripts import (
     delete_dialogue_script,
@@ -30,6 +33,20 @@ from voxcpm.dialogue_scripts import (
     normalize_script_name,
     resolve_dialogue_script,
     save_dialogue_script,
+)
+from voxcpm.openai_compat import (
+    OPENAI_MODEL_ID,
+    OPENAI_VOICE_PRESETS,
+    OpenAIAPIError,
+    OpenAISpeechRequest,
+    normalize_openai_response_format,
+    openai_error_response,
+    openai_model_payload,
+    openai_voice_payload,
+    require_openai_api_key,
+    resolve_openai_model,
+    resolve_openai_voice_id,
+    validate_openai_stream_format,
 )
 from voxcpm.standalone_ui.gpu import GPU_MONITOR
 from voxcpm.standalone_ui.server import attach_ui
@@ -182,6 +199,18 @@ OUTPUT_FORMATS = {
         "media_type": "audio/mpeg",
         "ffmpeg_args": ["-f", "mp3", "-codec:a", "libmp3lame", "-b:a", "192k"],
     },
+    "opus": {
+        "label": "Opus",
+        "extension": "opus",
+        "media_type": "audio/ogg",
+        "ffmpeg_args": ["-f", "ogg", "-codec:a", "libopus", "-b:a", "128k"],
+    },
+    "aac": {
+        "label": "AAC",
+        "extension": "aac",
+        "media_type": "audio/aac",
+        "ffmpeg_args": ["-f", "adts", "-codec:a", "aac", "-b:a", "192k"],
+    },
     "flac": {
         "label": "FLAC",
         "extension": "flac",
@@ -194,12 +223,23 @@ OUTPUT_FORMATS = {
         "media_type": "audio/ogg",
         "ffmpeg_args": ["-f", "ogg", "-codec:a", "libvorbis", "-q:a", "5"],
     },
+    "pcm": {
+        "label": "PCM 24 kHz",
+        "extension": "pcm",
+        "media_type": "audio/pcm;rate=24000",
+        "sample_rate": 24_000,
+        "ui": False,
+        "ffmpeg_args": ["-f", "s16le", "-codec:a", "pcm_s16le", "-ac", "1", "-ar", "24000"],
+    },
 }
 FORMAT_ALIASES = {
     ".wav": "wav",
     ".mp3": "mp3",
     ".flac": "flac",
     ".ogg": "ogg",
+    ".opus": "opus",
+    ".aac": "aac",
+    ".pcm": "pcm",
     "mpeg": "mp3",
     "vorbis": "ogg",
 }
@@ -495,6 +535,65 @@ def normalize_audio_loudness(audio: np.ndarray, sample_rate: int) -> np.ndarray:
         stderr = exc.stderr.decode("utf-8", errors="replace").strip()
         raise RuntimeError(f"ffmpeg failed to normalize output loudness: {stderr}") from exc
     return np.frombuffer(result.stdout, dtype="<i2").astype(np.float32) / 32768.0
+
+
+def adjust_audio_speed(audio: np.ndarray, sample_rate: int, speed: float) -> np.ndarray:
+    normalized = to_float32_audio(np.asarray(audio)).reshape(-1)
+    if normalized.size == 0 or abs(speed - 1.0) < 1e-9:
+        return normalized
+
+    remaining = float(speed)
+    stages: list[float] = []
+    while remaining > 2.0:
+        stages.append(2.0)
+        remaining /= 2.0
+    while remaining < 0.5:
+        stages.append(0.5)
+        remaining /= 0.5
+    if abs(remaining - 1.0) >= 1e-9:
+        stages.append(remaining)
+    audio_filter = ",".join(f"atempo={stage:.8g}" for stage in stages)
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "f32le",
+        "-acodec",
+        "pcm_f32le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "-i",
+        "pipe:0",
+        "-af",
+        audio_filter,
+        "-f",
+        "f32le",
+        "-acodec",
+        "pcm_f32le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "pipe:1",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            input=normalized.astype("<f4", copy=False).tobytes(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("ffmpeg is required to adjust speech speed") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"ffmpeg failed to adjust speech speed: {stderr}") from exc
+    return np.frombuffer(result.stdout, dtype="<f4").copy()
 
 
 def build_post_processing_filter(payload: "PostProcessingRequest") -> str:
@@ -905,6 +1004,103 @@ class StreamingTTSRequest(TTSRequest):
     stream_format: str = Field("mp3", description="Progressive response format. Supported: mp3.")
 
 
+def _openai_profile(profile_name: str, *, required: bool) -> tuple[str | None, dict[str, Any] | None]:
+    try:
+        normalized_name = normalize_profile_name(profile_name)
+        return resolve_voice_profile(VOICE_PROFILE_DIR, normalized_name)
+    except ValueError as exc:
+        if required:
+            raise OpenAIAPIError(
+                f"Voice '{profile_name}' is not available.",
+                param="voice",
+                code="unsupported_voice",
+            ) from exc
+        return None, None
+
+
+def openai_speech_to_tts_request(payload: OpenAISpeechRequest) -> TTSRequest:
+    resolve_openai_model(payload.model)
+    validate_openai_stream_format(payload.stream_format)
+    output_format = normalize_openai_response_format(payload.response_format)
+    if payload.clone_mode not in {"auto", "reference", "transcript"}:
+        raise OpenAIAPIError(
+            "clone_mode must be auto, reference, or transcript.",
+            param="clone_mode",
+            code="invalid_parameter",
+        )
+
+    voice_id = resolve_openai_voice_id(payload.voice)
+    if voice_id.lower() == "default":
+        voice_id = "alloy"
+    explicit_profile = (payload.voice_profile or "").strip()
+    profile_name: str | None = None
+    profile: dict[str, Any] | None = None
+    preset = OPENAI_VOICE_PRESETS.get(voice_id.lower())
+    if explicit_profile:
+        profile_name, profile = _openai_profile(explicit_profile, required=True)
+    elif not preset and voice_id.lower() not in {"auto", "default"}:
+        profile_name, profile = _openai_profile(voice_id, required=True)
+
+    recipe = dict((profile or {}).get("recipe") or {})
+    fields_set = payload.model_fields_set
+    instructions = (payload.instructions or "").strip()
+    control = instructions or (preset[0] if preset else "")
+    language = payload.language
+    if "language" not in fields_set and profile and profile.get("language"):
+        language = str(profile["language"])
+
+    if payload.randomize_seed is not None:
+        randomize_seed = payload.randomize_seed
+    elif profile and isinstance(recipe.get("randomize_seed"), bool):
+        randomize_seed = bool(recipe["randomize_seed"])
+    else:
+        randomize_seed = voice_id.lower() in {"auto", "default"} and not preset
+
+    seed = payload.seed
+    if seed is None and not randomize_seed:
+        if profile and isinstance(recipe.get("seed"), int):
+            seed = int(recipe["seed"])
+        elif preset:
+            seed = preset[1]
+        else:
+            seed = 42
+
+    def recipe_value(field: str, fallback: Any) -> Any:
+        return getattr(payload, field) if field in fields_set else recipe.get(field, fallback)
+
+    clone_mode = payload.clone_mode
+    if "clone_mode" not in fields_set and recipe.get("clone_mode") in {"reference", "transcript"}:
+        clone_mode = str(recipe["clone_mode"])
+
+    return TTSRequest(
+        text=payload.input,
+        input_type="text",
+        language=language,
+        voice=voice_id,
+        voice_profile=None if payload.ref_audio else profile_name,
+        clone_mode=clone_mode,
+        control=control or None,
+        ref_audio=payload.ref_audio,
+        ref_text=payload.ref_text,
+        cfg_value=float(recipe_value("cfg_value", payload.cfg_value)),
+        inference_timesteps=int(
+            recipe_value("inference_timesteps", payload.inference_timesteps or DEFAULT_INFERENCE_TIMESTEPS)
+        ),
+        normalize_text=bool(
+            payload.normalize_text
+            if "normalize_text" in fields_set
+            else recipe.get("normalize", payload.normalize_text)
+        ),
+        normalize_loudness=bool(recipe_value("normalize_loudness", payload.normalize_loudness)),
+        denoise=bool(recipe_value("denoise", payload.denoise)),
+        speed=payload.speed,
+        seed=seed,
+        randomize_seed=randomize_seed,
+        device=payload.device,
+        output_format=output_format,
+    )
+
+
 class PostProcessingRequest(BaseModel):
     method: Literal["ffmpeg", "signalsmith"] = Field("ffmpeg", description="Audio finishing backend.")
     preset: Literal["clean", "studio", "custom"] = Field("studio", description="UI preset identity.")
@@ -1201,7 +1397,15 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int]:
         successful_seed = getattr(model.tts_model, "last_successful_seed", None)
     if successful_seed is None:
         successful_seed = seed
-    return output_format, int(model.tts_model.sample_rate), to_float32_audio(wav), int(successful_seed)
+    sample_rate = int(model.tts_model.sample_rate)
+    waveform = to_float32_audio(wav)
+    if abs(payload.speed - 1.0) >= 1e-9:
+        try:
+            waveform = adjust_audio_speed(waveform, sample_rate, payload.speed)
+        except RuntimeError as exc:
+            set_generation_activity("failed", str(exc), active=False)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return output_format, sample_rate, waveform, int(successful_seed)
 
 
 def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, Iterator[np.ndarray], int]:
@@ -1254,7 +1458,9 @@ def _ssml_headers(
             else f"attachment; filename=voxcpm-ssml.{extension}"
         ),
         "X-VoxCPM-Model": DEFAULT_MODEL_ID,
-        "X-VoxCPM-Sample-Rate": str(sample_rate),
+        "X-VoxCPM-Sample-Rate": str(
+            (STREAM_FORMATS if streaming else OUTPUT_FORMATS)[output_format].get("sample_rate", sample_rate)
+        ),
         "X-VoxCPM-Route": route_name,
         "X-VoxCPM-Format": output_format,
         "X-VoxCPM-Seed": str(seed),
@@ -1384,7 +1590,7 @@ def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResp
     headers = {
         "Content-Disposition": f"attachment; filename=voxcpm.{extension}",
         "X-VoxCPM-Model": DEFAULT_MODEL_ID,
-        "X-VoxCPM-Sample-Rate": str(sample_rate),
+        "X-VoxCPM-Sample-Rate": str(OUTPUT_FORMATS[output_format].get("sample_rate", sample_rate)),
         "X-VoxCPM-Duration": f"{duration:.3f}",
         "X-VoxCPM-Route": route_name,
         "X-VoxCPM-Format": output_format,
@@ -1446,12 +1652,13 @@ def progressive_audio_response(
     return StreamingResponse(body(), media_type=media_type, headers=headers)
 
 
-def get_supported_output_formats() -> dict[str, dict[str, str]]:
+def get_supported_output_formats() -> dict[str, dict[str, Any]]:
     return {
         key: {
             "label": config["label"],
             "extension": config["extension"],
             "media_type": config["media_type"],
+            "ui": config.get("ui", True),
         }
         for key, config in OUTPUT_FORMATS.items()
     }
@@ -1743,13 +1950,110 @@ async def app_lifespan(_: FastAPI):
 
 api = FastAPI(
     title="VoxCPMTTS Service API",
-    description="HTTP API for Hangry Labs VoxCPMTTS.",
+    description="OpenAI-compatible and native HTTP APIs for Hangry Labs VoxCPMTTS.",
     version=APP_VERSION,
     openapi_url="/tts/openapi.json",
     docs_url="/tts/docs",
     redoc_url="/tts/redoc",
     lifespan=app_lifespan,
 )
+
+
+@api.exception_handler(OpenAIAPIError)
+async def openai_api_error_handler(_: Request, exc: OpenAIAPIError) -> JSONResponse:
+    return openai_error_response(
+        exc.message,
+        status_code=exc.status_code,
+        error_type=exc.error_type,
+        param=exc.param,
+        code=exc.code,
+        headers=exc.headers,
+    )
+
+
+@api.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> Response:
+    if not request.url.path.startswith("/v1"):
+        return await request_validation_exception_handler(request, exc)
+
+    first_error = exc.errors()[0] if exc.errors() else {}
+    location = first_error.get("loc", ())
+    param = str(location[-1]) if location and location[-1] != "body" else None
+    message = str(first_error.get("msg") or "Invalid request body.")
+    if param:
+        message = f"Invalid value for '{param}': {message}."
+    return openai_error_response(
+        message,
+        status_code=400,
+        param=param,
+        code="invalid_parameter",
+    )
+
+
+@api.exception_handler(StarletteHTTPException)
+async def http_error_handler(request: Request, exc: StarletteHTTPException) -> Response:
+    if not request.url.path.startswith("/v1"):
+        return await http_exception_handler(request, exc)
+    detail = exc.detail if isinstance(exc.detail, str) else json.dumps(exc.detail)
+    server_error = exc.status_code >= 500
+    return openai_error_response(
+        detail,
+        status_code=exc.status_code,
+        error_type="server_error" if server_error else "invalid_request_error",
+        code="internal_server_error" if server_error else ("not_found" if exc.status_code == 404 else None),
+        headers=exc.headers,
+    )
+
+
+OPENAI_API_DEPENDENCIES = [Depends(require_openai_api_key)]
+
+
+@api.get("/v1", tags=["OpenAI compatibility"], dependencies=OPENAI_API_DEPENDENCIES)
+@api.get("/v1/", tags=["OpenAI compatibility"], dependencies=OPENAI_API_DEPENDENCIES)
+def openai_api_index() -> dict[str, Any]:
+    return {
+        "object": "api",
+        "name": "VoxCPMTTS OpenAI-compatible speech API",
+        "version": APP_VERSION,
+        "model": OPENAI_MODEL_ID,
+        "endpoints": ["/v1/models", "/v1/audio/voices", "/v1/audio/speech"],
+    }
+
+
+@api.get("/v1/models", tags=["OpenAI compatibility"], dependencies=OPENAI_API_DEPENDENCIES)
+def openai_models() -> dict[str, Any]:
+    return {"object": "list", "data": [openai_model_payload()]}
+
+
+@api.get("/v1/models/{model_id:path}", tags=["OpenAI compatibility"], dependencies=OPENAI_API_DEPENDENCIES)
+def openai_model(model_id: str) -> dict[str, Any]:
+    resolve_openai_model(model_id)
+    return openai_model_payload(model_id)
+
+
+@api.get("/v1/audio/voices", tags=["OpenAI compatibility"], dependencies=OPENAI_API_DEPENDENCIES)
+def openai_voices() -> dict[str, Any]:
+    voices = []
+    for voice_id, (description, _) in OPENAI_VOICE_PRESETS.items():
+        voice = openai_voice_payload(voice_id, profile_type="preset", owned_by="hangry-labs")
+        voice["description"] = description
+        voices.append(voice)
+    for voice_id, profile in sorted(load_voice_profiles(VOICE_PROFILE_DIR).items()):
+        voice = openai_voice_payload(voice_id, profile_type=profile["profile_type"], owned_by="local")
+        voice.update(
+            {
+                "description": profile["description"],
+                "language": profile["language"],
+                "tags": profile["tags"],
+            }
+        )
+        voices.append(voice)
+    return {"object": "list", "data": voices}
+
+
+@api.post("/v1/audio/speech", tags=["OpenAI compatibility"], dependencies=OPENAI_API_DEPENDENCIES)
+def openai_speech(payload: OpenAISpeechRequest) -> StreamingResponse:
+    return stream_audio_response(openai_speech_to_tts_request(payload), "/v1/audio/speech")
 
 
 @api.get("/tts/ping")

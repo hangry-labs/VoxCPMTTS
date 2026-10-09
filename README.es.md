@@ -24,9 +24,9 @@ Esta versión de Hangry Labs está pensada para un uso local sencillo. Inicia un
 - Interfaz web para generación, transmisión, diseño y clonación de voces, transcripción local y acabado de voz no destructivo opcional
 - Perfiles de voz y guiones de diálogo persistentes con recetas, retratos, búsqueda, importación y exportación SSML-H y reutilización entre sesiones
 - SSML y SSML-H para narraciones, diálogos con varios hablantes y obras de audio
-- API HTTP nativa para aplicaciones e integraciones locales
+- API de voz compatible con OpenAI (`/v1/audio/speech`) y API HTTP nativa para aplicaciones e integraciones locales
 - Generación en los 30 idiomas compatibles con VoxCPM2
-- Salida WAV, MP3, FLAC y OGG
+- Salida WAV, MP3, FLAC, OGG, Opus, AAC y PCM
 - Inferencia Nano-vLLM con aceleración mediante grafos CUDA
 - Imagen Docker completa con los recursos de modelo necesarios para inferencia sin conexión
 

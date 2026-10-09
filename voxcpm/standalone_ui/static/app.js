@@ -696,10 +696,12 @@ async function refreshProfiles(selected) {
 }
 
 function formatOptions(formats) {
-  return Object.entries(formats).map(([value, details]) => ({
-    value,
-    label: details.label || value.toUpperCase(),
-  }))
+  return Object.entries(formats)
+    .filter(([, details]) => details.ui !== false)
+    .map(([value, details]) => ({
+      value,
+      label: details.label || value.toUpperCase(),
+    }))
 }
 
 function refreshFormatOptions() {

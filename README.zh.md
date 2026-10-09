@@ -24,9 +24,9 @@
 - 支持语音生成、流式输出、声音设计、声音克隆、本地转写和可选非破坏性声音处理的浏览器界面
 - 持久化声音配置和对话脚本，支持设计参数、头像、搜索、SSML-H 导入导出以及跨会话重复使用
 - 使用 SSML 和 SSML-H 创建旁白、多角色对话和广播剧
-- 面向应用程序和本地集成的原生 HTTP API
+- OpenAI 兼容语音 API（`/v1/audio/speech`）以及面向应用程序和本地集成的原生 HTTP API
 - 支持 VoxCPM2 的 30 种语言
-- 输出 WAV、MP3、FLAC 和 OGG
+- 输出 WAV、MP3、FLAC、OGG、Opus、AAC 和 PCM
 - 使用 CUDA 图加速的 Nano-vLLM 推理
 - 完整 Docker 镜像包含离线推理所需的模型资源
 
