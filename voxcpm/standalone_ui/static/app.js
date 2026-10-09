@@ -115,11 +115,19 @@ const state = {
   portraitObjectUrl: null,
   portraitRemoved: false,
   portraitTargetProfile: null,
+  magicCharacterBlockId: null,
+  magicCharacterPortraitFile: null,
+  magicCharacterPortraitUrl: null,
   pendingDeleteProfile: null,
   activityTimer: null,
 }
 
-const magicEditor = new MagicEditor($('#magic-editor-shell'), { onChange: updateMetrics })
+const magicEditor = new MagicEditor($('#magic-editor-shell'), {
+  onChange: updateMetrics,
+  onPreview: generateMagicPreview,
+  onSaveCharacter: openMagicCharacterDialog,
+  onError: (error) => showToast(errorMessage(error)),
+})
 
 const generateOutput = new AudioEditor($('#generate-output'), {
   label: t('output.generated', {}, 'Generated audio'),
@@ -390,11 +398,7 @@ function normalizedProfileName(value) {
 }
 
 function designVoiceTags() {
-  const tags = $('#design-voice-tags').value
-    .split(',')
-    .map((tag) => tag.trim().replace(/\s+/g, ' '))
-    .filter(Boolean)
-  return [...new Map(tags.map((tag) => [tag.toLowerCase(), tag])).values()].slice(0, 12)
+  return commaSeparatedTags($('#design-voice-tags').value)
 }
 
 function setDesignPortrait({ file = null, url = '', removed = false } = {}) {
@@ -461,6 +465,7 @@ function selectedProfile() {
 
 function updateVoiceProfileState() {
   const profile = selectedProfile()
+  magicEditor.setDefaultVoice(profile)
   const note = $('#voice-profile-note')
   if (!profile) note.textContent = t('profiles.selectionHelp', {}, 'Use a saved design or clone sample')
   else if (profile.profile_type === 'cloned') note.textContent = t(
@@ -875,6 +880,99 @@ async function requestAudio(options = {}) {
   }
 }
 
+function magicPreviewPayload(block) {
+  const payload = buildPayload({ workflow: 'generate' })
+  const fixedSeed = Number.isInteger(block.captureSeed) ? block.captureSeed : null
+  return {
+    ...payload,
+    text: block.voice ? magicEditor.toSSMLH([block]) : block.text.trim(),
+    input_type: block.voice ? 'ssml-h' : 'text',
+    voice_profile: block.voice || payload.voice_profile,
+    output_format: 'wav',
+    normalize: false,
+    seed: fixedSeed ?? payload.seed,
+    randomize_seed: fixedSeed === null ? payload.randomize_seed : false,
+  }
+}
+
+async function generateMagicPreview(block) {
+  setGenerationBusy(true, 'generate')
+  startActivityPolling('generate')
+  setStatus(t('status.generatingTurn', {}, 'Generating turn preview'))
+  try {
+    const result = await requestAudio({
+      workflow: 'generate',
+      payloadOverride: magicPreviewPayload(block),
+    })
+    setStatus(t('status.turnReady', {}, 'Turn preview ready'), 'success')
+    finishActivityPolling('generate', 'complete', t('status.turnReady', {}, 'Turn preview ready'))
+    return result
+  } catch (error) {
+    setStatus(errorMessage(error), 'error')
+    finishActivityPolling('generate', 'failed', errorMessage(error))
+    throw error
+  } finally {
+    setGenerationBusy(false, 'generate')
+  }
+}
+
+function setMagicCharacterPortrait(file = null) {
+  if (state.magicCharacterPortraitUrl) URL.revokeObjectURL(state.magicCharacterPortraitUrl)
+  state.magicCharacterPortraitFile = file
+  state.magicCharacterPortraitUrl = file ? URL.createObjectURL(file) : null
+  const preview = $('#magic-character-portrait-preview')
+  preview.src = state.magicCharacterPortraitUrl || ''
+  preview.hidden = !state.magicCharacterPortraitUrl
+  $('#magic-character-portrait-placeholder').hidden = Boolean(state.magicCharacterPortraitUrl)
+}
+
+function commaSeparatedTags(value) {
+  const tags = value
+    .split(',')
+    .map((tag) => tag.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+  return [...new Map(tags.map((tag) => [tag.toLowerCase(), tag])).values()].slice(0, 12)
+}
+
+async function openMagicCharacterDialog(block) {
+  const preview = await magicEditor.ensurePreview(block.id)
+  if (!preview) return
+  state.magicCharacterBlockId = block.id
+  setMagicCharacterPortrait()
+  const speechTurns = magicEditor.blocks.filter((item) => item.type === 'speech')
+  const turnNumber = Math.max(1, speechTurns.findIndex((item) => item.id === block.id) + 1)
+  $('#magic-character-name').value = `character-${turnNumber}`
+  $('#magic-character-tags').value = ($('#language').value || 'English').toLowerCase()
+  $('#magic-character-description').value = ''
+  $('#magic-character-dialog').showModal()
+  $('#magic-character-name').focus()
+  $('#magic-character-name').select()
+}
+
+function closeMagicCharacterDialog() {
+  state.magicCharacterBlockId = null
+  setMagicCharacterPortrait()
+  $('#magic-character-dialog').close()
+}
+
+function magicCharacterRecipe(block, preview) {
+  const payload = preview.payload
+  return {
+    design_source: 'reference',
+    clone_mode: 'transcript',
+    seed: Number(preview.seed ?? payload.seed ?? 42),
+    randomize_seed: false,
+    cfg_value: Number(payload.cfg_value),
+    inference_timesteps: Number(payload.inference_timesteps),
+    normalize: Boolean(payload.normalize),
+    normalize_loudness: Boolean(payload.normalize_loudness),
+    denoise: false,
+    output_format: preview.extension || 'wav',
+    sample_text: block.text.trim(),
+    reference_text: block.text.trim(),
+  }
+}
+
 function renderTimestamps(workflow, result) {
   const panel = $(`#${workflow}-timestamp-results`)
   const header = document.createElement('header')
@@ -1032,6 +1130,7 @@ async function generateAudio(workflow = 'generate') {
     if (seed !== null) {
       $('#last-generated-seed').value = seed
       $('#seed').value = seed
+      if (workflow === 'generate' && state.inputType === 'magic') magicEditor.markFullGeneration(Number(seed))
     }
     await alignGeneratedAudio(workflow, blob, extension, payload)
     setStatus(t('status.complete', {}, 'Generation complete'), 'success')
@@ -1220,6 +1319,7 @@ async function streamAudio() {
   const controller = new AbortController()
   const chunks = []
   let playback = null
+  let completedSeed = null
   state.streamAbort = controller
   setGenerationBusy(true, 'stream')
   startActivityPolling('stream')
@@ -1235,6 +1335,7 @@ async function streamAudio() {
     if (seed !== null) {
       $('#last-generated-seed').value = seed
       $('#seed').value = seed
+      completedSeed = Number(seed)
     }
     if (!response.body) throw new Error(t('errors.streamUnavailable', {}, 'Streaming response body is unavailable in this browser.'))
     const reader = response.body.getReader()
@@ -1266,6 +1367,7 @@ async function streamAudio() {
       state.streamPlayback = null
     }
     await streamOutput.load(new Blob(chunks, { type: 'audio/mpeg' }), 'voxcpmtts-stream.mp3')
+    if (state.inputType === 'magic') magicEditor.markFullGeneration(completedSeed)
     if (resumeAt > 0) await streamOutput.playFrom(resumeAt).catch(() => {})
     streamWaveform.complete()
     setTimeout(() => streamWaveform.hide(), 1000)
@@ -2237,6 +2339,62 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
 $('#save-profile-close').addEventListener('click', closeQuickSaveDialog)
 $('#save-profile-cancel').addEventListener('click', closeQuickSaveDialog)
 $('#save-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeQuickSaveDialog() })
+$('#magic-character-portrait').addEventListener('change', (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  const allowed = ['image/png', 'image/jpeg', 'image/webp']
+  if (!allowed.includes(file.type)) return showToast(t('errors.portraitFormat', {}, 'Choose a PNG, JPEG, or WebP portrait.'))
+  if (file.size > 5 * 1024 * 1024) return showToast(t('errors.portraitSize', {}, 'Voice portraits must be 5 MB or smaller.'))
+  setMagicCharacterPortrait(file)
+})
+$('#magic-character-form').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const blockId = state.magicCharacterBlockId
+  const block = magicEditor.block(blockId)
+  const name = normalizedProfileName($('#magic-character-name').value)
+  if (!block || !name) return showToast(t('errors.nameVoice', {}, 'Name this voice before storing it.'))
+  if (state.profiles.some((profile) => profile.id === name)) {
+    return showToast(t('errors.voiceExists', { name }, `Voice ${name} already exists. Use Edit to refine it.`))
+  }
+  const button = $('button[type="submit"]', event.currentTarget)
+  button.disabled = true
+  try {
+    const preview = await magicEditor.ensurePreview(block.id)
+    if (!preview) throw new Error(t('errors.generateTurnFirst', {}, 'Generate this turn before saving its voice.'))
+    const extension = preview.extension || 'wav'
+    const file = new File([preview.blob], `${name}.${extension}`, { type: preview.blob.type || 'audio/wav' })
+    const selected = $('#voice-profile').value
+    const saved = await saveProfileRequest({
+      name,
+      profileType: 'cloned',
+      description: $('#magic-character-description').value.trim(),
+      tags: commaSeparatedTags($('#magic-character-tags').value),
+      file,
+      designFile: file,
+      portraitFile: state.magicCharacterPortraitFile,
+      refText: block.text.trim(),
+      control: block.direction || '',
+      recipe: magicCharacterRecipe(block, preview),
+    })
+    await refreshProfiles(selected)
+    magicEditor.assignVoice(block.id, saved.id)
+    closeMagicCharacterDialog()
+    showToast(t('magic.characterSaved', { name: saved.id }, `Saved ${saved.id} and assigned it to this turn.`), 'success')
+    setStatus(t('status.voiceStored', { name: saved.id }, `Voice ${saved.id} stored`), 'success')
+  } catch (error) {
+    showToast(errorMessage(error))
+  } finally {
+    button.disabled = false
+  }
+})
+$('#magic-character-close').addEventListener('click', closeMagicCharacterDialog)
+$('#magic-character-cancel').addEventListener('click', closeMagicCharacterDialog)
+$('#magic-character-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeMagicCharacterDialog() })
+$('#magic-character-dialog').addEventListener('cancel', (event) => {
+  event.preventDefault()
+  closeMagicCharacterDialog()
+})
 $('#update-profile-close').addEventListener('click', closeUpdateProfileDialog)
 $('#update-profile-cancel').addEventListener('click', closeUpdateProfileDialog)
 $('#update-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeUpdateProfileDialog() })

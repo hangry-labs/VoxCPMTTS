@@ -13,6 +13,17 @@ const DIRECTIONS = [
   ['__custom__', 'magic.directionCustom', 'Custom...'],
 ]
 
+const EXPRESSIVE_CUES = [
+  ['', 'magic.cuePlaceholder', 'Add cue...'],
+  ['[sigh]', 'magic.cueSigh', 'Sigh'],
+  ['[laughing]', 'magic.cueLaughing', 'Laughing'],
+  ['[Uhm]', 'magic.cueThinking', 'Thinking'],
+  ['[Shh]', 'magic.cueHush', 'Hush'],
+  ['[Question-en]', 'magic.cueQuestion', 'Question'],
+  ['[Surprise-wa]', 'magic.cueSurprise', 'Surprise'],
+  ['[Dissatisfaction-hnn]', 'magic.cueDissatisfaction', 'Dissatisfaction'],
+]
+
 function button(icon, title, action) {
   const control = document.createElement('button')
   control.type = 'button'
@@ -27,17 +38,29 @@ function button(icon, title, action) {
 }
 
 export class MagicEditor {
-  constructor(root, { onChange } = {}) {
+  constructor(root, { onChange, onPreview, onSaveCharacter, onError } = {}) {
     this.root = root
     this.canvas = root.querySelector('#magic-editor')
     this.voiceControl = root.querySelector('#magic-voice-control')
     this.directionControl = root.querySelector('#magic-direction-control')
     this.customDirection = root.querySelector('#magic-custom-direction')
     this.customDirectionField = root.querySelector('.magic-custom-direction-field')
+    this.expressionControl = root.querySelector('#magic-expression-control')
     this.summary = root.querySelector('#magic-summary')
     this.onChange = onChange || (() => {})
+    this.onPreview = onPreview || (async () => null)
+    this.onSaveCharacter = onSaveCharacter || (async () => {})
+    this.onError = onError || (() => {})
     this.nextId = 1
     this.voices = []
+    this.defaultVoice = null
+    this.previewBusyId = null
+    this.playingId = null
+    this.previewAudio = new Audio()
+    this.previewAudio.addEventListener('ended', () => {
+      this.playingId = null
+      this.renderBlocks()
+    })
     this.maxBreakMs = 10_000
     this.supportsVoice = true
     this.supportsDirection = true
@@ -48,7 +71,7 @@ export class MagicEditor {
   }
 
   createSpeech(text = '') {
-    return { id: this.nextId++, type: 'speech', text, voice: '', direction: '' }
+    return { id: this.nextId++, type: 'speech', text, voice: '', direction: '', preview: null, captureSeed: null }
   }
 
   createBreak(milliseconds = DEFAULT_BREAK_MS) {
@@ -61,6 +84,7 @@ export class MagicEditor {
     this.voiceControl.addEventListener('change', () => {
       const block = this.activeSpeech()
       if (!block) return
+      this.invalidateBlock(block)
       block.voice = this.voiceControl.value
       if (!block.voice) block.direction = ''
       this.render()
@@ -69,6 +93,7 @@ export class MagicEditor {
     this.directionControl.addEventListener('change', () => {
       const block = this.activeSpeech()
       if (!block) return
+      this.invalidateBlock(block)
       const custom = this.directionControl.value === '__custom__'
       this.customDirectionField.hidden = !custom
       block.direction = custom ? this.customDirection.value.trim() : this.directionControl.value
@@ -79,9 +104,15 @@ export class MagicEditor {
     this.customDirection.addEventListener('input', () => {
       const block = this.activeSpeech()
       if (!block) return
+      this.invalidateBlock(block)
       block.direction = this.customDirection.value.trim()
       this.renderBlocks()
       this.changed()
+    })
+    this.expressionControl.addEventListener('change', () => {
+      const cue = this.expressionControl.value
+      this.expressionControl.value = ''
+      if (cue) this.insertCue(cue)
     })
     this.canvas.addEventListener('focusin', (event) => {
       const block = event.target.closest('[data-magic-id]')
@@ -92,13 +123,18 @@ export class MagicEditor {
       if (blockElement) this.activate(Number(blockElement.dataset.magicId))
       const action = event.target.closest('[data-magic-action]')?.dataset.magicAction
       if (!action || !blockElement) return
-      this.applyBlockAction(Number(blockElement.dataset.magicId), action)
+      this.applyBlockAction(Number(blockElement.dataset.magicId), action).catch(this.onError)
     })
     this.canvas.addEventListener('input', (event) => {
       const blockElement = event.target.closest('[data-magic-id]')
       const block = this.block(Number(blockElement?.dataset.magicId))
       if (!block) return
-      if (event.target.matches('textarea')) block.text = event.target.value
+      if (event.target.matches('textarea')) {
+        const generatedStateChanged = Boolean(block.preview || Number.isInteger(block.captureSeed))
+        block.text = event.target.value
+        this.invalidateBlock(block)
+        if (generatedStateChanged) this.renderBlocks()
+      }
       if (event.target.matches('input[type="number"]')) {
         block.milliseconds = Math.min(this.maxBreakMs, Math.max(0, Number(event.target.value) || 0))
       }
@@ -108,16 +144,37 @@ export class MagicEditor {
   }
 
   setVoices(profiles) {
-    this.voices = profiles.map((profile) => ({ id: profile.id, label: profile.id }))
+    this.voices = profiles.map((profile) => ({
+      id: profile.id,
+      label: profile.id,
+      portraitUrl: profile.portrait_url || '',
+      version: profile.created_at || 'current',
+    }))
     const known = new Set(this.voices.map((voice) => voice.id))
     for (const block of this.blocks) {
       if (block.type === 'speech' && block.voice && !known.has(block.voice)) {
-        this.voices.push({ id: block.voice, label: block.voice })
+        this.voices.push({ id: block.voice, label: block.voice, portraitUrl: '', version: 'current' })
         known.add(block.voice)
       }
     }
     this.renderVoiceOptions()
+    this.renderBlocks()
     this.syncToolbar()
+  }
+
+  setDefaultVoice(profile) {
+    const next = profile ? {
+      id: profile.id,
+      label: profile.id,
+      portraitUrl: profile.portrait_url || '',
+      version: profile.created_at || 'current',
+    } : null
+    if (next?.id === this.defaultVoice?.id
+      && next?.portraitUrl === this.defaultVoice?.portraitUrl
+      && next?.version === this.defaultVoice?.version) return
+    this.defaultVoice = next
+    this.blocks.filter((block) => block.type === 'speech' && !block.voice).forEach((block) => this.invalidateBlock(block))
+    this.renderBlocks()
   }
 
   setCapabilities(capabilities) {
@@ -131,6 +188,7 @@ export class MagicEditor {
   }
 
   loadSample(text) {
+    this.blocks.forEach((block) => this.clearPreview(block))
     const first = this.voices[0]?.id || ''
     const second = this.voices[1]?.id || first
     if (first) {
@@ -156,12 +214,21 @@ export class MagicEditor {
     this.canvas.querySelector(`[data-magic-id="${block.id}"] textarea`)?.focus()
   }
 
-  applyBlockAction(id, action) {
+  async applyBlockAction(id, action) {
     const index = this.blocks.findIndex((item) => item.id === id)
     if (index < 0) return
+    if (action === 'preview') {
+      await this.togglePreview(id)
+      return
+    }
+    if (action === 'save-character') {
+      await this.onSaveCharacter({ ...this.blocks[index] })
+      return
+    }
     if (action === 'up' && index > 0) [this.blocks[index - 1], this.blocks[index]] = [this.blocks[index], this.blocks[index - 1]]
     if (action === 'down' && index < this.blocks.length - 1) [this.blocks[index + 1], this.blocks[index]] = [this.blocks[index], this.blocks[index + 1]]
     if (action === 'remove') {
+      this.clearPreview(this.blocks[index])
       if (this.blocks.length === 1) {
         this.blocks = [this.createSpeech()]
       } else {
@@ -171,6 +238,115 @@ export class MagicEditor {
     }
     this.render()
     this.changed()
+  }
+
+  insertCue(cue) {
+    const block = this.activeSpeech()
+    if (!block) return
+    const textarea = this.canvas.querySelector(`[data-magic-id="${block.id}"] textarea`)
+    const start = Number.isInteger(textarea?.selectionStart) ? textarea.selectionStart : block.text.length
+    const end = Number.isInteger(textarea?.selectionEnd) ? textarea.selectionEnd : start
+    const before = block.text.slice(0, start)
+    const after = block.text.slice(end)
+    const prefix = before && !/\s$/.test(before) ? ' ' : ''
+    const suffix = after && !/^\s/.test(after) ? ' ' : ''
+    block.text = `${before}${prefix}${cue}${suffix}${after}`
+    this.invalidateBlock(block)
+    this.renderBlocks()
+    const updated = this.canvas.querySelector(`[data-magic-id="${block.id}"] textarea`)
+    const cursor = before.length + prefix.length + cue.length + suffix.length
+    updated?.focus()
+    updated?.setSelectionRange(cursor, cursor)
+    this.updateSummary()
+    this.changed()
+  }
+
+  clearPreview(block) {
+    if (!block?.preview) return
+    if (this.playingId === block.id) {
+      this.previewAudio.pause()
+      this.playingId = null
+    }
+    URL.revokeObjectURL(block.preview.url)
+    block.preview = null
+  }
+
+  invalidateBlock(block) {
+    this.clearPreview(block)
+    block.captureSeed = null
+  }
+
+  async ensurePreview(id, { play = false } = {}) {
+    const block = this.block(id)
+    if (!block || block.type !== 'speech' || !block.text.trim()) return null
+    if (!block.preview) {
+      if (this.previewBusyId !== null) return null
+      this.previewBusyId = id
+      this.renderBlocks()
+      try {
+        const result = await this.onPreview({ ...block })
+        if (!result?.blob) return null
+        this.clearPreview(block)
+        block.preview = { ...result, url: URL.createObjectURL(result.blob) }
+      } finally {
+        this.previewBusyId = null
+        this.renderBlocks()
+      }
+    }
+    if (play && block.preview) await this.playPreview(block)
+    return block.preview
+  }
+
+  async togglePreview(id) {
+    if (this.playingId === id) {
+      this.previewAudio.pause()
+      this.playingId = null
+      this.renderBlocks()
+      return
+    }
+    const preview = await this.ensurePreview(id)
+    const block = this.block(id)
+    if (preview && block) await this.playPreview(block)
+  }
+
+  async playPreview(block) {
+    this.previewAudio.pause()
+    this.previewAudio.src = block.preview.url
+    this.playingId = block.id
+    this.renderBlocks()
+    try {
+      await this.previewAudio.play()
+    } catch (error) {
+      this.playingId = null
+      this.renderBlocks()
+      if (error?.name !== 'AbortError') this.onError(error)
+    }
+  }
+
+  assignVoice(id, voice) {
+    const block = this.block(id)
+    if (!block || block.type !== 'speech') return
+    block.voice = voice
+    block.direction = ''
+    block.captureSeed = null
+    this.activeId = id
+    this.render()
+    this.changed()
+  }
+
+  markFullGeneration(seed) {
+    if (!Number.isInteger(seed)) return
+    let speechIndex = 0
+    for (const block of this.blocks) {
+      if (block.type === 'speech') this.clearPreview(block)
+      if (block.type !== 'speech' || !block.text.trim()) {
+        if (block.type === 'speech') block.captureSeed = null
+        continue
+      }
+      block.captureSeed = (seed + speechIndex) % (2 ** 32)
+      speechIndex += 1
+    }
+    this.renderBlocks()
   }
 
   activate(id) {
@@ -194,6 +370,7 @@ export class MagicEditor {
   render() {
     this.renderVoiceOptions()
     this.renderDirectionOptions()
+    this.renderExpressionOptions()
     this.renderBlocks()
     this.syncToolbar()
     this.updateSummary()
@@ -214,6 +391,16 @@ export class MagicEditor {
   renderDirectionOptions() {
     if (this.directionControl.options.length) return
     this.directionControl.replaceChildren(...DIRECTIONS.map(([value, key, fallback]) => {
+      const option = document.createElement('option')
+      option.value = value
+      option.textContent = t(key, {}, fallback)
+      return option
+    }))
+  }
+
+  renderExpressionOptions() {
+    if (this.expressionControl.options.length) return
+    this.expressionControl.replaceChildren(...EXPRESSIVE_CUES.map(([value, key, fallback]) => {
       const option = document.createElement('option')
       option.value = value
       option.textContent = t(key, {}, fallback)
@@ -259,13 +446,31 @@ export class MagicEditor {
     }
     const actions = document.createElement('div')
     actions.className = 'magic-block-actions'
+    const previewing = this.previewBusyId === block.id
+    const playing = this.playingId === block.id
+    const preview = button(
+      previewing ? 'icon-refresh-cw' : playing ? 'icon-pause' : 'icon-play',
+      previewing
+        ? t('magic.previewGenerating', {}, 'Generating turn preview')
+        : playing
+          ? t('magic.previewPause', {}, 'Pause turn preview')
+          : block.preview
+            ? t('magic.previewPlay', {}, 'Play turn preview')
+            : t('magic.previewGenerate', {}, 'Generate this turn'),
+      'preview',
+    )
+    preview.classList.add('magic-preview-action')
+    preview.classList.toggle('ready', Boolean(block.preview))
+    preview.classList.toggle('loading', previewing)
+    preview.disabled = !block.text.trim() || (this.previewBusyId !== null && !previewing)
     actions.append(
+      preview,
       button('icon-chevron-up', t('magic.moveUp', {}, 'Move turn up'), 'up'),
       button('icon-chevron-down', t('magic.moveDown', {}, 'Move turn down'), 'down'),
       button('icon-x', t('magic.remove', {}, 'Remove block'), 'remove'),
     )
-    actions.children[0].disabled = index === 0
-    actions.children[1].disabled = index === this.blocks.length - 1
+    actions.children[1].disabled = index === 0
+    actions.children[2].disabled = index === this.blocks.length - 1
     heading.append(metadata, actions)
 
     const textarea = document.createElement('textarea')
@@ -273,8 +478,50 @@ export class MagicEditor {
     textarea.value = block.text
     textarea.placeholder = t('magic.turnPlaceholder', {}, 'Write this turn...')
     textarea.setAttribute('aria-label', t('magic.turnLabel', { number: index + 1 }, `Speech turn ${index + 1}`))
-    article.append(heading, textarea)
+    const content = document.createElement('div')
+    content.className = 'magic-turn-content'
+    content.append(this.renderPortrait(block), textarea)
+    article.append(heading, content)
     return article
+  }
+
+  renderPortrait(block) {
+    const voice = block.voice
+      ? this.voices.find((item) => item.id === block.voice)
+      : this.defaultVoice
+    const portrait = document.createElement(voice ? 'div' : 'button')
+    portrait.className = 'magic-turn-portrait'
+    if (voice) {
+      portrait.title = voice.label
+      if (voice.portraitUrl) {
+        const image = document.createElement('img')
+        image.src = `${voice.portraitUrl}?v=${encodeURIComponent(voice.version)}`
+        image.alt = t('profiles.portraitAlt', { name: voice.label }, `${voice.label} portrait`)
+        image.loading = 'lazy'
+        portrait.append(image)
+      } else {
+        const placeholder = document.createElement('span')
+        placeholder.textContent = '?'
+        placeholder.setAttribute('aria-hidden', 'true')
+        portrait.append(placeholder)
+      }
+      return portrait
+    }
+
+    portrait.type = 'button'
+    portrait.dataset.magicAction = 'save-character'
+    const canSave = Boolean(block.preview || Number.isInteger(block.captureSeed))
+    portrait.disabled = !canSave || this.previewBusyId !== null
+    portrait.classList.toggle('ready', canSave)
+    portrait.title = canSave
+      ? t('magic.saveCharacter', {}, 'Save this generated voice as a character')
+      : t('magic.previewToSave', {}, 'Generate this turn before saving its voice')
+    portrait.setAttribute('aria-label', portrait.title)
+    const plus = document.createElement('span')
+    plus.textContent = '+'
+    plus.setAttribute('aria-hidden', 'true')
+    portrait.append(plus)
+    return portrait
   }
 
   renderBreak(block, index) {
@@ -311,6 +558,7 @@ export class MagicEditor {
     const block = this.activeSpeech()
     this.voiceControl.disabled = !block || !this.supportsVoice
     this.directionControl.disabled = !block || !block.voice || !this.supportsVoice || !this.supportsDirection
+    this.expressionControl.disabled = !block
     if (!block) {
       this.customDirectionField.hidden = true
       return
@@ -348,7 +596,7 @@ export class MagicEditor {
     this.onChange(this)
   }
 
-  toSSMLH() {
-    return serializeMagicDocument(this.blocks)
+  toSSMLH(blocks = this.blocks) {
+    return serializeMagicDocument(blocks)
   }
 }

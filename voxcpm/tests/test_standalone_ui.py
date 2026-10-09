@@ -151,6 +151,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'data-input-type="ssml-h"' in responses["/"].text
     assert 'data-input-type="magic"' in responses["/"].text
     assert 'id="magic-editor-shell"' in responses["/"].text
+    assert 'id="magic-expression-control"' in responses["/"].text
+    assert 'id="magic-character-dialog"' in responses["/"].text
     assert 'id="profile-edit-dialog"' not in responses["/"].text
     assert "gradio" not in responses["/"].text.lower()
     assert responses["/system/gpu"].json()["gpus"] == []
@@ -169,6 +171,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "function stopGpuMonitor(" in script
     assert "inputDrafts: { text: null, ssml: null, 'ssml-h': null }" in script
     assert "state.inputType === 'magic' ? 'ssml-h' : state.inputType" in script
+    assert "async function generateMagicPreview(" in script
+    assert "async function openMagicCharacterDialog(" in script
+    assert "magicEditor.markFullGeneration" in script
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
