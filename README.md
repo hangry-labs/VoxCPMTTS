@@ -21,16 +21,19 @@ This Hangry Labs fork is made for local use without the usual Python environment
 
 ## What You Get
 
-- A browser UI for voice design, voice cloning, transcript-guided cloning, local reference transcription, and optional non-destructive voice finishing
+- A browser UI for voice design, voice cloning, transcript-guided cloning, local reference transcription, and optional non-destructive voice or generated-audio finishing
 - Persistent saved voices and dialogue scripts with restorable recipes, portraits, search, SSML-H import/export, and reuse across sessions
 - SSML and SSML-H documents for timed narration, multi-speaker discussions, and plays
 - An OpenAI-compatible speech API plus the complete native API for applications and local integrations
 - Multilingual generation across 30 VoxCPM2 languages
 - WAV, MP3, FLAC, OGG, Opus, AAC, and raw PCM output
 - Nano-vLLM inference with CUDA graph acceleration
+- Default-on long-form protection that splits near natural boundaries, with an explicit opt-out
 - A baked image containing the model assets required for offline inference
 - A smaller image for persistent Hugging Face cache workflows
 - Python 3.13 and binary-wheel-only Docker builds
+
+**Languages:** VoxCPM2 officially supports [30 languages and nine Chinese dialect groups](SUPPORTED_LANGUAGES.md).
 
 Official images are published to [Docker Hub](https://hub.docker.com/r/hangrylabs/voxcpmtts/tags) and [GitHub Container Registry](https://github.com/Hangry-Labs/VoxCPMTTS/pkgs/container/voxcpmtts).
 
@@ -149,7 +152,7 @@ with client.audio.speech.with_streaming_response.create(
 
 Supported model aliases include `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, `voxcpm2`, and `openbmb/VoxCPM2`. Standard voice names map to stable VoxCPM voice designs with fixed seeds, while any saved VoxCPMTTS voice profile can be passed as `voice`. Discover them through `GET /v1/audio/voices`; model discovery is available at `GET /v1/models`.
 
-The standard `instructions`, `speed`, and `response_format` fields are supported. Output formats are `mp3`, `opus`, `aac`, `flac`, `wav`, and raw 24 kHz `pcm`. VoxCPMTTS extensions include `voice_profile`, `language`, `seed`, `randomize_seed`, `normalize_text`, `normalize_loudness`, `cfg_value`, `inference_timesteps`, `device`, `denoise`, `ref_audio`, `ref_text`, and `clone_mode`. Binary audio responses are supported; `stream_format: "sse"` is rejected explicitly because speech-event streaming is not implemented. Use the native endpoints for progressive model-chunk streaming, uploads, SSML, and SSML-H.
+The standard `instructions`, `speed`, and `response_format` fields are supported. Output formats are `mp3`, `opus`, `aac`, `flac`, `wav`, and raw 24 kHz `pcm`. VoxCPMTTS extensions include `voice_profile`, `language`, `seed`, `randomize_seed`, `normalize_text`, `normalize_loudness`, `protect_long_audio`, `cfg_value`, `inference_timesteps`, `device`, `denoise`, `ref_audio`, `ref_text`, and `clone_mode`. Binary audio responses are supported; `stream_format: "sse"` is rejected explicitly because speech-event streaming is not implemented. Use the native endpoints for progressive model-chunk streaming, uploads, SSML, and SSML-H.
 
 Authentication is optional for local use. Set `VOXCPMTTS_API_KEY` on the container to require `Authorization: Bearer <key>` on `/v1` routes. The placeholder `api_key="local"` above is accepted when server-side authentication is not configured.
 
@@ -255,6 +258,8 @@ curl --no-buffer -X POST "http://localhost:8808/tts/stream" \
 ```
 
 Set `normalize_loudness` to `true` to apply output-level normalization toward `-16 LUFS` with a `-1.5 dBTP` true-peak ceiling. It applies after complete SSML assembly and is also supported by progressive MP3 streaming. Text preprocessing remains the separate `normalize` option.
+
+Long-form protection is enabled by default for native and OpenAI-compatible requests. It keeps the same seed and conditioning while dividing long text near complete sentence or clause boundaries, then joins sections with a short natural pause. Set `protect_long_audio` to `false` only when one uninterrupted model pass is explicitly required.
 
 For repeatable output, set `randomize_seed` to `false` and provide a 32-bit `seed`. Every generated response reports the seed actually used in `X-VoxCPM-Seed`.
 

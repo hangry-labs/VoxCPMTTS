@@ -71,6 +71,7 @@ class OpenAISpeechRequest(BaseModel):
     randomize_seed: bool | None = Field(None, description="VoxCPMTTS extension: randomize the seed.")
     normalize_text: bool = Field(False, description="VoxCPMTTS extension: normalize plain text.")
     normalize_loudness: bool = Field(True, description="VoxCPMTTS extension: normalize toward -16 LUFS.")
+    protect_long_audio: bool = Field(True, description="VoxCPMTTS extension: protect long-form synthesis.")
     cfg_value: float = Field(2.0, ge=0.1, le=10.0, description="VoxCPMTTS extension: guidance scale.")
     inference_timesteps: int | None = Field(None, ge=1, le=100, description="VoxCPMTTS extension: inference steps.")
     device: str = Field("auto", description="VoxCPMTTS extension: inference device.")

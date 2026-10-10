@@ -21,14 +21,17 @@ Ta wersja Hangry Labs została przygotowana z myślą o prostej lokalnej pracy. 
 
 ## Co oferuje projekt
 
-- Interfejs przeglądarkowy do generowania, strumieniowania, projektowania i klonowania głosu, lokalnej transkrypcji oraz opcjonalnego niedestrukcyjnego dopracowania głosu
+- Interfejs przeglądarkowy do generowania, strumieniowania, projektowania i klonowania głosu, lokalnej transkrypcji oraz opcjonalnego niedestrukcyjnego dopracowania głosu i wygenerowanego nagrania
 - Trwałe profile głosowe i skrypty dialogów z recepturami, portretami, wyszukiwaniem, importem i eksportem SSML-H oraz ponownym użyciem między sesjami
 - SSML i SSML-H do narracji, dialogów wielu postaci i słuchowisk
 - API mowy zgodne z OpenAI (`/v1/audio/speech`) oraz natywne API HTTP dla aplikacji i lokalnych integracji
 - Generowanie w 30 językach obsługiwanych przez VoxCPM2
 - Formaty WAV, MP3, FLAC, OGG, Opus, AAC i PCM
 - Nano-vLLM z akceleracją grafów CUDA
+- Domyślna ochrona długich nagrań przez podział w naturalnych miejscach, z wyraźną możliwością wyłączenia
 - Pełny obraz Docker zawierający zasoby modelu potrzebne do pracy offline
+
+**Języki:** VoxCPM2 oficjalnie obsługuje [30 języków i dziewięć grup chińskich dialektów](SUPPORTED_LANGUAGES.md).
 
 > [!IMPORTANT]
 > Kod własny projektu i kod pochodzący z projektu nadrzędnego korzystają z licencji Apache-2.0. Obrazy Docker są jednak dystrybucjami zbiorczymi zawierającymi również zasoby modeli, biblioteki NVIDIA CUDA, FFmpeg i inne pakiety na ich własnych warunkach. Przed wdrożeniem lub redystrybucją przeczytaj [informacje o komponentach zewnętrznych](THIRD_PARTY_NOTICES.md).

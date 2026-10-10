@@ -392,12 +392,12 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .script-inline-name input { width: 100%; min-height: 30px; padding: 5px 8px; font-size: 0.68rem; }
 .composer-title-tools .script-save-button { flex: 0 0 auto; width: auto; min-height: 30px; margin: 0; }
 .composer-title-tools .script-file-action { flex: 0 0 30px; width: 30px; height: 30px; }
-.generate-authoring-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 0.34fr); align-items: stretch; gap: 16px; }
-.generate-authoring-grid > .composer { min-width: 0; }
-.script-library { display: flex; min-width: 0; flex-direction: column; padding-left: 14px; border-left: 1px solid var(--line); }
+.generate-workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 0.34fr); align-items: stretch; gap: 16px; min-height: 640px; }
+.generate-primary-column { min-width: 0; }
+.script-library { display: flex; min-width: 0; min-height: 100%; flex-direction: column; padding-left: 14px; border-left: 1px solid var(--line); }
 .script-library-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .script-library .script-search { width: 100%; margin-top: 8px; }
-.script-list { display: grid; align-content: start; gap: 6px; min-height: 94px; max-height: 352px; margin-top: 7px; padding-right: 3px; overflow-y: auto; }
+.script-list { display: grid; align-content: start; gap: 6px; min-height: 94px; margin-top: 7px; padding-right: 3px; overflow-y: auto; }
 .script-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
 .script-card.active { order: -1; border-color: #55c58a; background: #142019; box-shadow: inset 3px 0 #55c58a; }
 .script-card-copy { display: grid; min-width: 0; min-height: 42px; gap: 3px; }
@@ -567,6 +567,7 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
 #clone-output-section { transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
 #clone-output-section.is-complete { border-color: #315f46; background: #121a16; box-shadow: inset 3px 0 #55c58a; }
 .voice-finishing { margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--line); }
+.generate-finishing { margin-top: 14px; }
 .voice-finishing[hidden], .processed-preview[hidden] { display: none; }
 .voice-finishing-heading, .save-version-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .voice-finishing-heading > div, .save-version-row > div:first-child { display: grid; gap: 2px; }
@@ -635,6 +636,13 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
 .compact-advanced .mastering-grid { margin-top: 4px; }
 .compact-advanced .mastering-wide { grid-column: 1 / -1; }
 .compact-advanced .mastering-toggles { margin-top: 5px; }
+.long-text-protection { padding: 7px 8px; border: 1px solid #315f46; background: #141c18; box-shadow: inset 3px 0 #55c58a; }
+.long-text-protection > span:first-child { display: grid; gap: 2px; }
+.long-text-protection strong { color: #d8f4e4; font-size: 0.69rem; }
+.long-text-protection small { color: #8eb9a2; font-size: 0.59rem; line-height: 1.3; }
+.long-text-protection:has(input:not(:checked)) { border-color: var(--line); background: #17181b; box-shadow: none; }
+.long-text-protection:has(input:not(:checked)) strong { color: var(--text); }
+.long-text-protection:has(input:not(:checked)) small { color: var(--muted); }
 .compact-advanced input:disabled + .toggle-track { opacity: 0.45; cursor: not-allowed; }
 .compact-advanced .toggle-field:has(input:disabled) { color: #777a82; cursor: not-allowed; }
 
@@ -703,7 +711,7 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
 }
 
 @media (max-width: 1180px) {
-  .generate-authoring-grid { grid-template-columns: 1fr; }
+  .generate-workspace-grid { grid-template-columns: 1fr; }
   .script-library { min-height: 0; padding: 14px 0 0; border-top: 1px solid var(--line); border-left: 0; }
   .script-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 250px; }
   .clone-workspace-grid { grid-template-columns: 1fr; }

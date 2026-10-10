@@ -21,14 +21,17 @@ Denne Hangry Labs-versjonen er laget for enkel lokal bruk. Start én container, 
 
 ## Dette får du
 
-- Nettlesergrensesnitt for generering, strømming, stemmedesign, stemmekloning, lokal transkripsjon og valgfri ikke-destruktiv stemmebehandling
+- Nettlesergrensesnitt for generering, strømming, stemmedesign, stemmekloning, lokal transkripsjon og valgfri ikke-destruktiv behandling av stemmer og generert lyd
 - Vedvarende stemmeprofiler og dialogmanus med designoppskrifter, portretter, søk, SSML-H-import og -eksport samt gjenbruk på tvers av økter
 - SSML og SSML-H for fortellinger, dialoger med flere talere og skuespill
 - OpenAI-kompatibelt tale-API (`/v1/audio/speech`) og native HTTP-API for applikasjoner og lokale integrasjoner
 - Generering på 30 språk støttet av VoxCPM2
 - WAV-, MP3-, FLAC-, OGG-, Opus-, AAC- og PCM-utgang
 - Nano-vLLM med CUDA-grafakselerasjon
+- Langtekstbeskyttelse som standard, med deling ved naturlige grenser og et tydelig valg for å slå den av
 - Et komplett Docker-bilde med modellressursene som kreves for frakoblet inferens
+
+**Språk:** VoxCPM2 støtter offisielt [30 språk og ni kinesiske dialektgrupper](SUPPORTED_LANGUAGES.md).
 
 > [!IMPORTANT]
 > Prosjektets egen og oppstrømsavledede kildekode bruker Apache-2.0. Docker-bildene er samlede distribusjoner som også inneholder modellressurser, NVIDIA CUDA-biblioteker, FFmpeg og andre pakker med egne vilkår. Les [merknadene om tredjepartskomponenter](THIRD_PARTY_NOTICES.md) før distribusjon eller videredistribusjon.

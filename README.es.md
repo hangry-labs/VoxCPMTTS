@@ -21,14 +21,17 @@ Esta versión de Hangry Labs está pensada para un uso local sencillo. Inicia un
 
 ## Qué ofrece el proyecto
 
-- Interfaz web para generación, transmisión, diseño y clonación de voces, transcripción local y acabado de voz no destructivo opcional
+- Interfaz web para generación, transmisión, diseño y clonación de voces, transcripción local y acabado no destructivo opcional de voces o audio generado
 - Perfiles de voz y guiones de diálogo persistentes con recetas, retratos, búsqueda, importación y exportación SSML-H y reutilización entre sesiones
 - SSML y SSML-H para narraciones, diálogos con varios hablantes y obras de audio
 - API de voz compatible con OpenAI (`/v1/audio/speech`) y API HTTP nativa para aplicaciones e integraciones locales
 - Generación en los 30 idiomas compatibles con VoxCPM2
 - Salida WAV, MP3, FLAC, OGG, Opus, AAC y PCM
 - Inferencia Nano-vLLM con aceleración mediante grafos CUDA
+- Protección de audio largo activada de forma predeterminada, con división en límites naturales y una opción explícita para desactivarla
 - Imagen Docker completa con los recursos de modelo necesarios para inferencia sin conexión
+
+**Idiomas:** VoxCPM2 admite oficialmente [30 idiomas y nueve grupos de dialectos chinos](SUPPORTED_LANGUAGES.md).
 
 > [!IMPORTANT]
 > El código propio del proyecto y el derivado del proyecto original usan Apache-2.0. Sin embargo, las imágenes Docker son distribuciones agregadas que también incluyen recursos de modelos, bibliotecas NVIDIA CUDA, FFmpeg y otros paquetes bajo sus respectivas condiciones. Lee los [avisos de terceros](THIRD_PARTY_NOTICES.md) antes de implementar o redistribuir.

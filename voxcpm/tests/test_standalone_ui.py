@@ -69,6 +69,7 @@ def test_static_workspace_and_assets_are_available() -> None:
                     "/zh",
                     "/es",
                     "/static/app.js",
+                    "/static/audio-finisher.js",
                     "/static/dialogue-script-library.js",
                     "/static/i18n.js",
                     "/static/magic-editor.js",
@@ -134,6 +135,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="randomize-seed"' in responses["/"].text
     assert 'id="generation-settings"' in responses["/"].text
     assert 'id="normalize-loudness"' in responses["/"].text
+    assert 'id="protect-long-audio"' in responses["/"].text
+    assert 'id="generate-finishing"' in responses["/"].text
+    assert 'data-finish-role="output"' in responses["/"].text
     assert 'id="normalize-text"' in responses["/"].text
     assert 'id="timing-settings"' in responses["/"].text
     assert 'id="generate-timestamps"' in responses["/"].text
@@ -170,6 +174,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert responses["/system/gpu"].headers["cache-control"] == "no-store"
 
     script = responses["/static/app.js"].text
+    audio_finisher = responses["/static/audio-finisher.js"].text
     streaming_player = responses["/static/streaming-player.js"].text
     gpu_monitor = responses["/static/gpu-monitor.js"].text
     version_check = responses["/static/version-check.js"].text
@@ -201,6 +206,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
+    assert "protect_long_audio: $('#protect-long-audio').checked" in script
+    assert "export class AudioFinisher" in audio_finisher
+    assert "'/tts/postprocess-upload'" in audio_finisher
     assert "useProfile(profile, 'clone', { editing: true })" in script
     assert "referenceAudio.clear()" in script
     assert "compactGeneratedReferenceText" in script
@@ -228,6 +236,7 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
     source = "\n".join(
         (
             (static_dir / "app.js").read_text(encoding="utf-8"),
+            (static_dir / "audio-finisher.js").read_text(encoding="utf-8"),
             (static_dir / "dialogue-script-library.js").read_text(encoding="utf-8"),
             (static_dir / "magic-editor.js").read_text(encoding="utf-8"),
             (static_dir / "gpu-monitor.js").read_text(encoding="utf-8"),
@@ -248,6 +257,22 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
         if locale != "en":
             assert {key for key in english if not key.startswith("languages.")} <= set(catalog)
         assert all(isinstance(value, str) and "\ufffd" not in value for value in catalog.values())
+
+
+def test_language_endpoint_matches_the_official_voxcpm2_list() -> None:
+    expected = {
+        "Arabic", "Burmese", "Chinese", "Danish", "Dutch", "English", "Finnish", "French", "German",
+        "Greek", "Hebrew", "Hindi", "Indonesian", "Italian", "Japanese", "Khmer", "Korean", "Lao",
+        "Malay", "Norwegian", "Polish", "Portuguese", "Russian", "Spanish", "Swahili", "Swedish",
+        "Tagalog", "Thai", "Turkish", "Vietnamese",
+    }
+
+    with TestClient(runtime.app) as client:
+        response = client.get("/tts/languages")
+
+    assert response.status_code == 200
+    assert set(response.json()["languages"]) == expected
+    assert len(response.json()["languages"]) == 30
 
 
 def test_generate_upload_passes_a_temporary_reference_and_removes_it() -> None:
@@ -561,6 +586,7 @@ def test_defaults_enable_browser_loudness_normalization() -> None:
 
     assert response.status_code == 200
     assert response.json()["normalize_loudness"] is True
+    assert response.json()["protect_long_audio"] is True
     assert status.status_code == 200
     assert status.json()["post_processing"]["methods"] == ["ffmpeg", "signalsmith"]
 

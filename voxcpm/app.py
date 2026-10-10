@@ -50,6 +50,7 @@ from voxcpm.openai_compat import (
 )
 from voxcpm.standalone_ui.gpu import GPU_MONITOR
 from voxcpm.standalone_ui.server import attach_ui
+from voxcpm.text_planning import split_long_text
 from voxcpm.ssml import (
     SSMLPlan,
     SSMLUnit,
@@ -115,6 +116,7 @@ TIMESTAMP_DEVICE = os.getenv("VOXCPM_TIMESTAMP_DEVICE", "cpu")
 LOUDNESS_NORMALIZATION_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=11"
 POST_PROCESSING_METHODS = {"ffmpeg", "signalsmith"}
 POST_PROCESSING_SAMPLE_RATE = 48_000
+LONG_TEXT_JOIN_SECONDS = 0.12
 
 SUPPORTED_LANGUAGES = [
     "Arabic",
@@ -987,6 +989,10 @@ class TTSRequest(BaseModel):
         False,
         description="Normalize output toward -16 LUFS with a -1.5 dB true-peak ceiling.",
     )
+    protect_long_audio: bool = Field(
+        True,
+        description="Split long text near sentence boundaries to limit accumulated ringing and degradation.",
+    )
     denoise: bool = Field(False, description="Apply ZipEnhancer to prompt/reference audio when denoiser is enabled.")
     speed: float = Field(1.0, ge=0.25, le=4.0, description="Compatibility field; VoxCPM2 has no direct speed scalar.")
     seed: Optional[int] = Field(42, ge=0, le=MAX_RANDOM_SEED, description="32-bit generation seed.")
@@ -1002,6 +1008,58 @@ class TTSRequest(BaseModel):
 
 class StreamingTTSRequest(TTSRequest):
     stream_format: str = Field("mp3", description="Progressive response format. Supported: mp3.")
+
+
+def planned_text_sections(payload: TTSRequest) -> list[str]:
+    text = payload.text.strip()
+    if not payload.protect_long_audio:
+        return [text] if text else []
+    return split_long_text(text)
+
+
+def generate_planned_waveform(payload: TTSRequest, model: Any, seed: int) -> np.ndarray:
+    sections = planned_text_sections(payload)
+    generated: list[np.ndarray] = []
+    sample_rate = int(model.tts_model.sample_rate)
+    silence = np.zeros(round(sample_rate * LONG_TEXT_JOIN_SECONDS), dtype=np.float32)
+    for index, section in enumerate(sections):
+        if len(sections) > 1:
+            set_generation_activity(
+                "generating",
+                f"Generating protected section {index + 1} of {len(sections)}",
+                active=True,
+            )
+        section_payload = payload.model_copy(update={"text": section})
+        generated.append(to_float32_audio(model.generate(**build_generate_kwargs(section_payload, model, seed=seed))))
+        if index + 1 < len(sections):
+            generated.append(silence)
+    return np.concatenate(generated) if generated else np.zeros(0, dtype=np.float32)
+
+
+def iter_planned_waveform_chunks(
+    payload: StreamingTTSRequest,
+    model: Any,
+    seed: int,
+) -> Iterator[np.ndarray]:
+    sections = planned_text_sections(payload)
+    sample_rate = int(model.tts_model.sample_rate)
+    for index, section in enumerate(sections):
+        if len(sections) > 1:
+            set_generation_activity(
+                "streaming",
+                f"Streaming protected section {index + 1} of {len(sections)}",
+                active=True,
+            )
+        section_payload = payload.model_copy(update={"text": section})
+        chunks = model.generate_streaming(**build_generate_kwargs(section_payload, model, seed=seed))
+        try:
+            yield from chunks
+        finally:
+            close = getattr(chunks, "close", None)
+            if callable(close):
+                close()
+        if index + 1 < len(sections):
+            yield np.zeros(round(sample_rate * LONG_TEXT_JOIN_SECONDS), dtype=np.float32)
 
 
 def _openai_profile(profile_name: str, *, required: bool) -> tuple[str | None, dict[str, Any] | None]:
@@ -1092,6 +1150,7 @@ def openai_speech_to_tts_request(payload: OpenAISpeechRequest) -> TTSRequest:
             else recipe.get("normalize", payload.normalize_text)
         ),
         normalize_loudness=bool(recipe_value("normalize_loudness", payload.normalize_loudness)),
+        protect_long_audio=bool(recipe_value("protect_long_audio", payload.protect_long_audio)),
         denoise=bool(recipe_value("denoise", payload.denoise)),
         speed=payload.speed,
         seed=seed,
@@ -1280,6 +1339,7 @@ def create_ssml_execution_session(payload: TTSRequest, used_seed: int) -> SSMLEx
             cfg_value=payload.cfg_value,
             inference_timesteps=payload.inference_timesteps,
             normalize_text=False,
+            protect_long_audio=payload.protect_long_audio,
             denoise=payload.denoise,
             seed=seed,
             randomize_seed=False,
@@ -1287,7 +1347,7 @@ def create_ssml_execution_session(payload: TTSRequest, used_seed: int) -> SSMLEx
             use_gpu=payload.use_gpu,
             output_format="wav",
         )
-        return to_float32_audio(model.generate(**build_generate_kwargs(unit_payload, model, seed=seed)))
+        return generate_planned_waveform(unit_payload, model, seed)
 
     def prepare_voice(
         definition: SSMLVoiceDefinition,
@@ -1384,7 +1444,7 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int]:
         model = get_model(requested_device, load_denoiser=payload.denoise)
         set_generation_activity("generating", "Generating speech", active=True)
         seed = resolve_generation_seed(payload)
-        wav = model.generate(**build_generate_kwargs(payload, model, seed=seed))
+        wav = generate_planned_waveform(payload, model, seed)
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1429,7 +1489,7 @@ def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, I
         model = get_model(requested_device, load_denoiser=payload.denoise)
         set_generation_activity("streaming", "Generating the live audio stream", active=True)
         seed = resolve_generation_seed(payload)
-        chunks = model.generate_streaming(**build_generate_kwargs(payload, model, seed=seed))
+        chunks = iter_planned_waveform_chunks(payload, model, seed)
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1466,6 +1526,7 @@ def _ssml_headers(
         "X-VoxCPM-Seed": str(seed),
         "X-VoxCPM-Input-Type": payload.input_type,
         "X-VoxCPM-Loudness-Normalized": str(payload.normalize_loudness).lower(),
+        "X-VoxCPM-Long-Text-Protected": str(payload.protect_long_audio).lower(),
     }
     if streaming:
         headers["X-VoxCPM-Streaming"] = "ssml-units"
@@ -1597,6 +1658,7 @@ def stream_audio_response(payload: TTSRequest, route_name: str) -> StreamingResp
         "X-VoxCPM-Seed": str(seed),
         "X-VoxCPM-Input-Type": payload.input_type,
         "X-VoxCPM-Loudness-Normalized": str(payload.normalize_loudness).lower(),
+        "X-VoxCPM-Long-Text-Protected": str(payload.protect_long_audio).lower(),
     }
     return StreamingResponse(io.BytesIO(audio_bytes), media_type=media_type, headers=headers)
 
@@ -1648,6 +1710,7 @@ def progressive_audio_response(
         "X-VoxCPM-Seed": str(seed),
         "X-VoxCPM-Input-Type": payload.input_type,
         "X-VoxCPM-Loudness-Normalized": str(payload.normalize_loudness).lower(),
+        "X-VoxCPM-Long-Text-Protected": str(payload.protect_long_audio).lower(),
     }
     return StreamingResponse(body(), media_type=media_type, headers=headers)
 
@@ -2091,6 +2154,7 @@ def defaults() -> dict:
         "seed": 42,
         "randomize_seed": True,
         "normalize_loudness": True,
+        "protect_long_audio": True,
         "output_formats": {"default": "wav", "available": get_supported_output_formats()},
         "stream_formats": {"default": "mp3", "available": STREAM_FORMATS},
     }

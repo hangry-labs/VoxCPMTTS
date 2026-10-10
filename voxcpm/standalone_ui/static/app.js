@@ -1,5 +1,6 @@
 import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
 import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
+import { AudioFinisher } from './audio-finisher.js?v=long-form-audio'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=app-organization'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
@@ -119,6 +120,21 @@ const generateOutput = new AudioEditor($('#generate-output'), {
   emptyTitle: t('output.emptyTitle', {}, 'Audio output'),
   emptyDescription: t('output.ready', {}, 'Ready for synthesis'),
   labels: AUDIO_EDITOR_LABELS,
+})
+const generateFinisher = new AudioFinisher($('#generate-finishing'), {
+  audioEditorLabels: AUDIO_EDITOR_LABELS,
+  labels: {
+    processed: t('finishing.processedAudio', {}, 'Processed audio'),
+    emptyTitle: t('output.emptyTitle', {}, 'Audio output'),
+    ready: t('finishing.ready', {}, 'Ready for processing'),
+    ffmpeg: t('finishing.ffmpegStudio', {}, 'FFmpeg Studio'),
+    signalsmith: t('finishing.signalsmithVoice', {}, 'Signalsmith Voice'),
+    generateFirst: t('errors.generateAudioBeforeProcess', {}, 'Generate audio before processing it.'),
+    processing: t('status.processingAudio', {}, 'Finishing audio with {method}'),
+    complete: t('status.processedAudioReady', {}, 'Processed audio ready'),
+  },
+  responseError,
+  onError: (error) => showToast(errorMessage(error)),
 })
 const streamOutput = new AudioEditor($('#stream-output'), {
   label: t('output.streamed', {}, 'Streamed audio'),
@@ -344,7 +360,9 @@ function handleMagicChange(editorInstance) {
 
 function setGenerationMode(mode, { persist = true } = {}) {
   if (!['generate', 'stream'].includes(mode) || state.streamAbort) return
+  const modeChanged = state.generationMode !== mode
   state.generationMode = mode
+  if (modeChanged) generateFinisher.clear()
   $$('.generation-mode-control button').forEach((button) => {
     const active = button.dataset.generationMode === mode
     button.classList.toggle('active', active)
@@ -498,6 +516,7 @@ function restoreProfileGenerationSettings(profile) {
   else if (Number.isInteger(recipe.seed)) $('#randomize-seed').checked = false
   if (typeof recipe.normalize === 'boolean') $('#normalize-text').checked = recipe.normalize
   if (typeof recipe.normalize_loudness === 'boolean') $('#normalize-loudness').checked = recipe.normalize_loudness
+  if (typeof recipe.protect_long_audio === 'boolean') $('#protect-long-audio').checked = recipe.protect_long_audio
   if (typeof recipe.denoise === 'boolean') $('#denoise').checked = recipe.denoise
   if (recipe.output_format && [...$('#output-format').options].some((option) => option.value === recipe.output_format)) {
     $('#output-format').value = recipe.output_format
@@ -813,6 +832,7 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
     inference_timesteps: Number($('#steps').value),
     normalize: !cloning && state.inputType !== 'text' ? false : $('#normalize-text').checked,
     normalize_loudness: $('#normalize-loudness').checked,
+    protect_long_audio: $('#protect-long-audio').checked,
     denoise: usesReference && $('#denoise').checked,
     seed: Number($('#seed').value || 42),
     randomize_seed: $('#randomize-seed').checked,
@@ -958,6 +978,7 @@ function magicCharacterRecipe(block, preview) {
     inference_timesteps: Number(payload.inference_timesteps),
     normalize: Boolean(payload.normalize),
     normalize_loudness: Boolean(payload.normalize_loudness),
+    protect_long_audio: Boolean(payload.protect_long_audio),
     denoise: false,
     output_format: preview.extension || 'wav',
     sample_text: block.text.trim(),
@@ -1083,6 +1104,7 @@ function setGenerationBusy(active, workflow = 'generate') {
 
 async function generateAudio(workflow = 'generate') {
   const output = workflow === 'clone' ? cloneOutput : generateOutput
+  if (workflow === 'generate') generateFinisher.clear()
   if (workflow === 'clone') {
     state.lastCloneGeneration = null
     resetProcessedPreview({ hideFinishing: true })
@@ -1094,6 +1116,7 @@ async function generateAudio(workflow = 'generate') {
   try {
     const { blob, extension, seed, payload, reference } = await requestAudio({ workflow })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
+    if (workflow === 'generate') generateFinisher.setSource(blob, extension)
     if (workflow === 'clone') {
       state.lastCloneGeneration = {
         blob,
@@ -1139,6 +1162,7 @@ async function streamAudio() {
   let playback = null
   let completedSeed = null
   state.streamAbort = controller
+  generateFinisher.clear()
   setGenerationBusy(true, 'stream')
   startActivityPolling('stream')
   streamWaveform.surface.hidden = false
@@ -1184,7 +1208,9 @@ async function streamAudio() {
       playback = null
       state.streamPlayback = null
     }
-    await streamOutput.load(new Blob(chunks, { type: 'audio/mpeg' }), 'voxcpmtts-stream.mp3')
+    const streamedBlob = new Blob(chunks, { type: 'audio/mpeg' })
+    await streamOutput.load(streamedBlob, 'voxcpmtts-stream.mp3')
+    generateFinisher.setSource(streamedBlob, 'mp3')
     if (state.inputType === 'magic') magicEditor.markFullGeneration(completedSeed)
     if (resumeAt > 0) await streamOutput.playFrom(resumeAt).catch(() => {})
     streamWaveform.complete()
@@ -1287,6 +1313,7 @@ function generatedVoiceRecipe(generated) {
     inference_timesteps: Number(payload.inference_timesteps),
     normalize: Boolean(payload.normalize),
     normalize_loudness: Boolean(payload.normalize_loudness),
+    protect_long_audio: Boolean(payload.protect_long_audio),
     denoise: Boolean(payload.denoise),
     output_format: payload.output_format,
     sample_text: payload.text,
@@ -1678,6 +1705,7 @@ function resetControls() {
   $('#steps-slider').value = state.defaults.inference_timesteps || 10
   $('#normalize-text').checked = false
   $('#normalize-loudness').checked = state.defaults.normalize_loudness ?? true
+  $('#protect-long-audio').checked = state.defaults.protect_long_audio ?? true
   $('#denoise').checked = false
   $('#seed').value = state.defaults.seed ?? 42
   $('#randomize-seed').checked = state.defaults.randomize_seed ?? true
@@ -2097,6 +2125,7 @@ window.addEventListener('beforeunload', () => {
   streamWaveform.hide()
   referenceRecorder.stop()
   generateOutput.destroy()
+  generateFinisher.destroy()
   cloneOutput.destroy()
   cloneProcessedOutput.destroy()
   streamOutput.destroy()

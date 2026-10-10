@@ -113,6 +113,7 @@ def test_openai_standard_request_maps_to_stable_voxcpm_request() -> None:
     assert request.seed == 104_729
     assert request.randomize_seed is False
     assert request.normalize_loudness is True
+    assert request.protect_long_audio is True
 
 
 def test_openai_runtime_failure_uses_server_error_envelope() -> None:
@@ -205,6 +206,7 @@ def test_openai_extensions_override_saved_defaults() -> None:
             randomize_seed=False,
             normalize_text=True,
             normalize_loudness=False,
+            protect_long_audio=False,
             cfg_value=3.0,
             inference_timesteps=8,
             denoise=True,
@@ -218,6 +220,7 @@ def test_openai_extensions_override_saved_defaults() -> None:
     assert request.randomize_seed is False
     assert request.normalize_text is True
     assert request.normalize_loudness is False
+    assert request.protect_long_audio is False
     assert request.cfg_value == 3.0
     assert request.inference_timesteps == 8
     assert request.denoise is True
