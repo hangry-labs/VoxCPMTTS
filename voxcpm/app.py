@@ -28,11 +28,18 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from voxcpm.dialogue_scripts import (
+    create_dialogue_folder,
+    delete_dialogue_folder,
     delete_dialogue_script,
+    load_dialogue_folders,
     load_dialogue_scripts,
+    load_dialogue_workspace,
+    move_dialogue_script,
     normalize_script_name,
     resolve_dialogue_script,
+    resolve_dialogue_workspace_asset,
     save_dialogue_script,
+    save_dialogue_workspace,
 )
 from voxcpm.magic_takes import (
     MAGIC_TAKE_MEDIA_TYPE,
@@ -1210,6 +1217,15 @@ class DialogueScriptRequest(BaseModel):
     document: str = Field(..., min_length=1, max_length=1_000_000)
     description: str = Field("", max_length=240)
     tags: list[str] = Field(default_factory=list, max_length=12)
+    folder: str = Field("", max_length=80)
+
+
+class DialogueFolderRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+
+
+class DialogueFolderAssignment(BaseModel):
+    folder: str = Field("", max_length=80)
 
 
 class PurgeRequest(BaseModel):
@@ -1962,14 +1978,55 @@ def voice_profile_payloads() -> list[dict[str, Any]]:
     ]
 
 
+def dialogue_workspace_payload(name: str, script: dict[str, Any]) -> dict[str, Any] | None:
+    loaded = load_dialogue_workspace(DIALOGUE_SCRIPT_DIR, script)
+    if loaded is None:
+        return None
+    manifest, _ = loaded
+    base_url = f"/tts/dialogue-scripts/{name}/workspace"
+    takes = []
+    for item in manifest.get("takes", []):
+        if not isinstance(item, dict) or not item.get("file"):
+            continue
+        takes.append({
+            "speech_index": int(item.get("speech_index", len(takes))),
+            "seed": int(item.get("seed", 0)),
+            "locked": bool(item.get("locked", False)),
+            "extension": str(item.get("extension") or "wav"),
+            "url": f"{base_url}/{item['file']}",
+        })
+
+    def asset(key: str) -> dict[str, str] | None:
+        item = manifest.get(key)
+        if not isinstance(item, dict) or not item.get("file"):
+            return None
+        return {
+            "extension": str(item.get("extension") or "wav"),
+            "url": f"{base_url}/{item['file']}",
+        }
+
+    return {
+        "version": 1,
+        "settings": manifest.get("settings") if isinstance(manifest.get("settings"), dict) else {},
+        "finishing": manifest.get("finishing") if isinstance(manifest.get("finishing"), dict) else {},
+        "takes": takes,
+        "output": asset("output"),
+        "processed": asset("processed"),
+    }
+
+
 def dialogue_script_payload(name: str, script: dict[str, Any], *, include_document: bool = False) -> dict[str, Any]:
+    loaded_workspace = load_dialogue_workspace(DIALOGUE_SCRIPT_DIR, script)
     payload = {
         "id": name,
         "name": script["title"],
         "description": script["description"],
         "tags": script["tags"],
+        "folder": script.get("folder", ""),
         "turns": script["turns"],
         "words": script["words"],
+        "has_workspace": loaded_workspace is not None,
+        "generated_takes": len((loaded_workspace or ({"takes": []}, None))[0].get("takes", [])),
         "created_at": script["created_at"],
         "updated_at": script["updated_at"],
         "download_url": f"/tts/dialogue-scripts/{name}/download",
@@ -1977,6 +2034,7 @@ def dialogue_script_payload(name: str, script: dict[str, Any], *, include_docume
     if include_document:
         _, _, path = resolve_dialogue_script(DIALOGUE_SCRIPT_DIR, name)
         payload["document"] = path.read_text(encoding="utf-8")
+        payload["workspace"] = dialogue_workspace_payload(name, script)
     return payload
 
 
@@ -1985,11 +2043,105 @@ def dialogue_script_payloads() -> list[dict[str, Any]]:
     return [dialogue_script_payload(name, script) for name, script in sorted(scripts.items())]
 
 
+def dialogue_folder_payloads() -> list[dict[str, str]]:
+    return [
+        {"id": folder_id, "name": record["title"], "created_at": record["created_at"]}
+        for folder_id, record in sorted(load_dialogue_folders(DIALOGUE_SCRIPT_DIR).items(), key=lambda item: item[1]["title"].casefold())
+    ]
+
+
 def validate_dialogue_script(document: str) -> tuple[int, int]:
     plan = compile_ssml(document, "ssml-h")
     speech = [unit for unit in plan.units if unit.kind == "speech"]
     words = sum(len(str(getattr(unit, "text", "") or "").split()) for unit in speech)
     return len(speech), words
+
+
+async def _read_dialogue_workspace_upload(upload: UploadFile, total: list[int]) -> bytes:
+    data = bytearray()
+    try:
+        while chunk := await upload.read(1024 * 1024):
+            total[0] += len(chunk)
+            if total[0] > MAX_MAGIC_TAKE_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="Dialogue workspace audio exceeds the aggregate upload limit.")
+            data.extend(chunk)
+    finally:
+        await upload.close()
+    return bytes(data)
+
+
+async def save_dialogue_workspace_request(
+    metadata_json: str,
+    takes: list[UploadFile],
+    output: UploadFile | None,
+    processed: UploadFile | None,
+    *,
+    existing_name: str | None = None,
+) -> dict[str, Any]:
+    try:
+        metadata = json.loads(metadata_json)
+        if not isinstance(metadata, dict):
+            raise ValueError("Dialogue workspace metadata must be an object.")
+        script_request = DialogueScriptRequest.model_validate(metadata)
+        workspace = metadata.get("workspace") if isinstance(metadata.get("workspace"), dict) else {}
+        take_metadata = workspace.get("takes") if isinstance(workspace.get("takes"), list) else []
+        if len(takes) != len(take_metadata):
+            raise ValueError("Dialogue workspace take metadata does not match uploaded audio.")
+        if len(takes) > MAX_MAGIC_TAKES:
+            raise ValueError(f"Dialogue workspaces support at most {MAX_MAGIC_TAKES} saved takes.")
+        validated_take_metadata: list[dict[str, Any]] = []
+        for position, item in enumerate(take_metadata):
+            if not isinstance(item, dict):
+                raise ValueError("Dialogue workspace take metadata is invalid.")
+            seed = int(item.get("seed", 0))
+            if not 0 <= seed <= MAX_RANDOM_SEED:
+                raise ValueError("Dialogue workspace take seed is outside the 32-bit range.")
+            validated_take_metadata.append({**item, "speech_index": int(item.get("speech_index", position)), "seed": seed})
+        if existing_name is not None and normalize_script_name(script_request.name) != normalize_script_name(existing_name):
+            raise ValueError("Create a new script to use a different name.")
+        turns, words = validate_dialogue_script(script_request.document)
+        name, script = save_dialogue_script(
+            DIALOGUE_SCRIPT_DIR,
+            name=script_request.name,
+            document=script_request.document,
+            description=script_request.description,
+            tags=script_request.tags,
+            folder=script_request.folder,
+            turns=turns,
+            words=words,
+            overwrite=existing_name is not None,
+        )
+
+        total = [0]
+        take_assets: list[tuple[dict[str, Any], bytes]] = []
+        for item, upload in zip(validated_take_metadata, takes, strict=True):
+            take_assets.append((item, await _read_dialogue_workspace_upload(upload, total)))
+
+        async def optional_asset(upload: UploadFile | None, key: str) -> tuple[dict[str, Any], bytes] | None:
+            if upload is None:
+                return None
+            item = workspace.get(key) if isinstance(workspace.get(key), dict) else {}
+            return item, await _read_dialogue_workspace_upload(upload, total)
+
+        output_asset = await optional_asset(output, "output")
+        processed_asset = await optional_asset(processed, "processed")
+        save_dialogue_workspace(
+            DIALOGUE_SCRIPT_DIR,
+            name,
+            settings=workspace.get("settings"),
+            finishing=workspace.get("finishing"),
+            takes=take_assets,
+            output=output_asset,
+            processed=processed_asset,
+        )
+        _, saved, _ = resolve_dialogue_script(DIALOGUE_SCRIPT_DIR, name)
+        return dialogue_script_payload(name, saved, include_document=True)
+    except (SSMLValidationError, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        for upload in [*takes, output, processed]:
+            if upload is not None:
+                await upload.close()
 
 
 async def save_reference_upload(upload: UploadFile) -> str:
@@ -2568,7 +2720,50 @@ def remove_voice_profile(profile_name: str) -> dict[str, str]:
 def dialogue_scripts(response: Response) -> dict:
     response.headers["Cache-Control"] = "no-store"
     scripts = dialogue_script_payloads()
-    return {"object": "list", "data": scripts, "count": len(scripts)}
+    return {"object": "list", "data": scripts, "count": len(scripts), "folders": dialogue_folder_payloads()}
+
+
+@api.post("/tts/dialogue-script-folders")
+def create_script_folder(payload: DialogueFolderRequest) -> dict[str, str]:
+    try:
+        folder_id, folder = create_dialogue_folder(DIALOGUE_SCRIPT_DIR, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"id": folder_id, "name": folder["title"], "created_at": folder["created_at"]}
+
+
+@api.delete("/tts/dialogue-script-folders/{folder_name}")
+def remove_script_folder(folder_name: str) -> dict[str, str]:
+    try:
+        deleted = delete_dialogue_folder(DIALOGUE_SCRIPT_DIR, folder_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"deleted": deleted}
+
+
+@api.post("/tts/dialogue-workspaces")
+async def create_dialogue_workspace(
+    metadata: str = Form(...),
+    takes: list[UploadFile] = File(default=[]),
+    output: UploadFile | None = File(None),
+    processed: UploadFile | None = File(None),
+) -> dict[str, Any]:
+    return await save_dialogue_workspace_request(metadata, takes, output, processed)
+
+
+@api.put("/tts/dialogue-workspaces/{script_name}")
+async def edit_dialogue_workspace(
+    script_name: str,
+    metadata: str = Form(...),
+    takes: list[UploadFile] = File(default=[]),
+    output: UploadFile | None = File(None),
+    processed: UploadFile | None = File(None),
+) -> dict[str, Any]:
+    try:
+        resolve_dialogue_script(DIALOGUE_SCRIPT_DIR, script_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return await save_dialogue_workspace_request(metadata, takes, output, processed, existing_name=script_name)
 
 
 @api.post("/tts/dialogue-scripts")
@@ -2581,6 +2776,7 @@ def create_dialogue_script(payload: DialogueScriptRequest) -> dict:
             document=payload.document,
             description=payload.description,
             tags=payload.tags,
+            folder=payload.folder,
             turns=turns,
             words=words,
             overwrite=False,
@@ -2612,6 +2808,7 @@ def edit_dialogue_script(script_name: str, payload: DialogueScriptRequest) -> di
             document=payload.document,
             description=payload.description,
             tags=payload.tags,
+            folder=payload.folder,
             turns=turns,
             words=words,
             overwrite=True,
@@ -2621,6 +2818,15 @@ def edit_dialogue_script(script_name: str, payload: DialogueScriptRequest) -> di
     return dialogue_script_payload(name, script, include_document=True)
 
 
+@api.patch("/tts/dialogue-scripts/{script_name}/folder")
+def assign_dialogue_script_folder(script_name: str, payload: DialogueFolderAssignment) -> dict[str, Any]:
+    try:
+        name, script = move_dialogue_script(DIALOGUE_SCRIPT_DIR, script_name, payload.folder)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return dialogue_script_payload(name, script)
+
+
 @api.get("/tts/dialogue-scripts/{script_name}/download")
 def download_dialogue_script(script_name: str) -> FileResponse:
     try:
@@ -2628,6 +2834,15 @@ def download_dialogue_script(script_name: str) -> FileResponse:
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return FileResponse(path, filename=f"{name}.ssml", media_type="application/ssml+xml")
+
+
+@api.get("/tts/dialogue-scripts/{script_name}/workspace/{filename}")
+def dialogue_workspace_audio(script_name: str, filename: str) -> FileResponse:
+    try:
+        path = resolve_dialogue_workspace_asset(DIALOGUE_SCRIPT_DIR, script_name, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(path, headers={"Cache-Control": "no-store"})
 
 
 @api.delete("/tts/dialogue-scripts/{script_name}")

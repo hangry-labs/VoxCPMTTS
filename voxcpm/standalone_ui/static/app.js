@@ -1,11 +1,11 @@
 import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
 import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
-import { AudioFinisher } from './audio-finisher.js?v=audio-studio'
+import { AudioFinisher } from './audio-finisher.js?v=workspace-audio'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
-import { DialogueScriptLibrary } from './dialogue-script-library.js?v=app-organization'
+import { DialogueScriptLibrary } from './dialogue-script-library.js?v=workspace-v1'
 import { GenerationToolbar } from './generation-toolbar.js?v=workflow-controls'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
-import { MagicEditor } from './magic-editor.js?v=removable-chips'
+import { MagicEditor } from './magic-editor.js?v=dialogue-history-2'
 import { MagicTakeStudio } from './magic-takes.js?v=turn-studio'
 import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
 import { VersionCheck } from './version-check.js?v=published-builds'
@@ -122,6 +122,10 @@ const magicEditor = new MagicEditor($('#magic-editor-shell'), {
   onPreview: generateMagicPreview,
   onSaveCharacter: openMagicCharacterDialog,
   onError: (error) => showToast(errorMessage(error)),
+  onHistoryChange: ({ canUndo, canRedo }) => {
+    $('#dialogue-undo').disabled = !canUndo
+    $('#dialogue-redo').disabled = !canRedo
+  },
 })
 state.inputDrafts['ssml-h'] = magicEditor.toSSMLH()
 
@@ -140,6 +144,7 @@ const generateFinisher = new AudioFinisher($('#generate-finishing'), {
     ffmpeg: t('finishing.ffmpegStudio', {}, 'FFmpeg Studio'),
     signalsmith: t('finishing.signalsmithVoice', {}, 'Signalsmith Voice'),
     generateFirst: t('errors.generateAudioBeforeProcess', {}, 'Generate audio before processing it.'),
+    processFirst: t('errors.processAudioBeforeSave', {}, 'Create a processed preview before saving it.'),
     processing: t('status.processingAudio', {}, 'Finishing audio with {method}'),
     complete: t('status.processedAudioReady', {}, 'Processed audio ready'),
   },
@@ -206,6 +211,9 @@ const dialogueScripts = new DialogueScriptLibrary({
   getInputType: () => state.inputType,
   setInputType,
   onDocumentChange: (documentText) => { state.inputDrafts['ssml-h'] = documentText },
+  captureWorkspace: captureScriptWorkspace,
+  restoreWorkspace: restoreScriptWorkspace,
+  clearWorkspace: clearScriptWorkspace,
 })
 
 for (const editor of [generateOutput, cloneOutput, cloneProcessedOutput, streamOutput, referenceAudio]) {
@@ -230,6 +238,79 @@ async function fetchJson(path, options) {
   const response = await fetch(path, options)
   if (!response.ok) throw new Error(await responseError(response))
   return response.json()
+}
+
+function captureScriptWorkspace() {
+  const finishing = generateFinisher.snapshot()
+  return {
+    takes: magicEditor.workspaceTakes(),
+    output: finishing.source,
+    processed: finishing.processed,
+    settings: {
+      generation_mode: state.generationMode,
+      output_format: $('#output-format').value,
+      language: $('#language').value,
+      voice_profile: $('#voice-profile').value,
+      guidance: Number($('#guidance').value),
+      steps: Number($('#steps').value),
+      randomize_seed: $('#randomize-seed').checked,
+      seed: Number($('#seed').value),
+      protect_long_audio: $('#protect-long-audio').checked,
+      normalize_loudness: $('#normalize-loudness').checked,
+      normalize_text: $('#normalize-text').checked,
+    },
+    finishing: {
+      options: finishing.options,
+      processed_options: finishing.processedOptions,
+      stale: finishing.stale,
+    },
+  }
+}
+
+function clearScriptWorkspace() {
+  cancelMagicAssembly()
+  generateOutput.clear()
+  streamOutput.clear()
+  generateFinisher.clear()
+  $('#generate-timestamp-results').hidden = true
+}
+
+async function restoreScriptWorkspace(workspace) {
+  const settings = workspace.settings || {}
+  const setSelect = (selector, value) => {
+    const select = $(selector)
+    if (value !== undefined && [...select.options].some((option) => option.value === String(value))) select.value = String(value)
+  }
+  setSelect('#output-format', settings.output_format)
+  setSelect('#language', settings.language)
+  setSelect('#voice-profile', settings.voice_profile)
+  if (Number.isFinite(Number(settings.guidance))) $('#guidance').value = settings.guidance
+  if (Number.isFinite(Number(settings.steps))) $('#steps').value = settings.steps
+  if (Number.isInteger(Number(settings.seed))) $('#seed').value = settings.seed
+  for (const [key, selector] of Object.entries({
+    randomize_seed: '#randomize-seed',
+    protect_long_audio: '#protect-long-audio',
+    normalize_loudness: '#normalize-loudness',
+    normalize_text: '#normalize-text',
+  })) {
+    if (settings[key] !== undefined) $(selector).checked = Boolean(settings[key])
+  }
+  updateSeedState()
+  generationToolbar.sync()
+  if (['generate', 'stream'].includes(settings.generation_mode)) setGenerationMode(settings.generation_mode)
+  magicEditor.restoreWorkspaceTakes(workspace.takes || [], { notify: false })
+  if (workspace.output?.blob) {
+    const extension = workspace.output.extension || 'wav'
+    const output = settings.generation_mode === 'stream' ? streamOutput : generateOutput
+    await output.load(workspace.output.blob, `voxcpmtts-workspace.${extension}`)
+    await generateFinisher.restore({
+      source: { blob: workspace.output.blob, extension },
+      processed: workspace.processed,
+      options: workspace.finishing?.options || {},
+      processedOptions: workspace.finishing?.processed_options || null,
+      stale: Boolean(workspace.finishing?.stale),
+    })
+  }
 }
 
 function showToast(message, tone = 'error') {
@@ -381,8 +462,10 @@ function setInputType(inputType, { syncSsmlH = true } = {}) {
   editor.hidden = inputType === 'magic'
   $('#magic-editor-shell').hidden = inputType !== 'magic'
   $('#composer-title').textContent = inputType === 'magic'
-    ? t('magic.script', {}, 'Dialogue script')
+    ? t('scripts.name', {}, 'Script name')
     : t('composer.text', {}, 'Input text')
+  $('#sample-button').hidden = inputType !== 'text'
+  $('.dialogue-history-controls').hidden = inputType !== 'magic'
   state.inputType = inputType
   $$('.input-type-control button').forEach((button) => {
     const active = button.dataset.inputType === inputType
@@ -1948,7 +2031,7 @@ async function initialize() {
   populateSelect($('#device'), status.hardware || [{ value: 'auto', label: t('common.auto', {}, 'Auto') }, { value: 'cpu', label: 'CPU' }], defaults.device)
   renderVoiceProfileSelect()
   renderCloneProfileList()
-  dialogueScripts.initialize(scripts.data || [])
+  dialogueScripts.initialize(scripts.data || [], scripts.folders || [])
   magicEditor.setCapabilities(ssmlCapabilities)
   resetControls()
   $('#denoise').disabled = !status.load_denoiser
@@ -1984,6 +2067,8 @@ $('#design-voice-tags').addEventListener('input', renderVoiceSaveState)
 $('#clone-control-input').addEventListener('input', updateDesignCompletion)
 $('#reference-text').addEventListener('input', updateDesignCompletion)
 $$('.input-type-control button').forEach((button) => button.addEventListener('click', () => setInputType(button.dataset.inputType)))
+$('#dialogue-undo').addEventListener('click', () => magicEditor.undoDialogue())
+$('#dialogue-redo').addEventListener('click', () => magicEditor.redoDialogue())
 $$('.generation-mode-control button').forEach((button) => button.addEventListener('click', () => setGenerationMode(button.dataset.generationMode)))
 $$('.design-source-control button').forEach((button) => button.addEventListener('click', () => setDesignSource(button.dataset.designSource)))
 $$('.clone-mode-control button').forEach((button) => button.addEventListener('click', () => setCloneMode(button.dataset.cloneMode)))
@@ -1999,13 +2084,10 @@ $('#design-seed-lock').addEventListener('click', () => {
 })
 $('#generate-timestamps').addEventListener('change', updateTimestampState)
 $('#sample-button').addEventListener('click', () => {
-  if (state.inputType === 'magic' || state.inputType === 'text') state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
-  if (state.inputType === 'magic') {
-    magicEditor.loadSample(inputSample('magic'))
-    return
-  }
-  $('#text-input').value = inputSample(state.inputType)
-  state.inputDrafts[state.inputType] = $('#text-input').value
+  if (state.inputType !== 'text') return
+  state.sampleIndex = (state.sampleIndex + 1) % SAMPLE_TEXTS.length
+  $('#text-input').value = inputSample('text')
+  state.inputDrafts.text = $('#text-input').value
   updateMetrics()
 })
 $('#design-sample-button').addEventListener('click', () => {

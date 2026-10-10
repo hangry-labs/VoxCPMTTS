@@ -150,6 +150,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'class="audio-studio-toolbar"' in responses["/"].text
     assert 'class="audio-studio-source"' in responses["/"].text
     assert 'data-finish-role="save-source"' in responses["/"].text
+    assert 'data-finish-role="save-processed"' in responses["/"].text
     assert 'data-finish-role="output"' in responses["/"].text
     assert 'id="normalize-text"' in responses["/"].text
     assert 'id="timing-settings"' in responses["/"].text
@@ -185,8 +186,12 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="script-list"' in responses["/"].text
     assert 'id="script-import-input"' in responses["/"].text
     assert 'id="script-download"' in responses["/"].text
+    assert 'id="script-new"' in responses["/"].text
+    assert 'id="dialogue-undo"' in responses["/"].text
+    assert 'id="dialogue-redo"' in responses["/"].text
+    assert 'id="script-folder-dialog"' in responses["/"].text
     assert 'id="edit-script-dialog"' in responses["/"].text
-    assert 'id="update-script-dialog"' in responses["/"].text
+    assert 'id="update-script-dialog"' not in responses["/"].text
     assert 'id="delete-script-dialog"' in responses["/"].text
     assert 'id="profile-edit-dialog"' not in responses["/"].text
     assert "gradio" not in responses["/"].text.lower()
@@ -238,6 +243,11 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "this.fetchJson('/tts/dialogue-scripts')" in script_library
     assert "this.magicEditor.loadSSMLH" in script_library
     assert "downloadDocument" in script_library
+    assert "'/tts/dialogue-workspaces'" in script_library
+    assert "assignFolder(" in script_library
+    assert "restoreWorkspaceTakes" in magic_editor
+    assert "undoDialogue()" in magic_editor
+    assert "redoDialogue()" in magic_editor
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
@@ -245,6 +255,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "export class AudioFinisher" in audio_finisher
     assert "'/tts/postprocess-upload'" in audio_finisher
     assert "downloadSource()" in audio_finisher
+    assert "downloadProcessed()" in audio_finisher
+    assert "markPreviewStale()" in audio_finisher
     assert "voxcpmtts-original.${extension}" in audio_finisher
     assert "useProfile(profile, 'clone', { editing: true })" in script
     assert "referenceAudio.clear()" in script
@@ -887,6 +899,76 @@ def test_dialogue_script_rejects_invalid_ssml_h(tmp_path: Path) -> None:
             )
 
     assert response.status_code == 400
+
+
+def test_dialogue_workspace_persists_folders_takes_and_outputs(tmp_path: Path) -> None:
+    document = """<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+      xmlns:h="https://hangrylabs.app/ns/ssml-h/1.0" xml:lang="en-US">
+      <voice name="captain">Ready for launch.</voice>
+    </speak>"""
+    metadata = {
+        "name": "Launch Workspace",
+        "document": document,
+        "description": "Resumable launch scene",
+        "tags": ["launch"],
+        "folder": "audio-dramas",
+        "workspace": {
+            "settings": {"output_format": "mp3", "seed": 4242},
+            "finishing": {"options": {"method": "ffmpeg"}, "stale": False},
+            "takes": [{"speech_index": 0, "seed": 4242, "locked": True, "extension": "wav"}],
+            "output": {"extension": "mp3"},
+            "processed": {"extension": "wav"},
+        },
+    }
+
+    with patch.object(runtime, "DIALOGUE_SCRIPT_DIR", tmp_path):
+        with TestClient(runtime.app) as client:
+            folder = client.post("/tts/dialogue-script-folders", json={"name": "Audio Dramas"})
+            created = client.post(
+                "/tts/dialogue-workspaces",
+                data={"metadata": json.dumps(metadata)},
+                files=[
+                    ("takes", ("take.wav", b"saved-take", "audio/wav")),
+                    ("output", ("output.mp3", b"saved-output", "audio/mpeg")),
+                    ("processed", ("processed.wav", b"saved-processed", "audio/wav")),
+                ],
+            )
+            listed = client.get("/tts/dialogue-scripts")
+            loaded = client.get("/tts/dialogue-scripts/launch-workspace")
+            workspace = loaded.json()["workspace"]
+            take_audio = client.get(workspace["takes"][0]["url"])
+            output_audio = client.get(workspace["output"]["url"])
+            updated = client.put(
+                "/tts/dialogue-workspaces/launch-workspace",
+                data={"metadata": json.dumps(metadata)},
+                files=[
+                    ("takes", ("take.wav", b"replacement-take", "audio/wav")),
+                    ("output", ("output.mp3", b"replacement-output", "audio/mpeg")),
+                    ("processed", ("processed.wav", b"replacement-processed", "audio/wav")),
+                ],
+            )
+            reloaded_workspace = client.get("/tts/dialogue-scripts/launch-workspace").json()["workspace"]
+            replacement_take = client.get(reloaded_workspace["takes"][0]["url"])
+            moved = client.patch("/tts/dialogue-scripts/launch-workspace/folder", json={"folder": ""})
+            removed_folder = client.delete("/tts/dialogue-script-folders/audio-dramas")
+
+    assert folder.status_code == 200
+    assert folder.json()["id"] == "audio-dramas"
+    assert created.status_code == 200
+    assert created.json()["has_workspace"] is True
+    assert created.json()["generated_takes"] == 1
+    assert listed.json()["folders"][0]["name"] == "Audio Dramas"
+    assert loaded.json()["folder"] == "audio-dramas"
+    assert workspace["settings"]["seed"] == 4242
+    assert workspace["takes"][0]["locked"] is True
+    assert take_audio.content == b"saved-take"
+    assert output_audio.content == b"saved-output"
+    assert output_audio.headers["cache-control"] == "no-store"
+    assert updated.status_code == 200
+    assert replacement_take.content == b"replacement-take"
+    assert len(list(tmp_path.glob("workspace-launch-workspace-*"))) == 1
+    assert moved.json()["folder"] == ""
+    assert removed_folder.json() == {"deleted": "audio-dramas"}
 
 
 def test_saved_clone_profile_can_switch_from_transcript_to_directed_reference_mode(tmp_path: Path) -> None:

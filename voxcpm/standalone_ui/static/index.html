@@ -121,14 +121,24 @@
       <section class="composer" id="composer">
         <div class="composer-heading">
           <div class="composer-title-tools">
-            <div class="section-title"><i class="icon-message-square-text"></i><span id="composer-title" data-i18n="composer.text">Input text</span></div>
+            <div class="section-title"><i class="icon-message-square-text"></i><span id="composer-title" data-i18n="scripts.name">Script name</span></div>
             <label class="script-inline-name"><span class="visually-hidden" data-i18n="scripts.name">Script name</span><input id="script-name" type="text" maxlength="80" placeholder="Name this script" data-i18n-placeholder="scripts.namePlaceholder" autocomplete="off"></label>
             <button class="secondary-button compact-command script-save-button" id="script-save" type="button" hidden><i class="icon-check"></i><span data-i18n="scripts.saveShort">Save</span></button>
+            <div class="dialogue-history-controls" role="group" aria-label="Dialogue versions" data-i18n-aria-label="scripts.dialogueVersions">
+              <button class="icon-button bordered" id="dialogue-undo" type="button" disabled title="Previous dialogue version" aria-label="Previous dialogue version" data-i18n-title="scripts.undo" data-i18n-aria-label="scripts.undo"><span aria-hidden="true">←</span></button>
+              <button class="icon-button bordered" id="dialogue-redo" type="button" disabled title="Next dialogue version" aria-label="Next dialogue version" data-i18n-title="scripts.redo" data-i18n-aria-label="scripts.redo"><span aria-hidden="true">→</span></button>
+            </div>
+            <button class="secondary-button compact-command script-new-button" id="script-new" type="button" title="Start a new script" data-i18n-title="scripts.new"><i class="icon-x"></i><span data-i18n="scripts.newShort">New</span></button>
             <input class="visually-hidden" id="script-import-input" type="file" accept=".ssml,.xml,application/ssml+xml,text/xml,application/xml">
-            <button class="icon-button bordered script-file-action" id="script-import" type="button" title="Import SSML-H" aria-label="Import SSML-H" data-i18n-title="scripts.import" data-i18n-aria-label="scripts.import"><i class="icon-upload"></i></button>
-            <button class="icon-button bordered script-file-action" id="script-download" type="button" title="Export SSML-H" aria-label="Export SSML-H" data-i18n-title="scripts.export" data-i18n-aria-label="scripts.export"><i class="icon-download"></i></button>
+            <details class="script-transfer-menu">
+              <summary><i class="icon-download"></i><span data-i18n="scripts.transfer">Import / export</span><i class="icon-chevron-down"></i></summary>
+              <div class="script-transfer-panel">
+                <button class="secondary-button compact-command" id="script-import" type="button"><i class="icon-upload"></i><span data-i18n="scripts.import">Import SSML-H</span></button>
+                <button class="secondary-button compact-command" id="script-download" type="button"><i class="icon-download"></i><span data-i18n="scripts.export">Export SSML-H</span></button>
+              </div>
+            </details>
           </div>
-          <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format" data-i18n-aria-label="composer.inputType"><button class="active" type="button" data-input-type="magic" aria-pressed="true" data-i18n="magic.title">Magic</button><button type="button" data-input-type="text" aria-pressed="false">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span data-i18n="composer.newSample">New sample</span></button></div>
+          <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format" data-i18n-aria-label="composer.inputType"><button class="active" type="button" data-input-type="magic" aria-pressed="true" data-i18n="magic.title">Magic</button><button type="button" data-input-type="text" aria-pressed="false">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button" hidden><i class="icon-refresh-cw"></i><span data-i18n="composer.newSample">New sample</span></button></div>
         </div>
         <div class="generation-toolbar" id="generation-toolbar" role="toolbar" aria-label="Generation controls" data-i18n-aria-label="generation.settings">
           <div class="generation-menu" data-generation-menu="model">
@@ -267,7 +277,7 @@
             </div>
             <div class="audio-studio-source"><div id="generate-result"><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></div><div id="stream-result" hidden><section id="stream-output" aria-live="polite"></section></div></div>
             <div class="finishing-status" data-finish-role="status" role="status" aria-live="polite" hidden></div>
-            <section class="processed-preview" data-finish-role="preview" hidden><div class="output-heading"><div class="section-title"><i class="icon-sparkles"></i><span data-i18n="finishing.processedAudio">Processed audio</span></div><span class="final-badge" data-finish-role="method-badge">FFmpeg Studio</span></div><section data-finish-role="output" aria-live="polite"></section></section>
+            <section class="processed-preview" data-finish-role="preview" hidden><div class="output-heading"><div class="section-title"><i class="icon-sparkles"></i><span data-i18n="finishing.processedAudio">Processed audio</span></div><div><span class="stale-badge" data-finish-role="stale-badge" hidden data-i18n="finishing.settingsChanged">Settings changed</span><span class="final-badge" data-finish-role="method-badge">FFmpeg Studio</span><button class="secondary-button compact-command" data-finish-role="save-processed" type="button" title="Save processed audio" data-i18n-title="finishing.saveProcessed"><i class="icon-download"></i><span data-i18n="common.save">Save</span></button></div></div><section data-finish-role="output" aria-live="polite"></section></section>
           </section>
         </section>
       </div>
@@ -275,6 +285,7 @@
       <aside class="script-library" aria-labelledby="script-library-title">
         <div class="script-library-heading">
           <div class="section-title"><i class="icon-book-open"></i><span id="script-library-title" data-i18n="scripts.saved">Saved scripts</span><span class="count-badge" id="script-count">0</span></div>
+          <button class="icon-button bordered" id="script-folder-add" type="button" title="New folder" aria-label="New folder" data-i18n-title="scripts.newFolder" data-i18n-aria-label="scripts.newFolder"><span class="folder-plus-icon" aria-hidden="true">+</span></button>
         </div>
         <label class="profile-search script-search"><span class="visually-hidden" data-i18n="scripts.search">Search saved scripts</span><input id="script-filter" type="search" placeholder="Search scripts" data-i18n-placeholder="scripts.searchPlaceholder"></label>
         <div class="script-list" id="script-list"></div>
@@ -451,12 +462,13 @@
     <form id="edit-script-form" method="dialog">
       <div class="dialog-heading"><h2 data-i18n="scripts.editTitle">Edit script details</h2><button class="icon-button" id="edit-script-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div>
       <p><span data-i18n="scripts.editCopy">Organize</span> <strong id="edit-script-name"></strong> <span data-i18n="scripts.editSuffix">with a description and searchable tags.</span></p>
+      <label class="field"><span data-i18n="scripts.folder">Folder</span><select id="edit-script-folder"></select></label>
       <label class="field"><span><span data-i18n="profiles.tags">Tags</span> <small data-i18n="profiles.commaSeparated">Comma separated</small></span><input id="edit-script-tags" type="text" maxlength="395" placeholder="launch, dramatic, english" data-i18n-placeholder="scripts.tagsPlaceholder" autocomplete="off"></label>
       <label class="field"><span><span data-i18n="profiles.description">Description</span> <small data-i18n="common.optional">Optional</small></span><input id="edit-script-description" type="text" maxlength="240" placeholder="Short launch dialogue" data-i18n-placeholder="scripts.descriptionPlaceholder"></label>
       <div class="dialog-actions"><button class="secondary-button" id="edit-script-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="scripts.updateDetails">Update details</span></button></div>
     </form>
   </dialog>
-  <dialog class="confirm-dialog" id="update-script-dialog"><div class="dialog-heading"><h2 data-i18n="scripts.updateTitle">Update saved script?</h2><button class="icon-button" id="update-script-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div><p><span data-i18n="scripts.updatePrefix">Replace</span> <strong id="update-script-name"></strong> <span data-i18n="scripts.updateSuffix">with the current dialogue?</span></p><div class="dialog-actions"><button class="secondary-button" id="update-script-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" id="update-script-confirm" type="button"><i class="icon-check"></i><span data-i18n="scripts.update">Update script</span></button></div></dialog>
+  <dialog class="confirm-dialog script-folder-dialog" id="script-folder-dialog"><form id="script-folder-form"><div class="dialog-heading"><h2 data-i18n="scripts.newFolder">New folder</h2><button class="icon-button" id="script-folder-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div><label class="field"><span data-i18n="scripts.folderName">Folder name</span><input id="script-folder-name" type="text" maxlength="80" placeholder="Audio dramas" data-i18n-placeholder="scripts.folderPlaceholder" required></label><div class="dialog-actions"><button class="secondary-button" id="script-folder-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="scripts.createFolder">Create folder</span></button></div></form></dialog>
   <dialog class="confirm-dialog" id="delete-script-dialog"><div class="dialog-heading"><h2 data-i18n="scripts.deleteTitle">Delete saved script?</h2><button class="icon-button" id="delete-script-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div><p><span data-i18n="scripts.deletePrefix">Permanently delete</span> <strong id="delete-script-name"></strong><span data-i18n="scripts.deleteSuffix">?</span></p><div class="dialog-actions"><button class="secondary-button" id="delete-script-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="danger-button" id="delete-script-confirm" type="button" data-i18n="common.delete">Delete</button></div></dialog>
   <div class="toast" id="toast" role="alert" hidden></div>
 </body>

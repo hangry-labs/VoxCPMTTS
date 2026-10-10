@@ -105,7 +105,7 @@ function dragHandle(title) {
 }
 
 export class MagicEditor {
-  constructor(root, { onChange, onPreview, onSaveCharacter, onError } = {}) {
+  constructor(root, { onChange, onPreview, onSaveCharacter, onError, onHistoryChange } = {}) {
     this.root = root
     this.canvas = root.querySelector('#magic-editor')
     this.voiceControl = root.querySelector('#magic-voice-control')
@@ -122,6 +122,7 @@ export class MagicEditor {
     this.onPreview = onPreview || (async () => null)
     this.onSaveCharacter = onSaveCharacter || (async () => {})
     this.onError = onError || (() => {})
+    this.onHistoryChange = onHistoryChange || (() => {})
     this.nextId = 1
     this.voices = []
     this.languages = []
@@ -145,6 +146,10 @@ export class MagicEditor {
     this.pendingDragId = null
     this.draggingId = null
     this.pendingSubstitution = null
+    this.history = []
+    this.historyIndex = -1
+    this.historyLimit = 100
+    this.restoringHistory = false
     this.toolbar = new MagicToolbar(root)
     this.definitionEditor = new MagicVoiceDefinitions(document.querySelector('#magic-voice-definitions-dialog'), {
       onChange: (definitions, detail) => this.updateVoiceDefinitions(definitions, detail),
@@ -154,6 +159,7 @@ export class MagicEditor {
     this.activeId = this.blocks[0].id
     this.bind()
     this.render()
+    this.resetHistory()
   }
 
   createSpeech(text = '') {
@@ -403,7 +409,8 @@ export class MagicEditor {
     }
     this.activeId = this.blocks[0].id
     this.render()
-    this.changed()
+    this.resetHistory()
+    this.changed({ skipHistory: true })
   }
 
   newDocument() {
@@ -413,10 +420,11 @@ export class MagicEditor {
     this.blocks = [this.createSpeech('')]
     this.activeId = this.blocks[0].id
     this.render()
-    this.changed()
+    this.resetHistory()
+    this.changed({ skipHistory: true })
   }
 
-  loadSSMLH(source) {
+  loadSSMLH(source, { resetHistory = true, notify = true } = {}) {
     const parsed = parseMagicDocument(source)
     this.blocks.forEach((block) => this.clearPreview(block))
     this.documentMeta = { voiceDefinitions: parsed.voiceDefinitions, language: parsed.language }
@@ -445,7 +453,8 @@ export class MagicEditor {
     }
     this.activeId = this.blocks[0].id
     this.render()
-    this.changed()
+    if (resetHistory) this.resetHistory()
+    if (notify) this.changed({ skipHistory: true })
   }
 
   updateVoiceDefinitions(definitions, detail = {}) {
@@ -825,6 +834,39 @@ export class MagicEditor {
       block.locked = locked
       block.preview = { ...take, url: URL.createObjectURL(take.blob) }
       block.captureSeed = Number.isInteger(take.seed) ? take.seed : null
+    }
+    this.renderBlocks()
+    if (notify) this.changed({ takesOnly: true, takesChanged: true })
+  }
+
+  workspaceTakes() {
+    return this.speechBlocks().flatMap((block, speechIndex) => (
+      block.preview?.blob
+        ? [{
+            speechIndex,
+            blob: block.preview.blob,
+            extension: block.preview.extension || 'wav',
+            seed: Number.isInteger(block.captureSeed) ? block.captureSeed : 0,
+            locked: Boolean(block.locked),
+          }]
+        : []
+    ))
+  }
+
+  restoreWorkspaceTakes(takes = [], { notify = true } = {}) {
+    const speech = this.speechBlocks()
+    for (const item of takes) {
+      const block = speech[Number(item.speechIndex ?? item.speech_index)]
+      if (!block || !item.blob) continue
+      this.clearPreview(block)
+      block.preview = {
+        blob: item.blob,
+        extension: item.extension || 'wav',
+        seed: Number(item.seed) || 0,
+        url: URL.createObjectURL(item.blob),
+      }
+      block.captureSeed = Number.isInteger(item.seed) ? item.seed : Number(item.seed) || 0
+      block.locked = Boolean(item.locked)
     }
     this.renderBlocks()
     if (notify) this.changed({ takesOnly: true, takesChanged: true })
@@ -1289,7 +1331,45 @@ export class MagicEditor {
   }
 
   changed(detail = {}) {
+    if (!detail.takesOnly && !detail.skipHistory && !this.restoringHistory) this.recordHistory()
     this.onChange(this, detail)
+  }
+
+  resetHistory() {
+    this.history = [this.toSSMLH()]
+    this.historyIndex = 0
+    this.onHistoryChange({ canUndo: false, canRedo: false })
+  }
+
+  recordHistory() {
+    const snapshot = this.toSSMLH()
+    if (snapshot === this.history[this.historyIndex]) return
+    this.history.splice(this.historyIndex + 1)
+    this.history.push(snapshot)
+    if (this.history.length > this.historyLimit) this.history.shift()
+    this.historyIndex = this.history.length - 1
+    this.onHistoryChange({ canUndo: this.historyIndex > 0, canRedo: false })
+  }
+
+  restoreHistory(index) {
+    if (index < 0 || index >= this.history.length || index === this.historyIndex) return
+    this.restoringHistory = true
+    try {
+      this.loadSSMLH(this.history[index], { resetHistory: false, notify: false })
+      this.historyIndex = index
+    } finally {
+      this.restoringHistory = false
+    }
+    this.onHistoryChange({ canUndo: this.historyIndex > 0, canRedo: this.historyIndex < this.history.length - 1 })
+    this.changed({ skipHistory: true, historyOnly: true })
+  }
+
+  undoDialogue() {
+    this.restoreHistory(this.historyIndex - 1)
+  }
+
+  redoDialogue() {
+    this.restoreHistory(this.historyIndex + 1)
   }
 
   toSSMLH(blocks = this.blocks, { preview = false } = {}) {

@@ -410,13 +410,42 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .script-inline-name input { width: 100%; min-height: 30px; padding: 5px 8px; font-size: 0.68rem; }
 .composer-title-tools .script-save-button { flex: 0 0 auto; width: auto; min-height: 30px; margin: 0; }
 .composer-title-tools .script-file-action { flex: 0 0 30px; width: 30px; height: 30px; }
+.dialogue-history-controls { display: inline-flex; align-items: center; gap: 2px; }
+.dialogue-history-controls[hidden] { display: none; }
+.dialogue-history-controls .icon-button { width: 30px; height: 30px; font-size: 1rem; font-weight: 800; }
+.script-new-button { flex: 0 0 auto; min-height: 30px; }
+.script-transfer-menu { position: relative; flex: 0 0 auto; margin: 0; }
+.script-transfer-menu > summary { display: flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 0.65rem; font-weight: 700; list-style: none; }
+.script-transfer-menu > summary::-webkit-details-marker { display: none; }
+.script-transfer-menu > summary i:first-child { color: var(--accent); }
+.script-transfer-menu > summary i:last-child { color: var(--muted); transition: transform 140ms ease; }
+.script-transfer-menu[open] > summary { border-color: #81502e; background: #292018; }
+.script-transfer-menu[open] > summary i:last-child { transform: rotate(180deg); }
+.script-transfer-panel { position: absolute; top: calc(100% + 5px); right: 0; z-index: 40; display: grid; width: 174px; gap: 4px; padding: 5px; border: 1px solid #555861; border-radius: 5px; background: #18191d; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.48); }
+.script-transfer-panel button { width: 100%; margin: 0; justify-content: flex-start; }
 .generate-workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 0.34fr); align-items: stretch; gap: 16px; min-height: 640px; }
 .generate-primary-column { min-width: 0; }
 .script-library { display: flex; min-width: 0; min-height: 100%; flex-direction: column; padding-left: 14px; border-left: 1px solid var(--line); }
 .script-library-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .script-library .script-search { width: 100%; margin-top: 8px; }
 .script-list { display: grid; align-content: start; gap: 6px; min-height: 94px; margin-top: 7px; padding-right: 3px; overflow-y: auto; }
+.script-folder { display: grid; gap: 4px; padding: 4px; border: 1px solid transparent; border-radius: 5px; transition: border-color 120ms ease, background 120ms ease; }
+.script-folder + .script-folder { margin-top: 2px; }
+.script-folder.drag-target { border-color: var(--accent); background: #251b15; }
+.script-folder-heading { display: grid; grid-template-columns: minmax(0, 1fr) 26px; align-items: center; gap: 3px; min-height: 29px; }
+.script-folder-heading > button:first-child { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 5px; min-height: 29px; padding: 0 5px; border: 0; border-radius: 3px; background: transparent; color: var(--text); text-align: left; }
+.script-folder-heading > button:first-child:hover { background: #25272c; }
+.script-folder-heading strong { overflow: hidden; font-size: 0.69rem; text-overflow: ellipsis; white-space: nowrap; }
+.script-folder-heading button:first-child > span:last-child { color: var(--muted); font-size: 0.59rem; font-variant-numeric: tabular-nums; }
+.script-folder-chevron { color: var(--muted); font-size: 1rem; transform: rotate(90deg); transition: transform 120ms ease; }
+.script-folder.collapsed .script-folder-chevron { transform: rotate(0deg); }
+.script-folder-heading .icon-button { width: 26px; height: 26px; font-size: 0.72rem; }
+.script-folder-items { display: grid; gap: 5px; }
+.script-folder-items[hidden] { display: none; }
+.script-folder-empty { min-height: 38px; padding: 11px 7px; border: 1px dashed var(--line-soft); color: var(--muted); font-size: 0.62rem; text-align: center; }
 .script-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
+.script-card[draggable="true"] { cursor: grab; }
+.script-card.dragging { opacity: 0.48; }
 .script-card.active { order: -1; border-color: #55c58a; background: #142019; box-shadow: inset 3px 0 #55c58a; }
 .script-card-copy { display: grid; min-width: 0; min-height: 42px; gap: 3px; }
 .script-card-copy strong { display: flex; align-items: center; gap: 6px; overflow: hidden; font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -749,7 +778,12 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
 .audio-studio-source .wave-stage { background: #17181b; }
 .audio-studio .finishing-status { margin: 0; border-top: 1px solid var(--line-soft); border-left-width: 3px; }
 .audio-studio .processed-preview { margin: 0; padding: 9px; border-top: 1px solid var(--line); background: #131417; }
+.audio-studio .processed-preview.is-stale { border-top-color: #87434a; background: #1c1416; box-shadow: inset 3px 0 #b95761; }
 .audio-studio .processed-preview .output-heading { min-height: 28px; margin-bottom: 5px; }
+.audio-studio .processed-preview .output-heading > div:last-child { display: flex; align-items: center; gap: 5px; }
+.audio-studio .processed-preview [data-finish-role="save-processed"] { width: auto; min-height: 29px; margin: 0; }
+.stale-badge { padding: 3px 6px; border: 1px solid #87434a; border-radius: 4px; background: #2a171a; color: #ffb7bd; font-size: 0.58rem; font-weight: 750; }
+.stale-badge[hidden] { display: none; }
 .audio-studio .processed-preview .audio-editor { border-color: #454850; background: #191a1e; }
 .save-version-row { margin: 0 8px 8px; padding: 8px 9px; border: 1px solid var(--line-soft); background: #17181b; }
 .save-version-row strong { font-size: 0.73rem; }
@@ -914,6 +948,8 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
   .composer-title-tools { flex: 0 0 auto; width: 100%; flex-wrap: wrap; }
   .composer-title-tools .section-title { flex: 1 0 100%; }
   .script-inline-name { flex: 1 1 150px; }
+  .script-transfer-menu { margin-left: auto; }
+  .script-transfer-panel { position: fixed; top: 70px; right: 8px; left: 8px; width: auto; }
   .composer-actions { justify-content: flex-start; }
   .input-type-control button { min-width: 0; }
   .magic-footer { align-items: flex-start; flex-direction: column; gap: 3px; }

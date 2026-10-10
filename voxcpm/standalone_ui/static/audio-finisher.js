@@ -18,6 +18,7 @@ export class AudioFinisher {
     this.responseError = responseError
     this.onError = onError
     this.source = null
+    this.processedOptions = null
     this.$ = (role) => root.querySelector(`[data-finish-role="${role}"]`)
     this.output = new AudioEditor(this.$('output'), {
       label: labels.processed,
@@ -25,7 +26,11 @@ export class AudioFinisher {
       emptyDescription: labels.ready,
       labels: audioEditorLabels,
       onChange: (file) => {
-        if (!file) this.$('preview').hidden = true
+        if (!file) {
+          this.processedOptions = null
+          this.$('preview').hidden = true
+          this.renderStale(false)
+        }
       },
     })
     this.output.container.addEventListener('audio-error', (event) => this.onError(event.detail))
@@ -49,24 +54,25 @@ export class AudioFinisher {
     document.addEventListener('keydown', this.handleDocumentKeyDown)
     this.$('method').addEventListener('change', () => {
       this.renderMethod()
-      this.resetPreview()
+      this.markPreviewStale()
     })
     this.$('preset').addEventListener('change', (event) => {
-      if (event.target.value === 'custom') return this.resetPreview()
+      if (event.target.value === 'custom') return this.markPreviewStale()
       this.applyPreset(event.target.value)
     })
     for (const role of ['pitch', 'speed', 'noise', 'bass', 'presence', 'dynamics']) {
       this.$(role).addEventListener('input', () => {
         this.$('preset').value = 'custom'
         this.renderValues()
-        this.resetPreview()
+        this.markPreviewStale()
       })
     }
     this.$('normalize').addEventListener('change', () => {
       this.$('preset').value = 'custom'
-      this.resetPreview()
+      this.markPreviewStale()
     })
     this.$('save-source').addEventListener('click', () => this.downloadSource())
+    this.$('save-processed').addEventListener('click', () => this.downloadProcessed())
     this.$('create').addEventListener('click', () => this.create())
   }
 
@@ -100,7 +106,7 @@ export class AudioFinisher {
 
   renderMethod() {
     this.$('signalsmith-controls').hidden = this.$('method').value !== 'signalsmith'
-    this.$('method-badge').textContent = this.methodLabel()
+    if (!this.output.currentFile()) this.$('method-badge').textContent = this.methodLabel()
   }
 
   applyPreset(name, { invalidate = true } = {}) {
@@ -116,7 +122,26 @@ export class AudioFinisher {
     })) this.$(role).value = preset[key]
     this.$('normalize').checked = preset.normalize_loudness
     this.renderValues()
-    if (invalidate) this.resetPreview()
+    if (invalidate) this.markPreviewStale()
+  }
+
+  applyOptions(options = {}, { markStale = true } = {}) {
+    if (options.method) this.$('method').value = options.method
+    if (options.preset) this.$('preset').value = options.preset
+    for (const [key, role] of Object.entries({
+      pitch_semitones: 'pitch',
+      speed_factor: 'speed',
+      noise_reduction_db: 'noise',
+      bass_db: 'bass',
+      presence_db: 'presence',
+      dynamics: 'dynamics',
+    })) {
+      if (options[key] !== undefined) this.$(role).value = options[key]
+    }
+    if (options.normalize_loudness !== undefined) this.$('normalize').checked = Boolean(options.normalize_loudness)
+    this.renderValues()
+    this.renderMethod()
+    if (markStale) this.markPreviewStale()
   }
 
   setSource(blob, extension) {
@@ -134,8 +159,20 @@ export class AudioFinisher {
 
   resetPreview() {
     this.output.clear()
+    this.processedOptions = null
     this.$('preview').hidden = true
     this.$('status').hidden = true
+    this.renderStale(false)
+  }
+
+  renderStale(stale) {
+    this.$('preview').classList.toggle('is-stale', Boolean(stale))
+    this.$('stale-badge').hidden = !stale
+  }
+
+  markPreviewStale() {
+    if (!this.output.currentFile()) return
+    this.renderStale(true)
   }
 
   downloadSource() {
@@ -147,6 +184,35 @@ export class AudioFinisher {
     anchor.download = `voxcpmtts-original.${extension}`
     anchor.click()
     setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  downloadProcessed() {
+    if (!this.output.currentFile()) return this.onError(new Error(this.labels.processFirst))
+    this.output.download()
+  }
+
+  snapshot() {
+    const processed = this.output.currentFile()
+    return {
+      source: this.source ? { ...this.source } : null,
+      processed: processed ? { blob: processed, extension: processed.name.split('.').pop() || 'wav' } : null,
+      options: this.options(),
+      processedOptions: this.processedOptions,
+      stale: this.$('preview').classList.contains('is-stale'),
+    }
+  }
+
+  async restore({ source = null, processed = null, options = {}, processedOptions = null, stale = false } = {}) {
+    this.clear()
+    this.applyOptions(options, { markStale: false })
+    if (!source?.blob) return
+    this.setSource(source.blob, source.extension)
+    if (!processed?.blob) return
+    await this.output.load(processed.blob, `voxcpmtts-processed.${processed.extension || 'wav'}`)
+    this.processedOptions = processedOptions || options
+    this.$('method-badge').textContent = this.methodLabel(this.processedOptions.method)
+    this.$('preview').hidden = false
+    this.renderStale(stale)
   }
 
   async create() {
@@ -166,14 +232,17 @@ export class AudioFinisher {
       if (!response.ok) throw new Error(await this.responseError(response))
       const blob = await response.blob()
       await this.output.load(blob, 'voxcpmtts-processed.wav')
+      this.processedOptions = options
+      this.$('method-badge').textContent = this.methodLabel(options.method)
       this.$('preview').hidden = false
+      this.renderStale(false)
       status.dataset.tone = 'success'
       status.textContent = this.labels.complete
     } catch (error) {
-      this.resetPreview()
       status.hidden = false
       status.dataset.tone = 'error'
       status.textContent = error instanceof Error ? error.message : String(error)
+      this.markPreviewStale()
       this.onError(error)
     } finally {
       button.disabled = false
