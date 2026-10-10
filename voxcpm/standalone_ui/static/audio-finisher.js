@@ -35,6 +35,18 @@ export class AudioFinisher {
   }
 
   bind() {
+    this.adjustments = this.root.querySelector('.audio-studio-adjustments')
+    this.handleDocumentPointerDown = (event) => {
+      if (this.adjustments?.open && !this.adjustments.contains(event.target)) this.adjustments.open = false
+    }
+    this.handleDocumentKeyDown = (event) => {
+      if (event.key === 'Escape' && this.adjustments?.open) {
+        this.adjustments.open = false
+        this.adjustments.querySelector('summary')?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', this.handleDocumentPointerDown)
+    document.addEventListener('keydown', this.handleDocumentKeyDown)
     this.$('method').addEventListener('change', () => {
       this.renderMethod()
       this.resetPreview()
@@ -54,6 +66,7 @@ export class AudioFinisher {
       this.$('preset').value = 'custom'
       this.resetPreview()
     })
+    this.$('save-source').addEventListener('click', () => this.downloadSource())
     this.$('create').addEventListener('click', () => this.create())
   }
 
@@ -115,6 +128,7 @@ export class AudioFinisher {
   clear({ hide = true } = {}) {
     this.source = null
     this.resetPreview()
+    if (this.adjustments) this.adjustments.open = false
     if (hide) this.root.hidden = true
   }
 
@@ -122,6 +136,17 @@ export class AudioFinisher {
     this.output.clear()
     this.$('preview').hidden = true
     this.$('status').hidden = true
+  }
+
+  downloadSource() {
+    if (!this.source) return this.onError(new Error(this.labels.generateFirst))
+    const extension = String(this.source.extension || 'wav').replace(/[^a-z0-9]/gi, '') || 'wav'
+    const url = URL.createObjectURL(this.source.blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `voxcpmtts-original.${extension}`
+    anchor.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
   async create() {
@@ -156,6 +181,8 @@ export class AudioFinisher {
   }
 
   destroy() {
+    document.removeEventListener('pointerdown', this.handleDocumentPointerDown)
+    document.removeEventListener('keydown', this.handleDocumentKeyDown)
     this.output.destroy()
   }
 }

@@ -147,6 +147,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="normalize-loudness"' in responses["/"].text
     assert 'id="protect-long-audio"' in responses["/"].text
     assert 'id="generate-finishing"' in responses["/"].text
+    assert 'class="audio-studio-toolbar"' in responses["/"].text
+    assert 'class="audio-studio-source"' in responses["/"].text
+    assert 'data-finish-role="save-source"' in responses["/"].text
     assert 'data-finish-role="output"' in responses["/"].text
     assert 'id="normalize-text"' in responses["/"].text
     assert 'id="timing-settings"' in responses["/"].text
@@ -241,6 +244,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "protect_long_audio: $('#protect-long-audio').checked" in script
     assert "export class AudioFinisher" in audio_finisher
     assert "'/tts/postprocess-upload'" in audio_finisher
+    assert "downloadSource()" in audio_finisher
+    assert "voxcpmtts-original.${extension}" in audio_finisher
     assert "useProfile(profile, 'clone', { editing: true })" in script
     assert "referenceAudio.clear()" in script
     assert "compactGeneratedReferenceText" in script

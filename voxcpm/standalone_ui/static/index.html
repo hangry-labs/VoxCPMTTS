@@ -238,24 +238,34 @@
         </div>
         <div class="inference-progress" id="generate-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong data-i18n="progress.preparing">Preparing request</strong><span data-i18n="progress.gettingReady">VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
         <div class="live-stream-surface" id="stream-live" hidden><canvas id="stream-live-wave" aria-label="Live streamed audio waveform" data-i18n-aria-label="stream.waveform"></canvas><div><strong id="stream-live-state" data-i18n="stream.waiting">Waiting for audio</strong><span id="stream-live-detail">0 KiB buffered</span></div></div>
-        <section class="output-section"><div class="output-heading"><div class="section-title"><i id="generation-output-icon" class="icon-audio-lines"></i><span id="generation-output-title" data-i18n="output.generated">Generated audio</span></div><div><span class="final-badge" id="generation-output-badge" data-i18n="output.final">Final output</span></div></div><div id="generate-result"><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></div><div id="stream-result" hidden><section id="stream-output" aria-live="polite"></section></div>
-          <section class="voice-finishing generate-finishing" id="generate-finishing" hidden>
-            <div class="voice-finishing-heading"><div><div class="section-title"><i class="icon-sliders-horizontal"></i><span data-i18n="finishing.audioTitle">Finish audio</span></div><small data-i18n="finishing.audioDescription">Create a separate polished version while preserving the original</small></div><span class="optional-badge" data-i18n="common.optional">Optional</span></div>
-            <div class="finishing-toolbar">
-              <label class="compact-field"><span data-i18n="finishing.method">Method</span><select data-finish-role="method"><option value="ffmpeg" data-i18n="finishing.ffmpegStudio">FFmpeg Studio</option><option value="signalsmith" data-i18n="finishing.signalsmithVoice">Signalsmith Voice</option></select></label>
-              <label class="compact-field"><span data-i18n="finishing.preset">Preset</span><select data-finish-role="preset"><option value="clean" data-i18n="finishing.clean">Clean</option><option value="studio" selected data-i18n="finishing.studio">Studio</option><option value="custom" data-i18n="finishing.custom">Custom</option></select></label>
+        <section class="output-section audio-studio-section">
+          <section class="voice-finishing generate-finishing audio-studio" id="generate-finishing" hidden>
+            <div class="audio-studio-toolbar">
+              <div class="audio-studio-title"><i id="generation-output-icon" class="icon-audio-lines"></i><span id="generation-output-title" data-i18n="output.generated">Generated audio</span><span class="final-badge" id="generation-output-badge" data-i18n="output.final">Final output</span></div>
+              <label class="audio-studio-select"><span data-i18n="finishing.method">Method</span><select data-finish-role="method"><option value="ffmpeg" data-i18n="finishing.ffmpegStudio">FFmpeg Studio</option><option value="signalsmith" data-i18n="finishing.signalsmithVoice">Signalsmith Voice</option></select></label>
+              <label class="audio-studio-select"><span data-i18n="finishing.preset">Preset</span><select data-finish-role="preset"><option value="clean" data-i18n="finishing.clean">Clean</option><option value="studio" selected data-i18n="finishing.studio">Studio</option><option value="custom" data-i18n="finishing.custom">Custom</option></select></label>
+              <details class="audio-studio-adjustments">
+                <summary><i class="icon-sliders-horizontal"></i><span data-i18n="finishing.adjust">Adjust</span><i class="icon-chevron-down"></i></summary>
+                <div class="audio-studio-adjustment-panel">
+                  <div class="finishing-control-grid signalsmith-control-grid" data-finish-role="signalsmith-controls" hidden>
+                    <label class="range-control"><span class="range-heading"><span data-i18n="finishing.pitch">Pitch</span><output data-finish-role="pitch-value">0 st</output></span><input data-finish-role="pitch" type="range" min="-6" max="6" step="0.5" value="0"></label>
+                    <label class="range-control"><span class="range-heading"><span data-i18n="finishing.speed">Speed</span><output data-finish-role="speed-value">1.00x</output></span><input data-finish-role="speed" type="range" min="0.75" max="1.25" step="0.05" value="1"></label>
+                  </div>
+                  <div class="finishing-control-grid">
+                    <label class="range-control"><span class="range-heading"><span data-i18n="finishing.noise">Noise cleanup</span><output data-finish-role="noise-value">2 dB</output></span><input data-finish-role="noise" type="range" min="0" max="12" step="0.5" value="2"></label>
+                    <label class="range-control"><span class="range-heading"><span data-i18n="finishing.bass">Bass</span><output data-finish-role="bass-value">+1 dB</output></span><input data-finish-role="bass" type="range" min="-6" max="6" step="0.5" value="1"></label>
+                    <label class="range-control"><span class="range-heading"><span data-i18n="finishing.presence">Presence</span><output data-finish-role="presence-value">+1 dB</output></span><input data-finish-role="presence" type="range" min="-6" max="6" step="0.5" value="1"></label>
+                    <label class="range-control"><span class="range-heading"><span data-i18n="finishing.dynamics">Dynamics</span><output data-finish-role="dynamics-value">35%</output></span><input data-finish-role="dynamics" type="range" min="0" max="100" step="5" value="35"></label>
+                  </div>
+                  <label class="toggle-field"><span data-i18n="finishing.normalize">Finish at -16 LUFS</span><input data-finish-role="normalize" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
+                </div>
+              </details>
+              <div class="audio-studio-actions">
+                <button class="secondary-button compact-command" data-finish-role="save-source" type="button" title="Save original audio" data-i18n-title="finishing.saveOriginal"><i class="icon-download"></i><span data-i18n="common.save">Save</span></button>
+                <button class="primary-button compact-command" data-finish-role="create" type="button"><i class="icon-sparkles"></i><span data-i18n="finishing.create">Create processed preview</span></button>
+              </div>
             </div>
-            <div class="finishing-control-grid signalsmith-control-grid" data-finish-role="signalsmith-controls" hidden>
-              <label class="range-control"><span class="range-heading"><span data-i18n="finishing.pitch">Pitch</span><output data-finish-role="pitch-value">0 st</output></span><input data-finish-role="pitch" type="range" min="-6" max="6" step="0.5" value="0"></label>
-              <label class="range-control"><span class="range-heading"><span data-i18n="finishing.speed">Speed</span><output data-finish-role="speed-value">1.00x</output></span><input data-finish-role="speed" type="range" min="0.75" max="1.25" step="0.05" value="1"></label>
-            </div>
-            <div class="finishing-control-grid">
-              <label class="range-control"><span class="range-heading"><span data-i18n="finishing.noise">Noise cleanup</span><output data-finish-role="noise-value">2 dB</output></span><input data-finish-role="noise" type="range" min="0" max="12" step="0.5" value="2"></label>
-              <label class="range-control"><span class="range-heading"><span data-i18n="finishing.bass">Bass</span><output data-finish-role="bass-value">+1 dB</output></span><input data-finish-role="bass" type="range" min="-6" max="6" step="0.5" value="1"></label>
-              <label class="range-control"><span class="range-heading"><span data-i18n="finishing.presence">Presence</span><output data-finish-role="presence-value">+1 dB</output></span><input data-finish-role="presence" type="range" min="-6" max="6" step="0.5" value="1"></label>
-              <label class="range-control"><span class="range-heading"><span data-i18n="finishing.dynamics">Dynamics</span><output data-finish-role="dynamics-value">35%</output></span><input data-finish-role="dynamics" type="range" min="0" max="100" step="5" value="35"></label>
-            </div>
-            <div class="finishing-actions"><label class="toggle-field"><span data-i18n="finishing.normalize">Finish at -16 LUFS</span><input data-finish-role="normalize" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label><button class="primary-button finishing-stage-action" data-finish-role="create" type="button"><i class="icon-sparkles"></i><span data-i18n="finishing.create">Create processed preview</span></button></div>
+            <div class="audio-studio-source"><div id="generate-result"><section id="generate-output" aria-live="polite"></section><section class="timestamp-results" id="generate-timestamp-results" hidden aria-live="polite"></section></div><div id="stream-result" hidden><section id="stream-output" aria-live="polite"></section></div></div>
             <div class="finishing-status" data-finish-role="status" role="status" aria-live="polite" hidden></div>
             <section class="processed-preview" data-finish-role="preview" hidden><div class="output-heading"><div class="section-title"><i class="icon-sparkles"></i><span data-i18n="finishing.processedAudio">Processed audio</span></div><span class="final-badge" data-finish-role="method-badge">FFmpeg Studio</span></div><section data-finish-role="output" aria-live="polite"></section></section>
           </section>

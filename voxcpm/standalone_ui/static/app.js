@@ -1,6 +1,6 @@
 import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
 import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
-import { AudioFinisher } from './audio-finisher.js?v=long-form-audio'
+import { AudioFinisher } from './audio-finisher.js?v=audio-studio'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=app-organization'
 import { GenerationToolbar } from './generation-toolbar.js?v=workflow-controls'
