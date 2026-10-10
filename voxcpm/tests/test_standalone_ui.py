@@ -73,6 +73,7 @@ def test_static_workspace_and_assets_are_available() -> None:
                     "/static/dialogue-script-library.js",
                     "/static/i18n.js",
                     "/static/magic-editor.js",
+                    "/static/magic-toolbar.js",
                     "/static/magic-takes.js",
                     "/static/magic-document.js",
                     "/static/magic-voice-definitions.js",
@@ -190,7 +191,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     gpu_monitor = responses["/static/gpu-monitor.js"].text
     version_check = responses["/static/version-check.js"].text
     script_library = responses["/static/dialogue-script-library.js"].text
+    magic_editor = responses["/static/magic-editor.js"].text
     magic_takes = responses["/static/magic-takes.js"].text
+    styles = responses["/static/styles.css"].text
     assert "IncrementalAudioPlayback" in script
     assert "response.body.getReader()" in script
     assert "await playback.append(value)" in script
@@ -212,6 +215,10 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "async function openMagicCharacterDialog(" in script
     assert "magicEditor.markFullGeneration" in script
     assert "export class MagicTakeStudio" in magic_takes
+    assert "function removableChip(" in magic_editor
+    assert "action.startsWith('clear-')" in magic_editor
+    assert "'clear-rate', 'clear-pitch', 'clear-volume'" in magic_editor
+    assert ".magic-chip-remove" in styles
     assert "'/tts/magic/render'" in magic_takes
     assert "'/tts/magic/take'" in magic_takes
     assert "'/tts/magic/assemble-upload'" in magic_takes
@@ -255,6 +262,7 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
             (static_dir / "audio-finisher.js").read_text(encoding="utf-8"),
             (static_dir / "dialogue-script-library.js").read_text(encoding="utf-8"),
             (static_dir / "magic-editor.js").read_text(encoding="utf-8"),
+            (static_dir / "magic-toolbar.js").read_text(encoding="utf-8"),
             (static_dir / "magic-takes.js").read_text(encoding="utf-8"),
             (static_dir / "magic-voice-definitions.js").read_text(encoding="utf-8"),
             (static_dir / "gpu-monitor.js").read_text(encoding="utf-8"),

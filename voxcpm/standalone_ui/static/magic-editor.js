@@ -1,5 +1,6 @@
 import { t } from './i18n.js'
 import { parseMagicDocument, renderedSpeechText, serializeMagicDocument } from './magic-document.js'
+import { MagicToolbar } from './magic-toolbar.js'
 import { MagicVoiceDefinitions } from './magic-voice-definitions.js'
 
 const DEFAULT_BREAK_MS = 300
@@ -64,6 +65,35 @@ function button(icon, title, action) {
   return control
 }
 
+function chip(className, text, action, title) {
+  const control = document.createElement('button')
+  control.type = 'button'
+  control.className = `magic-chip ${className}`
+  control.dataset.magicAction = action
+  control.textContent = text
+  control.title = title
+  control.setAttribute('aria-label', title)
+  return control
+}
+
+function removableChip(className, text, editAction, clearAction, editTitle, clearTitle) {
+  const group = document.createElement('span')
+  group.className = `magic-chip-group ${className}`
+  const edit = chip(className, text, editAction, editTitle)
+  const remove = document.createElement('button')
+  remove.type = 'button'
+  remove.className = 'magic-chip-remove'
+  remove.dataset.magicAction = clearAction
+  remove.title = clearTitle
+  remove.setAttribute('aria-label', clearTitle)
+  const icon = document.createElement('i')
+  icon.className = 'icon-x'
+  icon.setAttribute('aria-hidden', 'true')
+  remove.append(icon)
+  group.append(edit, remove)
+  return group
+}
+
 function dragHandle(title) {
   const control = document.createElement('button')
   control.type = 'button'
@@ -82,7 +112,6 @@ export class MagicEditor {
     this.languageControl = root.querySelector('#magic-language-control')
     this.directionControl = root.querySelector('#magic-direction-control')
     this.customDirection = root.querySelector('#magic-custom-direction')
-    this.customDirectionField = root.querySelector('.magic-custom-direction-field')
     this.rateControl = root.querySelector('#magic-rate-control')
     this.pitchControl = root.querySelector('#magic-pitch-control')
     this.volumeControl = root.querySelector('#magic-volume-control')
@@ -116,6 +145,7 @@ export class MagicEditor {
     this.pendingDragId = null
     this.draggingId = null
     this.pendingSubstitution = null
+    this.toolbar = new MagicToolbar(root)
     this.definitionEditor = new MagicVoiceDefinitions(document.querySelector('#magic-voice-definitions-dialog'), {
       onChange: (definitions, detail) => this.updateVoiceDefinitions(definitions, detail),
       onError: this.onError,
@@ -166,6 +196,7 @@ export class MagicEditor {
       this.invalidateBlock(block)
       block.language = this.languageControl.value
       this.renderBlocks()
+      this.syncToolbar()
       this.changed()
     })
     this.directionControl.addEventListener('change', () => {
@@ -173,9 +204,9 @@ export class MagicEditor {
       if (!block) return
       this.invalidateBlock(block)
       const custom = this.directionControl.value === '__custom__'
-      this.customDirectionField.hidden = !custom
       block.direction = custom ? this.customDirection.value.trim() : this.directionControl.value
       this.renderBlocks()
+      this.syncToolbar()
       this.changed()
       if (custom) this.customDirection.focus()
     })
@@ -185,6 +216,7 @@ export class MagicEditor {
       this.invalidateBlock(block)
       block.direction = this.customDirection.value.trim()
       this.renderBlocks()
+      this.syncToolbar()
       this.changed()
     })
     this.expressionControl.addEventListener('change', () => {
@@ -201,6 +233,7 @@ export class MagicEditor {
         this.invalidateBlock(block)
         block.prosody[name] = control.value
         this.renderBlocks()
+        this.syncToolbar()
         this.changed()
       })
     }
@@ -221,9 +254,10 @@ export class MagicEditor {
         this.removeAnnotation(Number(blockElement.dataset.magicId), Number(annotationButton.dataset.magicAnnotation))
         return
       }
-      const action = event.target.closest('[data-magic-action]')?.dataset.magicAction
+      const actionControl = event.target.closest('[data-magic-action]')
+      const action = actionControl?.dataset.magicAction
       if (!action || !blockElement) return
-      this.applyBlockAction(Number(blockElement.dataset.magicId), action).catch(this.onError)
+      this.applyBlockAction(Number(blockElement.dataset.magicId), action, actionControl).catch(this.onError)
     })
     this.canvas.addEventListener('input', (event) => {
       const blockElement = event.target.closest('[data-magic-id]')
@@ -569,9 +603,47 @@ export class MagicEditor {
     this.canvas.querySelector(`[data-magic-id="${block.id}"] textarea`)?.focus()
   }
 
-  async applyBlockAction(id, action) {
+  async applyBlockAction(id, action, anchor = null) {
     const index = this.blocks.findIndex((item) => item.id === id)
     if (index < 0) return
+    const block = this.blocks[index]
+    if (action.startsWith('clear-')) {
+      if (action === 'clear-voice') {
+        block.voice = ''
+        block.direction = ''
+      } else if (action === 'clear-direction') {
+        block.direction = ''
+      } else if (action === 'clear-language') {
+        block.language = ''
+      } else if (['clear-rate', 'clear-pitch', 'clear-volume'].includes(action)) {
+        block.prosody[action.slice('clear-'.length)] = ''
+      } else {
+        return
+      }
+      this.invalidateBlock(block)
+      this.toolbar.close()
+      this.render()
+      this.changed()
+      return
+    }
+    if (action === 'edit-voice') {
+      this.toolbar.open('voice', anchor)
+      return
+    }
+    if (action === 'edit-language') {
+      this.toolbar.open('language', anchor)
+      return
+    }
+    if (action === 'edit-direction') {
+      const direction = this.blocks[index].direction
+      const predefined = DIRECTIONS.some(([value]) => value !== '__custom__' && value === direction)
+      this.toolbar.open('direction', anchor, { directionMode: predefined ? 'predefined' : 'custom' })
+      return
+    }
+    if (action === 'edit-transformations') {
+      this.toolbar.open('transformations', anchor)
+      return
+    }
     if (action === 'preview') {
       await this.togglePreview(id)
       return
@@ -581,7 +653,6 @@ export class MagicEditor {
       return
     }
     if (action === 'lock') {
-      const block = this.blocks[index]
       if (!block.preview) return
       block.locked = !block.locked
       this.renderBlocks()
@@ -761,6 +832,7 @@ export class MagicEditor {
 
   activate(id) {
     if (this.activeId === id) return
+    this.toolbar.close()
     this.activeId = id
     this.canvas.querySelectorAll('[data-magic-id]').forEach((element) => {
       element.classList.toggle('active', Number(element.dataset.magicId) === id)
@@ -809,6 +881,12 @@ export class MagicEditor {
       return option
     }))
     if (options.some((voice) => voice.id === selected)) this.voiceControl.value = selected
+    this.toolbar.refreshOptions('voice', options.map((voice) => ({
+      value: voice.id,
+      label: voice.label,
+      portraitUrl: voice.portraitUrl || '',
+      version: voice.version || '',
+    })))
   }
 
   renderLanguageOptions() {
@@ -824,6 +902,7 @@ export class MagicEditor {
       return option
     }))
     if (options.some((language) => language.value === selected)) this.languageControl.value = selected
+    this.toolbar.refreshOptions('language', options)
   }
 
   renderDirectionOptions() {
@@ -834,6 +913,9 @@ export class MagicEditor {
       option.textContent = t(key, {}, fallback)
       return option
     }))
+    this.toolbar.refreshOptions('direction', DIRECTIONS
+      .filter(([value]) => value !== '__custom__')
+      .map(([value, key, fallback]) => ({ value, label: t(key, {}, fallback) })))
   }
 
   renderProsodyOptions() {
@@ -897,9 +979,23 @@ export class MagicEditor {
     heading.className = 'magic-block-heading'
     const metadata = document.createElement('div')
     metadata.className = 'magic-turn-metadata'
-    const voice = document.createElement('span')
-    voice.className = 'magic-chip voice'
-    voice.textContent = block.voice || t('magic.defaultVoice', {}, 'Default voice')
+    const voice = block.voice
+      ? removableChip(
+        'voice',
+        block.voice,
+        'edit-voice',
+        'clear-voice',
+        t('magic.editVoice', {}, 'Change voice'),
+        t('magic.removeVoice', {}, 'Remove voice'),
+      )
+      : chip(
+        'voice',
+        t('magic.defaultVoice', {}, 'Default voice'),
+        'edit-voice',
+        t('magic.editVoice', {}, 'Change voice'),
+      )
+    voice.querySelector?.('.magic-chip')?.toggleAttribute('disabled', !this.supportsVoice)
+    if (voice.matches('button')) voice.disabled = !this.supportsVoice
     metadata.append(voice)
     if (block.locked) {
       const locked = document.createElement('span')
@@ -910,22 +1006,48 @@ export class MagicEditor {
       metadata.append(locked)
     }
     if (block.direction) {
-      const direction = document.createElement('span')
-      direction.className = 'magic-chip direction'
-      direction.textContent = block.direction
+      const direction = removableChip(
+        'direction',
+        block.direction,
+        'edit-direction',
+        'clear-direction',
+        t('magic.editDirection', {}, 'Change direction'),
+        t('magic.removeDirection', {}, 'Remove direction'),
+      )
+      direction.querySelector('.magic-chip').disabled = !this.supportsDirection
+      metadata.append(direction)
+    } else if (block.voice && this.supportsDirection) {
+      const direction = chip(
+        'direction add',
+        '+',
+        'edit-direction',
+        t('magic.addDirection', {}, 'Add direction'),
+      )
       metadata.append(direction)
     }
     if (block.language) {
-      const language = document.createElement('span')
-      language.className = 'magic-chip language'
-      language.textContent = block.language
+      const language = removableChip(
+        'language',
+        block.language,
+        'edit-language',
+        'clear-language',
+        t('magic.editLanguage', {}, 'Change language'),
+        t('magic.removeLanguage', {}, 'Remove language'),
+      )
+      language.querySelector('.magic-chip').disabled = !this.supportsLanguage
       metadata.append(language)
     }
     const prosodyValues = Object.entries(block.prosody || {}).filter(([, value]) => value)
-    if (prosodyValues.length) {
-      const prosody = document.createElement('span')
-      prosody.className = 'magic-chip prosody'
-      prosody.textContent = prosodyValues.map(([name, value]) => `${name}: ${value}`).join(' · ')
+    for (const [name, value] of prosodyValues) {
+      const prosody = removableChip(
+        'prosody',
+        `${t(`magic.${name}`, {}, name)}: ${value}`,
+        'edit-transformations',
+        `clear-${name}`,
+        t('magic.editTransformations', {}, 'Change transformations'),
+        t('magic.removeTransformation', { name: t(`magic.${name}`, {}, name) }, `Remove ${name}`),
+      )
+      prosody.querySelector('.magic-chip').disabled = !this.supportsProsody
       metadata.append(prosody)
     }
     const actions = document.createElement('div')
@@ -1102,8 +1224,13 @@ export class MagicEditor {
     this.volumeControl.disabled = !block || !this.supportsProsody
     this.sayAsControl.disabled = !block || !this.supportedSayAs.size
     this.root.querySelector('#magic-add-substitution').disabled = !block || !this.supportsSubstitution
+    this.toolbar.setDisabled('voice', !block || !this.supportsVoice)
+    this.toolbar.setDisabled('language', !block || !this.supportsLanguage)
+    this.toolbar.setDisabled('direction', !block || !block.voice || !this.supportsVoice || !this.supportsDirection)
+    this.toolbar.setDisabled('transformations', !block || !this.supportsProsody)
+    this.toolbar.setDisabled('expression', !block)
     if (!block) {
-      this.customDirectionField.hidden = true
+      this.toolbar.sync()
       return
     }
     this.voiceControl.value = block.voice
@@ -1114,7 +1241,7 @@ export class MagicEditor {
     const predefined = DIRECTIONS.some(([value]) => value === block.direction)
     this.directionControl.value = predefined ? block.direction : '__custom__'
     this.customDirection.value = predefined ? '' : block.direction
-    this.customDirectionField.hidden = predefined
+    this.toolbar.sync()
   }
 
   plainText() {

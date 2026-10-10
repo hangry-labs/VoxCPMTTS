@@ -132,20 +132,65 @@
         </div>
         <section class="magic-editor-shell" id="magic-editor-shell" aria-label="Magic dialogue editor" data-i18n-aria-label="magic.editorLabel">
           <div class="magic-toolbar" role="toolbar" aria-label="Dialogue tools" data-i18n-aria-label="magic.toolbarLabel">
-            <label class="magic-tool-field"><span data-i18n="magic.voice">Voice</span><select id="magic-voice-control"></select></label>
-            <label class="magic-tool-field magic-language-field"><span data-i18n="magic.language">Language</span><select id="magic-language-control"></select></label>
-            <label class="magic-tool-field"><span data-i18n="magic.direction">Direction</span><select id="magic-direction-control"></select></label>
-            <label class="magic-tool-field magic-custom-direction-field" hidden><span data-i18n="magic.customDirection">Custom direction</span><input id="magic-custom-direction" type="text" maxlength="300" placeholder="Softly, with cautious optimism" data-i18n-placeholder="magic.customDirectionPlaceholder"></label>
-            <label class="magic-tool-field magic-prosody-field"><span data-i18n="magic.rate">Rate</span><select id="magic-rate-control"></select></label>
-            <label class="magic-tool-field magic-prosody-field"><span data-i18n="magic.pitch">Pitch</span><select id="magic-pitch-control"></select></label>
-            <label class="magic-tool-field magic-prosody-field"><span data-i18n="magic.volume">Volume</span><select id="magic-volume-control"></select></label>
-            <label class="magic-tool-field magic-expression-field" title="Inline cues are experimental and may be spoken literally" data-i18n-title="magic.cueHelp"><span data-i18n="magic.cue">Cue (experimental)</span><select id="magic-expression-control"></select></label>
-            <label class="magic-tool-field magic-say-as-field"><span data-i18n="magic.sayAs">Say as</span><select id="magic-say-as-control"></select></label>
+            <div class="magic-menu" data-magic-menu="voice">
+              <button class="magic-category-button" type="button" data-magic-menu-trigger="voice" aria-expanded="false" title="Voice" aria-label="Voice" data-i18n-title="magic.voice" data-i18n-aria-label="magic.voice"><i class="icon-mic"></i><span data-i18n="magic.voice">Voice</span><i class="icon-chevron-down"></i></button>
+              <section class="magic-menu-panel magic-choice-panel" data-magic-menu-panel="voice" hidden>
+                <div class="magic-menu-heading"><strong data-i18n="magic.voice">Voice</strong><span data-magic-current="voice"></span></div>
+                <label class="magic-menu-search"><span class="visually-hidden" data-i18n="profiles.search">Search saved voices</span><input data-magic-filter="voice" type="search" placeholder="Search voices" data-i18n-placeholder="profiles.searchPlaceholder"></label>
+                <div class="magic-menu-list magic-voice-menu-list" data-magic-options="voice"></div>
+                <select id="magic-voice-control" hidden tabindex="-1" aria-hidden="true"></select>
+              </section>
+            </div>
+            <div class="magic-menu" data-magic-menu="language">
+              <button class="magic-category-button" type="button" data-magic-menu-trigger="language" aria-expanded="false" title="Language" aria-label="Language" data-i18n-title="magic.language" data-i18n-aria-label="magic.language"><i class="icon-book-open"></i><span data-i18n="magic.language">Language</span><i class="icon-chevron-down"></i></button>
+              <section class="magic-menu-panel magic-choice-panel" data-magic-menu-panel="language" hidden>
+                <div class="magic-menu-heading"><strong data-i18n="magic.language">Language</strong><span data-magic-current="language"></span></div>
+                <label class="magic-menu-search"><span class="visually-hidden" data-i18n="magic.searchLanguages">Search languages</span><input data-magic-filter="language" type="search" placeholder="Search languages" data-i18n-placeholder="magic.searchLanguages"></label>
+                <div class="magic-menu-list" data-magic-options="language"></div>
+                <select id="magic-language-control" hidden tabindex="-1" aria-hidden="true"></select>
+              </section>
+            </div>
+            <div class="magic-menu" data-magic-menu="direction">
+              <button class="magic-category-button" type="button" data-magic-menu-trigger="direction" aria-expanded="false" title="Direction" aria-label="Direction" data-i18n-title="magic.direction" data-i18n-aria-label="magic.direction"><i class="icon-message-square-text"></i><span data-i18n="magic.direction">Direction</span><i class="icon-chevron-down"></i></button>
+              <section class="magic-menu-panel magic-direction-panel" data-magic-menu-panel="direction" hidden>
+                <div class="magic-menu-heading"><strong data-i18n="magic.direction">Direction</strong><span data-magic-current="direction"></span></div>
+                <div class="magic-direction-layout">
+                  <div class="magic-menu-mode-list">
+                    <button type="button" data-magic-direction-mode="predefined"><i class="icon-sparkles" aria-hidden="true"></i><span data-i18n="magic.predefined">Predefined</span><i class="icon-chevron-down" aria-hidden="true"></i></button>
+                    <button type="button" data-magic-direction-mode="custom"><i class="icon-message-square-text" aria-hidden="true"></i><span data-i18n="magic.directionCustom">Custom...</span><i class="icon-chevron-down" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="magic-menu-detail" data-magic-direction-detail="predefined">
+                    <div class="magic-menu-list" data-magic-options="direction"></div>
+                  </div>
+                  <div class="magic-menu-detail" data-magic-direction-detail="custom" hidden>
+                    <label class="magic-popup-field"><span data-i18n="magic.customDirection">Custom direction</span><input id="magic-custom-direction" type="text" maxlength="300" placeholder="Softly, with cautious optimism" data-i18n-placeholder="magic.customDirectionPlaceholder"></label>
+                  </div>
+                </div>
+                <select id="magic-direction-control" hidden tabindex="-1" aria-hidden="true"></select>
+              </section>
+            </div>
+            <div class="magic-menu" data-magic-menu="transformations">
+              <button class="magic-category-button" type="button" data-magic-menu-trigger="transformations" aria-expanded="false" title="Transform" aria-label="Transform" data-i18n-title="magic.transformations" data-i18n-aria-label="magic.transformations"><i class="icon-sliders-horizontal"></i><span data-i18n="magic.transformations">Transform</span><i class="icon-chevron-down"></i></button>
+              <section class="magic-menu-panel magic-transform-panel" data-magic-menu-panel="transformations" hidden>
+                <div class="magic-menu-heading"><strong data-i18n="magic.transformations">Transform</strong><span data-magic-current="transformations"></span></div>
+                <label class="magic-popup-field"><span data-i18n="magic.rate">Rate</span><select id="magic-rate-control"></select></label>
+                <label class="magic-popup-field"><span data-i18n="magic.pitch">Pitch</span><select id="magic-pitch-control"></select></label>
+                <label class="magic-popup-field"><span data-i18n="magic.volume">Volume</span><select id="magic-volume-control"></select></label>
+              </section>
+            </div>
+            <div class="magic-menu" data-magic-menu="expression">
+              <button class="magic-category-button" type="button" data-magic-menu-trigger="expression" aria-expanded="false" title="Expression" aria-label="Expression" data-i18n-title="magic.expression" data-i18n-aria-label="magic.expression"><i class="icon-sparkles"></i><span data-i18n="magic.expression">Expression</span><i class="icon-chevron-down"></i></button>
+              <section class="magic-menu-panel magic-expression-panel" data-magic-menu-panel="expression" hidden>
+                <div class="magic-menu-heading"><strong data-i18n="magic.expression">Expression</strong></div>
+                <label class="magic-popup-field" title="Inline cues are experimental and may be spoken literally" data-i18n-title="magic.cueHelp"><span data-i18n="magic.cue">Cue (experimental)</span><select id="magic-expression-control"></select></label>
+                <label class="magic-popup-field"><span data-i18n="magic.sayAs">Say as</span><select id="magic-say-as-control"></select></label>
+                <button class="secondary-button compact-command magic-pronunciation-action" id="magic-add-substitution" type="button"><i class="icon-audio-lines"></i><span data-i18n="magic.pronunciation">Pronunciation</span></button>
+              </section>
+            </div>
             <div class="magic-toolbar-actions">
-              <button class="secondary-button compact-command" id="magic-add-substitution" type="button"><i class="icon-audio-lines"></i><span data-i18n="magic.pronunciation">Pronunciation</span></button>
-              <button class="secondary-button compact-command" id="magic-edit-definitions" type="button"><i class="icon-boxes"></i><span data-i18n="magic.characters">Characters</span><span class="magic-definition-count" id="magic-definition-count">0</span></button>
-              <button class="secondary-button compact-command" id="magic-add-pause" type="button"><i class="icon-pause"></i><span data-i18n="magic.addPause">Add pause</span></button>
-              <button class="secondary-button compact-command" id="magic-add-turn" type="button"><i class="icon-message-square-text"></i><span data-i18n="magic.addTurn">Add turn</span></button>
+              <button class="secondary-button compact-command" id="magic-edit-definitions" type="button" title="Characters" aria-label="Characters" data-i18n-title="magic.characters" data-i18n-aria-label="magic.characters"><i class="icon-boxes"></i><span data-i18n="magic.characters">Characters</span><span class="magic-definition-count" id="magic-definition-count">0</span></button>
+              <button class="secondary-button compact-command" id="magic-add-pause" type="button" title="Add pause" aria-label="Add pause" data-i18n-title="magic.addPause" data-i18n-aria-label="magic.addPause"><i class="icon-pause"></i><span data-i18n="magic.addPause">Add pause</span></button>
+              <button class="secondary-button compact-command" id="magic-add-turn" type="button" title="Add turn" aria-label="Add turn" data-i18n-title="magic.addTurn" data-i18n-aria-label="magic.addTurn"><i class="icon-message-square-text"></i><span data-i18n="magic.addTurn">Add turn</span></button>
             </div>
           </div>
           <div class="magic-canvas" id="magic-editor"></div>
