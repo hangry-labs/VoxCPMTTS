@@ -183,6 +183,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="magic-substitution-dialog"' in responses["/"].text
     assert 'id="magic-voice-definitions-dialog"' in responses["/"].text
     assert 'id="magic-character-dialog"' in responses["/"].text
+    assert 'data-character-scope="request"' in responses["/"].text
+    assert 'data-character-scope="profile"' in responses["/"].text
     assert 'id="script-list"' in responses["/"].text
     assert 'id="script-import-input"' in responses["/"].text
     assert 'id="script-download"' in responses["/"].text
@@ -227,6 +229,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "state.inputType === 'magic' ? 'ssml-h' : state.inputType" in script
     assert "async function generateMagicPreview(" in script
     assert "async function openMagicCharacterDialog(" in script
+    assert "function setMagicCharacterScope(" in script
+    assert "magicEditor.addScriptCharacter(" in script
     assert "magicEditor.markFullGeneration" in script
     assert "export class MagicTakeStudio" in magic_takes
     assert "function removableChip(" in magic_editor
@@ -248,6 +252,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "restoreWorkspaceTakes" in magic_editor
     assert "undoDialogue()" in magic_editor
     assert "redoDialogue()" in magic_editor
+    assert "supportsDefaultDirection" in magic_editor
+    assert "addScriptCharacter(id, definition)" in magic_editor
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script

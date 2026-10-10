@@ -5,7 +5,7 @@ import { AudioRecorder } from './audio-recorder.js?v=voice-library'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=workspace-v1'
 import { GenerationToolbar } from './generation-toolbar.js?v=workflow-controls'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
-import { MagicEditor } from './magic-editor.js?v=dialogue-history-2'
+import { MagicEditor } from './magic-editor.js?v=default-direction'
 import { MagicTakeStudio } from './magic-takes.js?v=turn-studio'
 import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
 import { VersionCheck } from './version-check.js?v=published-builds'
@@ -103,6 +103,7 @@ const state = {
   portraitRemoved: false,
   portraitTargetProfile: null,
   magicCharacterBlockId: null,
+  magicCharacterScope: 'request',
   magicCharacterPortraitFile: null,
   magicCharacterPortraitUrl: null,
   pendingDeleteProfile: null,
@@ -1113,7 +1114,8 @@ async function generateMagicPreview(block) {
   try {
     const speechIndex = magicEditor.speechBlocks().findIndex((item) => item.id === block.id)
     if (speechIndex < 0) throw new Error(t('errors.turnMissing', {}, 'This speech turn is no longer in the dialogue.'))
-    const result = await magicTakeStudio.take(magicPreviewPayload(), speechIndex)
+    const payload = magicPreviewPayload()
+    const result = { ...await magicTakeStudio.take(payload, speechIndex), payload }
     setStatus(t('status.turnReady', {}, 'Turn preview ready'), 'success')
     finishActivityPolling('generate', 'complete', t('status.turnReady', {}, 'Turn preview ready'))
     return result
@@ -1136,6 +1138,25 @@ function setMagicCharacterPortrait(file = null) {
   $('#magic-character-portrait-placeholder').hidden = Boolean(state.magicCharacterPortraitUrl)
 }
 
+function setMagicCharacterScope(scope = 'request') {
+  state.magicCharacterScope = scope === 'profile' ? 'profile' : 'request'
+  $$('[data-character-scope]').forEach((button) => {
+    const active = button.dataset.characterScope === state.magicCharacterScope
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-pressed', String(active))
+  })
+  $$('[data-character-persistent]').forEach((element) => {
+    element.hidden = state.magicCharacterScope !== 'profile'
+  })
+  const persistent = state.magicCharacterScope === 'profile'
+  $('#magic-character-copy').textContent = persistent
+    ? t('magic.characterPersistentCopy', {}, 'Store an exact cloned reference in Saved voices for reuse across scripts.')
+    : t('magic.characterScriptCopy', {}, 'Keep this direction and seed as a character inside the current script.')
+  $('#magic-character-submit-label').textContent = persistent
+    ? t('magic.saveCharacterShort', {}, 'Save character')
+    : t('magic.addCharacter', {}, 'Add character')
+}
+
 function commaSeparatedTags(value) {
   const tags = value
     .split(',')
@@ -1153,7 +1174,8 @@ async function openMagicCharacterDialog(block) {
   const turnNumber = Math.max(1, speechTurns.findIndex((item) => item.id === block.id) + 1)
   $('#magic-character-name').value = `character-${turnNumber}`
   $('#magic-character-tags').value = ($('#language').value || 'English').toLowerCase()
-  $('#magic-character-description').value = ''
+  $('#magic-character-description').value = block.direction || ''
+  setMagicCharacterScope('request')
   $('#magic-character-dialog').showModal()
   $('#magic-character-name').focus()
   $('#magic-character-name').select()
@@ -1166,7 +1188,7 @@ function closeMagicCharacterDialog() {
 }
 
 function magicCharacterRecipe(block, preview) {
-  const payload = preview.payload
+  const payload = preview.payload || magicPreviewPayload()
   const spokenText = magicEditor.spokenText(block).trim()
   return {
     design_source: 'reference',
@@ -2246,27 +2268,46 @@ $('#magic-character-portrait').addEventListener('change', (event) => {
   if (file.size > 5 * 1024 * 1024) return showToast(t('errors.portraitSize', {}, 'Voice portraits must be 5 MB or smaller.'))
   setMagicCharacterPortrait(file)
 })
+$$('[data-character-scope]').forEach((button) => {
+  button.addEventListener('click', () => setMagicCharacterScope(button.dataset.characterScope))
+})
 $('#magic-character-form').addEventListener('submit', async (event) => {
   event.preventDefault()
   const blockId = state.magicCharacterBlockId
   const block = magicEditor.block(blockId)
   const name = normalizedProfileName($('#magic-character-name').value)
   if (!block || !name) return showToast(t('errors.nameVoice', {}, 'Name this voice before storing it.'))
-  if (state.profiles.some((profile) => profile.id === name)) {
-    return showToast(t('errors.voiceExists', { name }, `Voice ${name} already exists. Use Edit to refine it.`))
+  if (magicEditor.characterNameExists(name)) {
+    return showToast(t('magic.characterExists', { name }, `Character ${name} already exists.`))
   }
   const button = $('button[type="submit"]', event.currentTarget)
   button.disabled = true
   try {
     const preview = await magicEditor.ensurePreview(block.id)
     if (!preview) throw new Error(t('errors.generateTurnFirst', {}, 'Generate this turn before saving its voice.'))
+    const description = $('#magic-character-description').value.trim() || block.direction.trim()
+    if (state.magicCharacterScope === 'request') {
+      if (!description) {
+        throw new Error(t('magic.characterDescriptionRequired', {}, 'Add a direction or description so this script can recreate the character.'))
+      }
+      magicEditor.addScriptCharacter(block.id, {
+        name,
+        description,
+        sample: magicEditor.spokenText(block).trim(),
+        sampleLanguage: block.language || $('#language').value || 'English',
+        seed: String(Number(preview.seed ?? preview.payload?.seed ?? 42)),
+      })
+      closeMagicCharacterDialog()
+      showToast(t('magic.characterAdded', { name }, `Added ${name} to this script.`), 'success')
+      return
+    }
     const extension = preview.extension || 'wav'
     const file = new File([preview.blob], `${name}.${extension}`, { type: preview.blob.type || 'audio/wav' })
     const selected = $('#voice-profile').value
     const saved = await saveProfileRequest({
       name,
       profileType: 'cloned',
-      description: $('#magic-character-description').value.trim(),
+      description,
       tags: commaSeparatedTags($('#magic-character-tags').value),
       file,
       designFile: file,

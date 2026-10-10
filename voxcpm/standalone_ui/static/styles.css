@@ -593,6 +593,8 @@ button.magic-turn-portrait.ready:hover, button.magic-turn-portrait.ready:focus-v
 #magic-summary { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 @keyframes magic-spin { to { transform: rotate(360deg); } }
 .magic-character-identity { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: end; gap: 10px; }
+.magic-character-destination { width: 100%; margin: 10px 0 4px; }
+.magic-character-destination button { flex: 1 1 50%; }
 .magic-character-portrait { display: grid; width: 58px; height: 58px; overflow: hidden; place-items: center; border: 1px dashed #555861; border-radius: 4px; background: #202126; color: var(--muted); font-size: 1.35rem; font-weight: 800; cursor: pointer; }
 .magic-character-portrait:hover, .magic-character-portrait:focus-within { border-color: var(--accent); background: #251b15; color: var(--text); }
 .magic-character-portrait:has(img:not([hidden])) { border-style: solid; border-color: #4b765f; }

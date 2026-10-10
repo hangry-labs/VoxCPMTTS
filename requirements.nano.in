@@ -21,4 +21,4 @@ wetext
 tqdm
 safetensors
 xxhash
-ssml-h-tools==0.2.0
+ssml-h-tools==0.3.1

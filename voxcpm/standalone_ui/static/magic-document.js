@@ -95,7 +95,8 @@ function serializeSpeech(block) {
     const direction = block.direction ? ` h:direction="${escapeXml(block.direction)}"` : ''
     return `<voice name="${escapeXml(block.voice)}"${direction}>${content}</voice>`
   }
-  return `<s>${content}</s>`
+  const direction = block.direction ? ` h:direction="${escapeXml(block.direction)}"` : ''
+  return `<s${direction}>${content}</s>`
 }
 
 export function serializeMagicDocument(blocks, options = {}) {
@@ -286,7 +287,11 @@ export function parseMagicDocument(source) {
       continue
     }
     if (node.localName === 's' || node.localName === 'lang' || node.localName === 'prosody') {
-      blocks.push(speechBlock(node))
+      blocks.push(speechBlock(node, {
+        direction: node.localName === 's'
+          ? node.getAttributeNS(SSML_H_NAMESPACE, 'direction') || node.getAttribute('h:direction') || ''
+          : '',
+      }))
       continue
     }
     if (node.localName === 'break') {

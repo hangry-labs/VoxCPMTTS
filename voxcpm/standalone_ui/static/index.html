@@ -405,15 +405,19 @@
   </dialog>
   <dialog class="guide-dialog" id="magic-character-dialog">
     <form id="magic-character-form" method="dialog">
-      <div class="dialog-heading"><h2 data-i18n="magic.characterTitle">Save character voice</h2><button class="icon-button" id="magic-character-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div>
-      <p data-i18n="magic.characterCopy">Keep this generated turn as a reusable cloned voice.</p>
+      <div class="dialog-heading"><h2 data-i18n="magic.characterTitle">Add generated character</h2><button class="icon-button" id="magic-character-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div>
+      <p id="magic-character-copy" data-i18n="magic.characterScriptCopy">Keep this generated voice inside the current script.</p>
+      <div class="segmented-control magic-character-destination" role="group" aria-label="Character destination" data-i18n-aria-label="magic.characterDestination">
+        <button class="active" type="button" data-character-scope="request" aria-pressed="true" data-i18n="magic.characterThisScript">This script</button>
+        <button type="button" data-character-scope="profile" aria-pressed="false" data-i18n="magic.characterSavedVoices">Saved voices</button>
+      </div>
       <div class="magic-character-identity">
-        <label class="magic-character-portrait" title="Choose character portrait" data-i18n-title="profiles.choosePortrait"><input class="visually-hidden" id="magic-character-portrait" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"><span id="magic-character-portrait-placeholder" aria-hidden="true">?</span><img id="magic-character-portrait-preview" alt="" hidden></label>
+        <label class="magic-character-portrait" data-character-persistent title="Choose character portrait" data-i18n-title="profiles.choosePortrait"><input class="visually-hidden" id="magic-character-portrait" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"><span id="magic-character-portrait-placeholder" aria-hidden="true">?</span><img id="magic-character-portrait-preview" alt="" hidden></label>
         <label class="field"><span data-i18n="profiles.name">Voice name</span><input id="magic-character-name" type="text" maxlength="48" placeholder="captain" data-i18n-placeholder="magic.characterNamePlaceholder" autocomplete="off" required></label>
       </div>
-      <label class="field"><span><span data-i18n="profiles.tags">Tags</span> <small data-i18n="profiles.commaSeparated">Comma separated</small></span><input id="magic-character-tags" type="text" maxlength="395" placeholder="captain, dramatic, english" data-i18n-placeholder="magic.characterTagsPlaceholder" autocomplete="off"></label>
+      <label class="field" data-character-persistent><span><span data-i18n="profiles.tags">Tags</span> <small data-i18n="profiles.commaSeparated">Comma separated</small></span><input id="magic-character-tags" type="text" maxlength="395" placeholder="captain, dramatic, english" data-i18n-placeholder="magic.characterTagsPlaceholder" autocomplete="off"></label>
       <label class="field"><span><span data-i18n="profiles.description">Description</span> <small data-i18n="common.optional">Optional</small></span><input id="magic-character-description" type="text" maxlength="240" placeholder="Where this voice works best" data-i18n-placeholder="profiles.descriptionPlaceholder"></label>
-      <div class="dialog-actions"><button class="secondary-button" id="magic-character-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="magic.saveCharacterShort">Save character</span></button></div>
+      <div class="dialog-actions"><button class="secondary-button" id="magic-character-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span id="magic-character-submit-label" data-i18n="magic.addCharacter">Add character</span></button></div>
     </form>
   </dialog>
   <dialog class="guide-dialog compact-dialog" id="magic-substitution-dialog">

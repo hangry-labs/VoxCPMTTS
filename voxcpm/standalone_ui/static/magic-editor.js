@@ -138,6 +138,7 @@ export class MagicEditor {
     this.maxBreakMs = 10_000
     this.supportsVoice = true
     this.supportsDirection = true
+    this.supportsDefaultDirection = true
     this.supportsLanguage = true
     this.supportsProsody = true
     this.supportsSubstitution = true
@@ -192,7 +193,6 @@ export class MagicEditor {
       if (!block) return
       this.invalidateBlock(block)
       block.voice = this.voiceControl.value
-      if (!block.voice) block.direction = ''
       this.render()
       this.changed()
     })
@@ -378,7 +378,10 @@ export class MagicEditor {
   setCapabilities(capabilities) {
     const elements = new Set(capabilities?.ssml?.elements || [])
     this.supportsVoice = elements.has('voice')
-    this.supportsDirection = Boolean(capabilities?.ssml_h?.turn_direction?.supported)
+    const directionCapability = capabilities?.ssml_h?.turn_direction
+    const directionElements = new Set(directionCapability?.elements || [directionCapability?.element].filter(Boolean))
+    this.supportsDirection = Boolean(directionCapability?.supported)
+    this.supportsDefaultDirection = this.supportsDirection && directionElements.has('s')
     this.supportsLanguage = elements.has('lang')
     this.supportsProsody = elements.has('prosody')
     this.supportsSubstitution = elements.has('sub')
@@ -463,7 +466,6 @@ export class MagicEditor {
       for (const block of this.blocks) {
         if (block.type === 'speech' && block.voice === detail.removed) {
           block.voice = ''
-          block.direction = ''
           this.invalidateBlock(block)
         }
       }
@@ -619,7 +621,6 @@ export class MagicEditor {
     if (action.startsWith('clear-')) {
       if (action === 'clear-voice') {
         block.voice = ''
-        block.direction = ''
       } else if (action === 'clear-direction') {
         block.direction = ''
       } else if (action === 'clear-language') {
@@ -790,8 +791,30 @@ export class MagicEditor {
     const block = this.block(id)
     if (!block || block.type !== 'speech') return
     block.voice = voice
-    block.direction = ''
     block.captureSeed = null
+    if (block.preview) block.locked = true
+    this.activeId = id
+    this.render()
+    this.changed()
+  }
+
+  characterNameExists(name) {
+    const normalized = String(name || '').toLowerCase()
+    return this.voices.some((voice) => voice.id.toLowerCase() === normalized)
+      || this.documentMeta.voiceDefinitions.some((definition) => definition.name.toLowerCase() === normalized)
+  }
+
+  addScriptCharacter(id, definition) {
+    const block = this.block(id)
+    if (!block || block.type !== 'speech') return
+    if (this.characterNameExists(definition.name)) {
+      throw new Error(t('magic.characterExists', { name: definition.name }, `Character ${definition.name} already exists.`))
+    }
+    this.documentMeta.voiceDefinitions.push({ ...definition, scope: 'request', replace: false })
+    this.definitionEditor.setDefinitions(this.documentMeta.voiceDefinitions)
+    block.voice = definition.name
+    block.captureSeed = null
+    if (block.preview) block.locked = true
     this.activeId = id
     this.render()
     this.changed()
@@ -1058,7 +1081,7 @@ export class MagicEditor {
       )
       direction.querySelector('.magic-chip').disabled = !this.supportsDirection
       metadata.append(direction)
-    } else if (block.voice && this.supportsDirection) {
+    } else if (this.supportsDirection && (block.voice || this.supportsDefaultDirection)) {
       const direction = chip(
         'direction add',
         '+',
@@ -1259,7 +1282,9 @@ export class MagicEditor {
     const block = this.activeSpeech()
     this.voiceControl.disabled = !block || !this.supportsVoice
     this.languageControl.disabled = !block || !this.supportsLanguage
-    this.directionControl.disabled = !block || !block.voice || !this.supportsVoice || !this.supportsDirection
+    this.directionControl.disabled = !block
+      || !this.supportsDirection
+      || (!block.voice && !this.supportsDefaultDirection)
     this.expressionControl.disabled = !block
     this.rateControl.disabled = !block || !this.supportsProsody
     this.pitchControl.disabled = !block || !this.supportsProsody
@@ -1281,10 +1306,10 @@ export class MagicEditor {
     )
     const directionReason = !block
       ? t('magic.directionNeedsTurn', {}, 'Select a dialogue turn before adding direction')
-      : !this.supportsVoice || !this.supportsDirection
+      : !this.supportsDirection
         ? t('magic.directionUnavailable', {}, 'Direction controls are unavailable for this backend')
-        : !block.voice
-          ? t('magic.directionNeedsVoice', {}, 'Choose a character before adding direction')
+        : !block.voice && !this.supportsDefaultDirection
+          ? t('magic.directionNeedsVoice', {}, 'This backend requires a named character before adding direction')
           : ''
     this.toolbar.setDisabled('direction', Boolean(directionReason), directionReason)
     this.toolbar.setDisabled(

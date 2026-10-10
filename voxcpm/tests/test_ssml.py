@@ -79,6 +79,39 @@ def test_ssml_h_compiles_namespaced_turn_direction() -> None:
     assert plan.units[0].direction == "Energetic and delighted"
 
 
+def test_ssml_h_compiles_direction_for_the_default_voice() -> None:
+    document = f'''<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+      xmlns:h="{SSML_H_NAMESPACE}" xml:lang="en-US">
+      <s h:direction="Warm and thoughtful narrator">Welcome aboard.</s>
+    </speak>'''
+
+    plan = compile_ssml(document, "ssml-h", resolve_language=runtime.resolve_ssml_language)
+
+    assert plan.units[0].voice is None
+    assert plan.units[0].direction == "Warm and thoughtful narrator"
+
+
+def test_ssml_h_default_voice_direction_reaches_model_without_reference() -> None:
+    model = _FakeModel()
+    document = f'''<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+      xmlns:h="{SSML_H_NAMESPACE}" xml:lang="en-US">
+      <s h:direction="Warm and thoughtful narrator">Welcome aboard.</s>
+    </speak>'''
+
+    with patch.object(runtime, "get_model", return_value=model):
+        with TestClient(runtime.app) as client:
+            response = client.post(
+                "/tts/generate",
+                json={"text": document, "input_type": "ssml-h", "output_format": "wav"},
+            )
+
+    assert response.status_code == 200, response.text
+    assert len(model.calls) == 1
+    assert model.calls[0]["text"] == "(Warm and thoughtful narrator)Welcome aboard."
+    assert model.calls[0]["reference_wav_path"] is None
+    assert model.calls[0]["prompt_text"] is None
+
+
 def test_turn_direction_requires_the_ssml_h_namespace() -> None:
     document = '<speak><voice name="host" direction="Calm">Welcome back.</voice></speak>'
 
