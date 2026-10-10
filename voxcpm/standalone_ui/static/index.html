@@ -130,6 +130,33 @@
           </div>
           <div class="composer-actions"><div class="segmented-control input-type-control" role="group" aria-label="Input format" data-i18n-aria-label="composer.inputType"><button class="active" type="button" data-input-type="magic" aria-pressed="true" data-i18n="magic.title">Magic</button><button type="button" data-input-type="text" aria-pressed="false">Text</button><button type="button" data-input-type="ssml" aria-pressed="false">SSML</button><button type="button" data-input-type="ssml-h" aria-pressed="false">SSML-H</button></div><span class="text-metrics" id="text-metrics">0 characters</span><button class="secondary-button compact-command" id="sample-button" type="button"><i class="icon-refresh-cw"></i><span data-i18n="composer.newSample">New sample</span></button></div>
         </div>
+        <div class="generation-toolbar" id="generation-toolbar" role="toolbar" aria-label="Generation controls" data-i18n-aria-label="generation.settings">
+          <div class="generation-menu" data-generation-menu="model">
+            <button class="generation-category-button" type="button" data-generation-menu-trigger="model" aria-expanded="false"><i class="icon-sliders-horizontal"></i><span data-i18n="generation.modelControls">Model controls</span><output data-generation-summary="model">2 / 10</output><i class="icon-chevron-down"></i></button>
+            <section class="generation-menu-panel" data-generation-menu-panel="model" hidden>
+              <div class="generation-menu-heading"><strong data-i18n="generation.modelControls">Model controls</strong><button class="icon-button reset-controls" type="button" data-generation-reset title="Reset controls" aria-label="Reset controls" data-i18n-title="generation.reset" data-i18n-aria-label="generation.reset"><i class="icon-rotate-ccw"></i></button></div>
+              <label class="range-control"><span class="range-heading"><span data-i18n="generation.guidance">Guidance</span></span><span class="range-input-row"><input data-generation-proxy="guidance" type="range" min="0.1" max="10" step="0.1" value="2"><input data-generation-proxy="guidance" class="number-input" type="number" min="0.1" max="10" step="0.1" value="2" aria-label="Guidance value" data-i18n-aria-label="generation.guidanceValue"></span></label>
+              <label class="range-control"><span class="range-heading"><span data-i18n="generation.steps">Inference steps</span></span><span class="range-input-row"><input data-generation-proxy="steps" type="range" min="1" max="100" step="1" value="10"><input data-generation-proxy="steps" class="number-input" type="number" min="1" max="100" step="1" value="10" aria-label="Inference steps value" data-i18n-aria-label="generation.stepsValue"></span></label>
+            </section>
+          </div>
+          <div class="generation-menu" data-generation-menu="seed">
+            <button class="generation-category-button" type="button" data-generation-menu-trigger="seed" aria-expanded="false"><i class="icon-square"></i><span data-i18n="generation.seed">Seed</span><output data-generation-summary="seed">Randomize</output><i class="icon-chevron-down"></i></button>
+            <section class="generation-menu-panel generation-seed-panel" data-generation-menu-panel="seed" hidden>
+              <div class="generation-menu-heading"><strong data-i18n="generation.seed">Seed</strong><span><span data-i18n="generation.lastSeed">Last used seed</span> <output data-generation-summary="last-seed">--</output></span></div>
+              <label class="toggle-field"><span data-i18n="generation.randomSeed">Randomize</span><input data-generation-proxy="randomize" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
+              <label class="compact-field"><span data-i18n="generation.seedValue">Seed value</span><input data-generation-proxy="seed" type="number" min="0" max="4294967295" step="1" value="42"></label>
+            </section>
+          </div>
+          <div class="generation-menu" data-generation-menu="output">
+            <button class="generation-category-button" type="button" data-generation-menu-trigger="output" aria-expanded="false"><i class="icon-sparkles"></i><span data-i18n="generation.outputProcessing">Output processing</span><output data-generation-summary="output">2/3</output><i class="icon-chevron-down"></i></button>
+            <section class="generation-menu-panel generation-output-panel" data-generation-menu-panel="output" hidden>
+              <div class="generation-menu-heading"><strong data-i18n="generation.outputProcessing">Output processing</strong><span>-16 LUFS</span></div>
+              <label class="toggle-field"><span><strong data-i18n="generation.protectLongAudio">Protect long audio</strong><small data-i18n="generation.protectLongAudioHelp">Split long passages at natural boundaries</small></span><input data-generation-proxy="protect" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
+              <label class="toggle-field"><span data-i18n="generation.normalize">Normalize loudness</span><input data-generation-proxy="loudness" type="checkbox" checked><span class="toggle-track" aria-hidden="true"></span></label>
+              <label class="toggle-field"><span data-i18n="generation.normalizeText">Normalize text</span><input data-generation-proxy="text" type="checkbox"><span class="toggle-track" aria-hidden="true"></span></label>
+            </section>
+          </div>
+        </div>
         <section class="magic-editor-shell" id="magic-editor-shell" aria-label="Magic dialogue editor" data-i18n-aria-label="magic.editorLabel">
           <div class="magic-toolbar" role="toolbar" aria-label="Dialogue tools" data-i18n-aria-label="magic.toolbarLabel">
             <div class="magic-menu" data-magic-menu="voice">
@@ -200,11 +227,14 @@
       </section>
       <div class="tab-panel" data-panel="generate">
         <div class="generation-command-bar">
-          <div class="segmented-control generation-mode-control" role="group" aria-label="Output mode" data-i18n-aria-label="generation.outputMode">
-            <button class="active" type="button" data-generation-mode="generate" aria-pressed="true"><i class="icon-audio-lines"></i><span data-i18n="tabs.generate">Generate</span></button>
-            <button type="button" data-generation-mode="stream" aria-pressed="false"><i class="icon-radio"></i><span data-i18n="tabs.stream">Stream</span></button>
+          <div class="generation-launch-control">
+            <div class="segmented-control generation-mode-control" role="group" aria-label="Output mode" data-i18n-aria-label="generation.outputMode">
+              <button class="active" type="button" data-generation-mode="generate" aria-pressed="true"><i class="icon-audio-lines"></i><span data-i18n="tabs.generate">Generate</span></button>
+              <button type="button" data-generation-mode="stream" aria-pressed="false"><i class="icon-radio"></i><span data-i18n="tabs.stream">Stream</span></button>
+            </div>
+            <button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span data-i18n="common.generateAudio">Generate audio</span></button>
           </div>
-          <div class="generation-actions"><button class="primary-button" id="generate-button" type="button"><i class="icon-audio-lines"></i><span data-i18n="common.generateAudio">Generate audio</span></button><button class="secondary-button stop-button" id="stream-stop" type="button" disabled hidden data-i18n="common.stop">Stop</button></div>
+          <button class="secondary-button stop-button" id="stream-stop" type="button" disabled hidden data-i18n="common.stop">Stop</button>
         </div>
         <div class="inference-progress" id="generate-progress" hidden role="status" aria-live="polite"><div class="progress-track"><span></span></div><div class="progress-copy"><strong data-i18n="progress.preparing">Preparing request</strong><span data-i18n="progress.gettingReady">VoxCPM is getting ready</span></div><div class="stage-dots" aria-hidden="true"><span data-stage="loading_model"></span><span data-stage="generating"></span><span data-stage="encoding"></span></div></div>
         <div class="live-stream-surface" id="stream-live" hidden><canvas id="stream-live-wave" aria-label="Live streamed audio waveform" data-i18n-aria-label="stream.waveform"></canvas><div><strong id="stream-live-state" data-i18n="stream.waiting">Waiting for audio</strong><span id="stream-live-detail">0 KiB buffered</span></div></div>

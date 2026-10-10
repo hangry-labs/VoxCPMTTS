@@ -172,12 +172,21 @@ export class AudioEditor {
   async load(value, name = null) {
     const file = value instanceof File ? value : fileFromBlob(value, name || 'audio.wav')
     this.disableTrim()
+    this.wave.pause()
+    this.wave.empty()
+    this.setPlayIcon(false)
+    this.currentElement.textContent = '0:00'
+    this.durationElement.textContent = '0:00'
+    this.emptyElement.hidden = false
+    this.setAudioActionsEnabled(false)
     if (this.objectUrl) URL.revokeObjectURL(this.objectUrl)
     this.file = file
     this.objectUrl = URL.createObjectURL(file)
     this.filenameElement.textContent = file.name
     this.container.classList.add('has-audio')
     await this.wave.load(this.objectUrl)
+    this.wave.setTime(0)
+    this.currentElement.textContent = '0:00'
     this.setAudioActionsEnabled(true)
     this.onChange(file)
   }

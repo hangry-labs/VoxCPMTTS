@@ -71,6 +71,7 @@ def test_static_workspace_and_assets_are_available() -> None:
                     "/static/app.js",
                     "/static/audio-finisher.js",
                     "/static/dialogue-script-library.js",
+                    "/static/generation-toolbar.js",
                     "/static/i18n.js",
                     "/static/magic-editor.js",
                     "/static/magic-toolbar.js",
@@ -137,6 +138,10 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="reference-text"' in responses["/"].text
     assert 'id="voice-profile"' in responses["/"].text
     assert 'id="generate-progress"' in responses["/"].text
+    assert 'id="generation-toolbar"' in responses["/"].text
+    assert 'class="generation-launch-control"' in responses["/"].text
+    assert 'data-generation-proxy="normalize-loudness"' not in responses["/"].text
+    assert 'data-generation-proxy="loudness"' in responses["/"].text
     assert 'id="randomize-seed"' in responses["/"].text
     assert 'id="generation-settings"' in responses["/"].text
     assert 'id="normalize-loudness"' in responses["/"].text
@@ -191,6 +196,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     gpu_monitor = responses["/static/gpu-monitor.js"].text
     version_check = responses["/static/version-check.js"].text
     script_library = responses["/static/dialogue-script-library.js"].text
+    generation_toolbar = responses["/static/generation-toolbar.js"].text
     magic_editor = responses["/static/magic-editor.js"].text
     magic_takes = responses["/static/magic-takes.js"].text
     styles = responses["/static/styles.css"].text
@@ -223,6 +229,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "'/tts/magic/take'" in magic_takes
     assert "'/tts/magic/assemble-upload'" in magic_takes
     assert "export class DialogueScriptLibrary" in script_library
+    assert "export class GenerationToolbar" in generation_toolbar
+    assert "class WorkflowValidationError" in script
+    assert "emphasizeRequiredStep" in script
     assert "this.fetchJson('/tts/dialogue-scripts')" in script_library
     assert "this.magicEditor.loadSSMLH" in script_library
     assert "downloadDocument" in script_library
@@ -247,6 +256,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     audio_editor = responses["/static/audio-editor.js"].text
     assert "getComputedStyle(this.waveformElement).height" in audio_editor
     assert "height: waveformHeight" in audio_editor
+    assert "this.wave.empty()" in audio_editor
+    assert "this.wave.setTime(0)" in audio_editor
     assert "portraitFile" in script
     assert "metadataOnly" in script
     assert "Update details" in script

@@ -3,6 +3,7 @@ import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
 import { AudioFinisher } from './audio-finisher.js?v=long-form-audio'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=app-organization'
+import { GenerationToolbar } from './generation-toolbar.js?v=workflow-controls'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
 import { MagicEditor } from './magic-editor.js?v=removable-chips'
 import { MagicTakeStudio } from './magic-takes.js?v=turn-studio'
@@ -112,6 +113,9 @@ const state = {
   magicGenerating: false,
 }
 
+const generationToolbar = new GenerationToolbar($('#generation-toolbar'), {
+  randomLabel: t('generation.randomSeed', {}, 'Randomize'),
+})
 const magicTakeStudio = new MagicTakeStudio({ responseError })
 const magicEditor = new MagicEditor($('#magic-editor-shell'), {
   onChange: handleMagicChange,
@@ -235,6 +239,37 @@ function showToast(message, tone = 'error') {
   toast.hidden = false
   clearTimeout(showToast.timer)
   showToast.timer = setTimeout(() => { toast.hidden = true }, 5000)
+}
+
+class WorkflowValidationError extends Error {
+  constructor(message, targetSelector, focusSelector = null) {
+    super(message)
+    this.name = 'WorkflowValidationError'
+    this.targetSelector = targetSelector
+    this.focusSelector = focusSelector
+  }
+}
+
+function emphasizeRequiredStep(targetSelector, message, focusSelector = null) {
+  const target = $(targetSelector)
+  if (target) {
+    target.classList.remove('requires-attention')
+    void target.offsetWidth
+    target.classList.add('requires-attention')
+    clearTimeout(target.attentionTimer)
+    target.attentionTimer = setTimeout(() => target.classList.remove('requires-attention'), 1900)
+    target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
+  }
+  const focusTarget = focusSelector ? $(focusSelector) : null
+  if (focusTarget && !focusTarget.disabled) setTimeout(() => focusTarget.focus({ preventScroll: true }), 180)
+  showToast(message)
+}
+
+function presentWorkflowValidation(error) {
+  if (!(error instanceof WorkflowValidationError)) return false
+  emphasizeRequiredStep(error.targetSelector, error.message, error.focusSelector)
+  setStatus(error.message, 'error')
+  return true
 }
 
 function setStatus(message, tone = 'neutral') {
@@ -572,6 +607,7 @@ function restoreProfileGenerationSettings(profile) {
     $('#output-format').value = recipe.output_format
   }
   updateSeedState()
+  generationToolbar.sync()
 }
 
 function restoreProfileRecipe(profile) {
@@ -840,6 +876,7 @@ function updateSeedState() {
     ? t('generation.seedUnlocked', {}, 'Seed unlocked')
     : t('generation.seedLocked', {}, 'Seed locked')
   lockButton.classList.toggle('active', !randomized)
+  generationToolbar.sync()
 }
 
 function updateTimestampState() {
@@ -893,24 +930,56 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
   return payload
 }
 
-async function requestAudioResponse(options = {}) {
-  const { workflow = state.activeTab, streaming = false, signal, payloadOverride = null } = options
+function prepareAudioRequest(options = {}) {
+  const { workflow = state.activeTab, streaming = false, payloadOverride = null } = options
   const payload = payloadOverride || buildPayload({ workflow, streaming })
-  if (!payload.text) throw new Error(t('errors.textRequired', {}, 'Enter text to synthesize.'))
-  const needsReference = workflow === 'clone' && payload.voice === 'reference'
+  const cloning = workflow === 'clone'
+  const needsReference = cloning && payload.voice === 'reference'
   const reference = Object.prototype.hasOwnProperty.call(options, 'referenceOverride')
     ? options.referenceOverride
     : referenceAudio.currentFile()
   const profile = state.profiles.find((item) => item.id === payload.voice_profile) || null
+
+  const hasText = cloning
+    ? Boolean(payload.text)
+    : state.inputType === 'magic' && !payloadOverride
+      ? Boolean(magicEditor.plainText())
+      : Boolean(payload.text)
+  if (!hasText) {
+    throw new WorkflowValidationError(
+      t('errors.textRequired', {}, 'Enter text to synthesize.'),
+      cloning ? '#design-composer' : '#composer',
+      cloning ? '#design-text-input' : state.inputType === 'magic' ? '.magic-turn.active textarea, .magic-turn textarea' : '#text-input',
+    )
+  }
   if (needsReference && !reference && profile?.profile_type !== 'cloned') {
-    throw new Error(t('errors.referenceRequired', {}, 'Choose or record reference audio, or select a saved cloned voice.'))
+    throw new WorkflowValidationError(
+      t('errors.referenceRequired', {}, 'Choose or record reference audio, or select a saved cloned voice.'),
+      '#reference-audio-drop',
+      '#reference-audio-choose',
+    )
   }
   if (needsReference && payload.clone_mode === 'transcript' && !payload.ref_text && !profile?.has_transcript) {
-    throw new Error(t('errors.transcriptRequired', {}, 'Enter or transcribe the reference words for transcript-guided cloning.'))
+    throw new WorkflowValidationError(
+      t('errors.transcriptRequired', {}, 'Enter or transcribe the reference words for transcript-guided cloning.'),
+      '#clone-transcript-panel',
+      '#reference-text',
+    )
   }
-  if (workflow === 'clone' && !needsReference && !payload.control) {
-    throw new Error(t('errors.directionRequired', {}, 'Describe the voice you want to design.'))
+  if (cloning && !needsReference && !payload.control) {
+    throw new WorkflowValidationError(
+      t('errors.directionRequired', {}, 'Describe the voice you want to design.'),
+      '#clone-direction-panel',
+      '#clone-control-input',
+    )
   }
+  return { payload, reference }
+}
+
+async function requestAudioResponse(options = {}) {
+  const { workflow = state.activeTab, streaming = false, signal } = options
+  const { payload, reference } = prepareAudioRequest(options)
+  const needsReference = workflow === 'clone' && payload.voice === 'reference'
 
   const route = streaming ? '/tts/stream' : '/tts/generate'
   let response
@@ -1153,13 +1222,20 @@ function setGenerationBusy(active, workflow = 'generate') {
 }
 
 async function generateMagicAudio() {
+  let prepared
+  try {
+    prepared = prepareAudioRequest({ workflow: 'generate' })
+  } catch (error) {
+    if (!presentWorkflowValidation(error)) showToast(errorMessage(error))
+    return
+  }
   cancelMagicAssembly()
   state.magicGenerating = true
   generateFinisher.clear()
   setGenerationBusy(true, 'generate')
   startActivityPolling('generate')
   setStatus(t('status.generatingMagic', {}, 'Generating dialogue takes'))
-  const payload = buildPayload({ workflow: 'generate' })
+  const payload = prepared.payload
   try {
     const result = await magicTakeStudio.render(payload, magicEditor.blocks)
     magicEditor.applyTakes(result.takes)
@@ -1168,13 +1244,14 @@ async function generateMagicAudio() {
     if (Number.isInteger(result.requestSeed)) {
       $('#last-generated-seed').value = result.requestSeed
       $('#seed').value = result.requestSeed
+      generationToolbar.sync()
     }
     await alignGeneratedAudio('generate', result.output.blob, result.output.extension, payload)
     setStatus(t('status.complete', {}, 'Generation complete'), 'success')
     finishActivityPolling('generate', 'complete', t('progress.complete', {}, 'Audio is ready'))
   } catch (error) {
     setStatus(errorMessage(error), 'error')
-    showToast(errorMessage(error))
+    if (!presentWorkflowValidation(error)) showToast(errorMessage(error))
     finishActivityPolling('generate', 'failed', errorMessage(error))
   } finally {
     state.magicGenerating = false
@@ -1184,6 +1261,13 @@ async function generateMagicAudio() {
 
 async function generateAudio(workflow = 'generate') {
   if (workflow === 'generate' && state.inputType === 'magic') return generateMagicAudio()
+  let prepared
+  try {
+    prepared = prepareAudioRequest({ workflow })
+  } catch (error) {
+    if (!presentWorkflowValidation(error)) showToast(errorMessage(error))
+    return
+  }
   const output = workflow === 'clone' ? cloneOutput : generateOutput
   if (workflow === 'generate') generateFinisher.clear()
   if (workflow === 'clone') {
@@ -1195,7 +1279,11 @@ async function generateAudio(workflow = 'generate') {
   startActivityPolling(workflow)
   setStatus(t('status.generating', {}, 'Generating audio'))
   try {
-    const { blob, extension, seed, payload, reference } = await requestAudio({ workflow })
+    const { blob, extension, seed, payload, reference } = await requestAudio({
+      workflow,
+      payloadOverride: prepared.payload,
+      referenceOverride: prepared.reference,
+    })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
     if (workflow === 'generate') generateFinisher.setSource(blob, extension)
     if (workflow === 'clone') {
@@ -1221,6 +1309,7 @@ async function generateAudio(workflow = 'generate') {
     if (seed !== null) {
       $('#last-generated-seed').value = seed
       $('#seed').value = seed
+      generationToolbar.sync()
       if (workflow === 'generate' && state.inputType === 'magic') magicEditor.markFullGeneration(Number(seed))
     }
     await alignGeneratedAudio(workflow, blob, extension, payload)
@@ -1228,7 +1317,7 @@ async function generateAudio(workflow = 'generate') {
     finishActivityPolling(workflow, 'complete', t('progress.complete', {}, 'Audio is ready'))
   } catch (error) {
     setStatus(errorMessage(error), 'error')
-    showToast(errorMessage(error))
+    if (!presentWorkflowValidation(error)) showToast(errorMessage(error))
     finishActivityPolling(workflow, 'failed', errorMessage(error))
   } finally {
     setGenerationBusy(false, workflow)
@@ -1238,6 +1327,13 @@ async function generateAudio(workflow = 'generate') {
 const streamWaveform = new StreamWaveform($('#stream-live-wave'), $('#stream-live'), $('#stream-live-state'), $('#stream-live-detail'))
 
 async function streamAudio() {
+  let prepared
+  try {
+    prepared = prepareAudioRequest({ workflow: 'stream', streaming: true })
+  } catch (error) {
+    if (!presentWorkflowValidation(error)) showToast(errorMessage(error))
+    return
+  }
   const controller = new AbortController()
   const chunks = []
   let playback = null
@@ -1253,11 +1349,18 @@ async function streamAudio() {
   try {
     playback = await IncrementalAudioPlayback.create(streamWaveform)
     state.streamPlayback = playback
-    const { response } = await requestAudioResponse({ workflow: 'stream', streaming: true, signal: controller.signal })
+    const { response } = await requestAudioResponse({
+      workflow: 'stream',
+      streaming: true,
+      signal: controller.signal,
+      payloadOverride: prepared.payload,
+      referenceOverride: prepared.reference,
+    })
     const seed = response.headers.get('X-VoxCPM-Seed')
     if (seed !== null) {
       $('#last-generated-seed').value = seed
       $('#seed').value = seed
+      generationToolbar.sync()
       completedSeed = Number(seed)
     }
     if (!response.body) throw new Error(t('errors.streamUnavailable', {}, 'Streaming response body is unavailable in this browser.'))
@@ -1307,7 +1410,7 @@ async function streamAudio() {
     }
     else {
       setStatus(errorMessage(error), 'error')
-      showToast(errorMessage(error))
+      if (!presentWorkflowValidation(error)) showToast(errorMessage(error))
       finishActivityPolling('stream', 'failed', errorMessage(error))
     }
   } finally {
@@ -1320,7 +1423,13 @@ async function streamAudio() {
 
 async function transcribeReference() {
   const file = referenceAudio.currentFile()
-  if (!file) return showToast(t('errors.referenceFirst', {}, 'Choose or record reference audio first.'))
+  if (!file) {
+    return emphasizeRequiredStep(
+      '#reference-audio-drop',
+      t('errors.referenceFirst', {}, 'Choose or record reference audio first.'),
+      '#reference-audio-choose',
+    )
+  }
   const button = $('#transcribe-reference')
   const label = button.querySelector('span')
   button.disabled = true
@@ -1519,7 +1628,13 @@ async function requestPostProcessedAudio(blob, extension, options) {
 
 async function processDesignedVoice() {
   const generated = state.lastCloneGeneration
-  if (!generated) return showToast(t('errors.generateBeforeProcess', {}, 'Generate a voice before processing it.'))
+  if (!generated) {
+    return emphasizeRequiredStep(
+      '#clone-output-section',
+      t('errors.generateBeforeProcess', {}, 'Generate a voice before processing it.'),
+      '#clone-button',
+    )
+  }
   const button = $('#post-process-voice')
   const status = $('#post-processing-status')
   const options = postProcessingOptions()
@@ -1618,10 +1733,20 @@ async function prepareGeneratedVoiceReference() {
 
 function openQuickSaveDialog(profileType) {
   if (profileType === 'clone-generated' && !state.lastCloneGeneration) {
-    return showToast(t('errors.generateDesignedFirst', {}, 'Generate a designed voice before storing it.'))
+    return emphasizeRequiredStep(
+      '#clone-output-section',
+      t('errors.generateDesignedFirst', {}, 'Generate a designed voice before storing it.'),
+      '#clone-button',
+    )
   }
   const name = normalizedProfileName($('#design-voice-name').value)
-  if (!name) return showToast(t('errors.nameVoice', {}, 'Name this voice before storing it.'))
+  if (!name) {
+    return emphasizeRequiredStep(
+      '#design-identity',
+      t('errors.nameVoice', {}, 'Name this voice before storing it.'),
+      '#design-voice-name',
+    )
+  }
   if (state.profiles.some((profile) => profile.id === name)) return showToast(t('errors.voiceExists', { name }, `Voice ${name} already exists. Use Edit to refine it.`))
   state.quickSaveType = profileType
   $('#save-profile-title').textContent = t('profiles.storeNamed', { name }, `Store ${name}`)
@@ -1771,11 +1896,17 @@ function setHeaderCollapsed(collapsed) {
 function bindRangeInputs() {
   $$('[data-value-input]').forEach((range) => {
     const number = $(`#${range.dataset.valueInput}`)
-    range.addEventListener('input', () => { number.value = range.value })
+    range.addEventListener('input', () => {
+      number.value = range.value
+      generationToolbar.sync()
+    })
   })
   $$('[data-range-input]').forEach((number) => {
     const range = $(`#${number.dataset.rangeInput}`)
-    number.addEventListener('input', () => { range.value = number.value })
+    number.addEventListener('input', () => {
+      range.value = number.value
+      generationToolbar.sync()
+    })
   })
 }
 
@@ -1791,6 +1922,7 @@ function resetControls() {
   $('#seed').value = state.defaults.seed ?? 42
   $('#randomize-seed').checked = state.defaults.randomize_seed ?? true
   updateSeedState()
+  generationToolbar.sync()
 }
 
 async function initialize() {
@@ -2169,6 +2301,7 @@ $('#stream-stop').addEventListener('click', () => {
 })
 $('#transcribe-reference').addEventListener('click', transcribeReference)
 $('#reset-controls').addEventListener('click', resetControls)
+$$('[data-generation-reset]').forEach((button) => button.addEventListener('click', resetControls))
 $('#api-refresh').addEventListener('click', () => refreshApi().catch((error) => showToast(errorMessage(error))))
 $('#system-refresh').addEventListener('click', refreshSystem)
 $('#purge-models').addEventListener('click', async () => {

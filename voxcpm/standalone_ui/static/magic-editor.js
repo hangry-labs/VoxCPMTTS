@@ -1224,11 +1224,33 @@ export class MagicEditor {
     this.volumeControl.disabled = !block || !this.supportsProsody
     this.sayAsControl.disabled = !block || !this.supportedSayAs.size
     this.root.querySelector('#magic-add-substitution').disabled = !block || !this.supportsSubstitution
-    this.toolbar.setDisabled('voice', !block || !this.supportsVoice)
-    this.toolbar.setDisabled('language', !block || !this.supportsLanguage)
-    this.toolbar.setDisabled('direction', !block || !block.voice || !this.supportsVoice || !this.supportsDirection)
-    this.toolbar.setDisabled('transformations', !block || !this.supportsProsody)
-    this.toolbar.setDisabled('expression', !block)
+    const turnReason = !block
+      ? t('magic.controlNeedsTurn', {}, 'Select a dialogue turn to use this control')
+      : ''
+    this.toolbar.setDisabled(
+      'voice',
+      !block || !this.supportsVoice,
+      turnReason || t('magic.voiceUnavailable', {}, 'Voice selection is unavailable for this backend'),
+    )
+    this.toolbar.setDisabled(
+      'language',
+      !block || !this.supportsLanguage,
+      turnReason || t('magic.languageUnavailable', {}, 'Language control is unavailable for this backend'),
+    )
+    const directionReason = !block
+      ? t('magic.directionNeedsTurn', {}, 'Select a dialogue turn before adding direction')
+      : !this.supportsVoice || !this.supportsDirection
+        ? t('magic.directionUnavailable', {}, 'Direction controls are unavailable for this backend')
+        : !block.voice
+          ? t('magic.directionNeedsVoice', {}, 'Choose a character before adding direction')
+          : ''
+    this.toolbar.setDisabled('direction', Boolean(directionReason), directionReason)
+    this.toolbar.setDisabled(
+      'transformations',
+      !block || !this.supportsProsody,
+      turnReason || t('magic.prosodyUnavailable', {}, 'Prosody controls are unavailable for this backend'),
+    )
+    this.toolbar.setDisabled('expression', !block, turnReason)
     if (!block) {
       this.toolbar.sync()
       return

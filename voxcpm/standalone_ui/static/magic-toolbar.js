@@ -43,6 +43,7 @@ export class MagicToolbar {
       wrapper: menu,
       trigger: menu.querySelector('[data-magic-menu-trigger]'),
       panel: menu.querySelector('[data-magic-menu-panel]'),
+      label: menu.querySelector('[data-magic-menu-trigger]')?.title || '',
     }]))
     this.bind()
   }
@@ -187,10 +188,13 @@ export class MagicToolbar {
     if (mode === 'custom') requestAnimationFrame(() => this.root.querySelector('#magic-custom-direction')?.focus())
   }
 
-  setDisabled(name, disabled) {
+  setDisabled(name, disabled, reason = '') {
     const menu = this.menus.get(name)
     if (!menu) return
     menu.trigger.disabled = disabled
+    menu.wrapper.title = disabled ? reason : ''
+    menu.trigger.title = disabled ? reason : menu.label
+    menu.trigger.setAttribute('aria-label', disabled && reason ? reason : menu.label)
     if (disabled && this.openName === name) this.close()
   }
 
