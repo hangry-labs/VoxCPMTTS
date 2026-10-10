@@ -33,12 +33,15 @@ Denne Hangry Labs-versjonen er laget for enkel lokal bruk. Start én container, 
 
 **Språk:** VoxCPM2 støtter offisielt [30 språk og ni kinesiske dialektgrupper](SUPPORTED_LANGUAGES.md).
 
+> [!TIP]
+> **Lytt før installasjon:** Åpne det [interaktive eksempelgalleriet med 30 språk](https://hangry-labs.github.io/VoxCPMTTS/examples/) for stemmedesign, kloning og en utvalgt Magic-dialog.
+
 > [!IMPORTANT]
 > Prosjektets egen og oppstrømsavledede kildekode bruker Apache-2.0. Docker-bildene er samlede distribusjoner som også inneholder modellressurser, NVIDIA CUDA-biblioteker, FFmpeg og andre pakker med egne vilkår. Les [merknadene om tredjepartskomponenter](THIRD_PARTY_NOTICES.md) før distribusjon eller videredistribusjon.
 
 ### Bygg komplette dialogmanus
 
-Bruk Magic-redigereren til å sette sammen scener med flere talere visuelt, tilordne lagrede stemmer, styre hver fremføring, forhåndsvise enkeltreplikker og lagre hele dialogen som portabel SSML-H.
+Bruk Magic-redigereren til å sette sammen scener med flere talere visuelt, tilordne lagrede eller manusdefinerte stemmer, styre språk, tempo, tonehøyde, volum og regi for hver replikk, merke uttaleområder, forhåndsvise enkeltreplikker, dra dem i ønsket rekkefølge og lagre hele dialogen som portabel SSML-H.
 
 <p align="center">
   <a href="assets/screenshots/generate-ui.webp">

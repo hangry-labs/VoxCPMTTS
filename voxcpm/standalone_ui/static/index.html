@@ -123,10 +123,17 @@
         <section class="magic-editor-shell" id="magic-editor-shell" aria-label="Magic dialogue editor" data-i18n-aria-label="magic.editorLabel">
           <div class="magic-toolbar" role="toolbar" aria-label="Dialogue tools" data-i18n-aria-label="magic.toolbarLabel">
             <label class="magic-tool-field"><span data-i18n="magic.voice">Voice</span><select id="magic-voice-control"></select></label>
+            <label class="magic-tool-field magic-language-field"><span data-i18n="magic.language">Language</span><select id="magic-language-control"></select></label>
             <label class="magic-tool-field"><span data-i18n="magic.direction">Direction</span><select id="magic-direction-control"></select></label>
             <label class="magic-tool-field magic-custom-direction-field" hidden><span data-i18n="magic.customDirection">Custom direction</span><input id="magic-custom-direction" type="text" maxlength="300" placeholder="Softly, with cautious optimism" data-i18n-placeholder="magic.customDirectionPlaceholder"></label>
+            <label class="magic-tool-field magic-prosody-field"><span data-i18n="magic.rate">Rate</span><select id="magic-rate-control"></select></label>
+            <label class="magic-tool-field magic-prosody-field"><span data-i18n="magic.pitch">Pitch</span><select id="magic-pitch-control"></select></label>
+            <label class="magic-tool-field magic-prosody-field"><span data-i18n="magic.volume">Volume</span><select id="magic-volume-control"></select></label>
             <label class="magic-tool-field magic-expression-field" title="Inline cues are experimental and may be spoken literally" data-i18n-title="magic.cueHelp"><span data-i18n="magic.cue">Cue (experimental)</span><select id="magic-expression-control"></select></label>
+            <label class="magic-tool-field magic-say-as-field"><span data-i18n="magic.sayAs">Say as</span><select id="magic-say-as-control"></select></label>
             <div class="magic-toolbar-actions">
+              <button class="secondary-button compact-command" id="magic-add-substitution" type="button"><i class="icon-audio-lines"></i><span data-i18n="magic.pronunciation">Pronunciation</span></button>
+              <button class="secondary-button compact-command" id="magic-edit-definitions" type="button"><i class="icon-boxes"></i><span data-i18n="magic.characters">Characters</span><span class="magic-definition-count" id="magic-definition-count">0</span></button>
               <button class="secondary-button compact-command" id="magic-add-pause" type="button"><i class="icon-pause"></i><span data-i18n="magic.addPause">Add pause</span></button>
               <button class="secondary-button compact-command" id="magic-add-turn" type="button"><i class="icon-message-square-text"></i><span data-i18n="magic.addTurn">Add turn</span></button>
             </div>
@@ -302,6 +309,46 @@
       <label class="field"><span><span data-i18n="profiles.description">Description</span> <small data-i18n="common.optional">Optional</small></span><input id="magic-character-description" type="text" maxlength="240" placeholder="Where this voice works best" data-i18n-placeholder="profiles.descriptionPlaceholder"></label>
       <div class="dialog-actions"><button class="secondary-button" id="magic-character-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="magic.saveCharacterShort">Save character</span></button></div>
     </form>
+  </dialog>
+  <dialog class="guide-dialog compact-dialog" id="magic-substitution-dialog">
+    <form id="magic-substitution-form" method="dialog">
+      <div class="dialog-heading"><h2 data-i18n="magic.pronunciationTitle">Pronunciation override</h2><button class="icon-button" id="magic-substitution-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div>
+      <p data-i18n="magic.pronunciationCopy">Keep the selected text in the script while sending different written text to the speech model.</p>
+      <div class="magic-selected-text"><span data-i18n="magic.selectedText">Selected text</span><output id="magic-substitution-source"></output></div>
+      <label class="field"><span data-i18n="magic.speakAs">Speak as</span><input id="magic-substitution-alias" type="text" maxlength="300" autocomplete="off" required placeholder="Text the model should pronounce" data-i18n-placeholder="magic.speakAsPlaceholder"></label>
+      <div class="dialog-actions"><button class="secondary-button" id="magic-substitution-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="magic.applyPronunciation">Apply pronunciation</span></button></div>
+    </form>
+  </dialog>
+  <dialog class="guide-dialog magic-definitions-dialog" id="magic-voice-definitions-dialog">
+    <div class="dialog-heading"><div><h2 data-i18n="magic.definitionsTitle">Script characters</h2><p data-i18n="magic.definitionsCopy">Design temporary or persistent voices stored inside this SSML-H document.</p></div><button class="icon-button" id="magic-definition-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div>
+    <div class="magic-definition-workspace">
+      <aside class="magic-definition-sidebar">
+        <div class="magic-definition-sidebar-heading"><strong data-i18n="magic.characters">Characters</strong><span id="magic-definition-summary">0 of 12 characters</span></div>
+        <select id="magic-definition-list" size="7" aria-label="Script characters" data-i18n-aria-label="magic.characters"></select>
+        <div class="magic-definition-list-actions"><button class="secondary-button compact-command" id="magic-definition-add" type="button"><i class="icon-message-square-text"></i><span data-i18n="magic.definitionAdd">New</span></button><button class="danger-button compact-command" id="magic-definition-delete" type="button"><i class="icon-x"></i><span data-i18n="common.delete">Delete</span></button></div>
+      </aside>
+      <form id="magic-definition-form">
+        <h3 id="magic-definition-form-title" data-i18n="magic.definitionNew">New character</h3>
+        <div class="magic-definition-grid">
+          <label class="field"><span data-i18n="profiles.name">Voice name</span><input name="name" type="text" maxlength="64" autocomplete="off" required placeholder="Captain" data-i18n-placeholder="magic.definitionNamePlaceholder"></label>
+          <label class="field"><span data-i18n="magic.definitionScope">Scope</span><select name="scope"><option value="request" data-i18n="magic.scopeRequest">This request</option><option value="profile" data-i18n="magic.scopeProfile">Save as voice</option></select></label>
+          <label class="field magic-definition-wide"><span data-i18n="profiles.description">Description</span><input name="description" type="text" maxlength="500" placeholder="A calm, experienced ship captain" data-i18n-placeholder="magic.definitionDescriptionPlaceholder"></label>
+          <label class="field"><span data-i18n="magic.gender">Gender</span><input name="gender" type="text" maxlength="80" placeholder="male" data-i18n-placeholder="magic.genderPlaceholder"></label>
+          <label class="field"><span data-i18n="magic.age">Age</span><input name="age" type="text" maxlength="80" placeholder="middle-aged" data-i18n-placeholder="magic.agePlaceholder"></label>
+          <label class="field"><span data-i18n="magic.definitionPitch">Voice pitch</span><input name="pitch" type="text" maxlength="80" placeholder="low" data-i18n-placeholder="magic.pitchPlaceholder"></label>
+          <label class="field"><span data-i18n="magic.style">Style</span><input name="style" type="text" maxlength="120" placeholder="warm and confident" data-i18n-placeholder="magic.stylePlaceholder"></label>
+          <label class="field"><span data-i18n="magic.languages">Languages</span><input name="languages" type="text" maxlength="240" placeholder="en-US pl-PL" data-i18n-placeholder="magic.languagesPlaceholder"></label>
+          <label class="field"><span data-i18n="magic.accent">Accent</span><input name="accent" type="text" maxlength="120" placeholder="american" data-i18n-placeholder="magic.accentPlaceholder"></label>
+          <label class="field"><span data-i18n="magic.dialect">Dialect</span><input name="dialect" type="text" maxlength="120" placeholder="midwestern" data-i18n-placeholder="magic.dialectPlaceholder"></label>
+          <label class="field"><span data-i18n="generation.seed">Seed</span><input name="seed" type="number" min="0" max="4294967295" step="1" placeholder="4242"></label>
+          <label class="field magic-definition-wide"><span data-i18n="magic.sampleText">Design sample text</span><input name="sample" type="text" maxlength="500" placeholder="My name is Captain Marek. The ship is ready." data-i18n-placeholder="magic.samplePlaceholder"></label>
+          <label class="field"><span data-i18n="magic.sampleLanguage">Sample language</span><input name="sampleLanguage" type="text" maxlength="40" placeholder="en-US" data-i18n-placeholder="magic.sampleLanguagePlaceholder"></label>
+          <label class="toggle-field magic-definition-replace"><input name="replace" type="checkbox"><span class="toggle-track" aria-hidden="true"></span><span data-i18n="magic.definitionReplace">Replace an existing saved voice with this name</span></label>
+        </div>
+        <div class="dialog-actions"><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="magic.definitionApply">Apply character</span></button></div>
+      </form>
+    </div>
+    <div class="dialog-actions"><button class="secondary-button" id="magic-definition-done" type="button" data-i18n="common.done">Done</button></div>
   </dialog>
   <dialog class="confirm-dialog" id="update-profile-dialog"><div class="dialog-heading"><h2 id="update-profile-title" data-i18n="profiles.replaceTitle">Replace saved voice?</h2><button class="icon-button" id="update-profile-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div><p id="update-profile-copy"><span data-i18n="profiles.replacePrefix">Replace</span> <strong id="update-profile-name"></strong> <span data-i18n="profiles.replaceSuffix">with this newly refined voice?</span></p><div class="dialog-actions"><button class="secondary-button" id="update-profile-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" id="update-profile-confirm" type="button"><i class="icon-check"></i><span data-i18n="profiles.updateVoice">Update voice</span></button></div></dialog>
   <dialog class="confirm-dialog" id="delete-profile-dialog"><div class="dialog-heading"><h2 data-i18n="profiles.deleteTitle">Delete saved voice</h2><button class="icon-button" id="delete-profile-close" type="button" title="Close" aria-label="Close" data-i18n-title="common.close" data-i18n-aria-label="common.close"><i class="icon-x"></i></button></div><p><span data-i18n="profiles.deletePrefix">Delete</span> <strong id="delete-profile-name"></strong> <span data-i18n="profiles.deleteSuffix">and its stored audio?</span></p><div class="dialog-actions"><button class="secondary-button" id="delete-profile-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="danger-button" id="delete-profile-confirm" type="button" data-i18n="common.delete">Delete</button></div></dialog>

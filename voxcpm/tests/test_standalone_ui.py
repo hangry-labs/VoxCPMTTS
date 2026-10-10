@@ -74,6 +74,7 @@ def test_static_workspace_and_assets_are_available() -> None:
                     "/static/i18n.js",
                     "/static/magic-editor.js",
                     "/static/magic-document.js",
+                    "/static/magic-voice-definitions.js",
                     "/static/gpu-monitor.js",
                     "/static/streaming-player.js",
                     "/static/version-check.js",
@@ -161,6 +162,13 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'data-input-type="magic"' in responses["/"].text
     assert 'id="magic-editor-shell"' in responses["/"].text
     assert 'id="magic-expression-control"' in responses["/"].text
+    assert 'id="magic-language-control"' in responses["/"].text
+    assert 'id="magic-rate-control"' in responses["/"].text
+    assert 'id="magic-pitch-control"' in responses["/"].text
+    assert 'id="magic-volume-control"' in responses["/"].text
+    assert 'id="magic-say-as-control"' in responses["/"].text
+    assert 'id="magic-substitution-dialog"' in responses["/"].text
+    assert 'id="magic-voice-definitions-dialog"' in responses["/"].text
     assert 'id="magic-character-dialog"' in responses["/"].text
     assert 'id="script-list"' in responses["/"].text
     assert 'id="script-import-input"' in responses["/"].text
@@ -239,6 +247,7 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
             (static_dir / "audio-finisher.js").read_text(encoding="utf-8"),
             (static_dir / "dialogue-script-library.js").read_text(encoding="utf-8"),
             (static_dir / "magic-editor.js").read_text(encoding="utf-8"),
+            (static_dir / "magic-voice-definitions.js").read_text(encoding="utf-8"),
             (static_dir / "gpu-monitor.js").read_text(encoding="utf-8"),
             (static_dir / "streaming-player.js").read_text(encoding="utf-8"),
             (static_dir / "version-check.js").read_text(encoding="utf-8"),

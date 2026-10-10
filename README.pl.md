@@ -33,12 +33,15 @@ Ta wersja Hangry Labs została przygotowana z myślą o prostej lokalnej pracy. 
 
 **Języki:** VoxCPM2 oficjalnie obsługuje [30 języków i dziewięć grup chińskich dialektów](SUPPORTED_LANGUAGES.md).
 
+> [!TIP]
+> **Posłuchaj przed instalacją:** Otwórz [interaktywną galerię przykładów w 30 językach](https://hangry-labs.github.io/VoxCPMTTS/examples/), obejmującą projektowanie i klonowanie głosu oraz wyróżniony dialog Magic.
+
 > [!IMPORTANT]
 > Kod własny projektu i kod pochodzący z projektu nadrzędnego korzystają z licencji Apache-2.0. Obrazy Docker są jednak dystrybucjami zbiorczymi zawierającymi również zasoby modeli, biblioteki NVIDIA CUDA, FFmpeg i inne pakiety na ich własnych warunkach. Przed wdrożeniem lub redystrybucją przeczytaj [informacje o komponentach zewnętrznych](THIRD_PARTY_NOTICES.md).
 
 ### Twórz kompletne scenariusze dialogów
 
-Edytor Magic pozwala wizualnie układać sceny z wieloma mówcami, przypisywać zapisane głosy, określać sposób wypowiedzi każdej postaci, odsłuchiwać pojedyncze kwestie i zapisywać cały dialog jako przenośny dokument SSML-H.
+Edytor Magic pozwala wizualnie układać sceny z wieloma mówcami, przypisywać zapisane lub zdefiniowane w skrypcie głosy, ustawiać język, tempo, wysokość, głośność i kierunek każdej kwestii, oznaczać wymowę, odsłuchiwać pojedyncze kwestie, przeciągać je w odpowiedniej kolejności i zapisywać cały dialog jako przenośny dokument SSML-H.
 
 <p align="center">
   <a href="assets/screenshots/generate-ui.webp">

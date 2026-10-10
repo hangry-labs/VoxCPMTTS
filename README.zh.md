@@ -33,12 +33,15 @@
 
 **语言：** VoxCPM2 官方支持 [30 种语言和 9 个中文方言组](SUPPORTED_LANGUAGES.md)。
 
+> [!TIP]
+> **安装前先试听：** 打开[涵盖 30 种语言的交互式示例库](https://hangry-labs.github.io/VoxCPMTTS/examples/)，体验声音设计、声音克隆和精选 Magic 对话。
+
 > [!IMPORTANT]
 > 项目自有及上游衍生源代码采用 Apache-2.0 许可证。Docker 镜像属于聚合发行版，其中还包含模型资源、NVIDIA CUDA 库、FFmpeg 及其他遵循各自条款的软件包。部署或再分发前，请阅读[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ### 可视化构建完整对话脚本
 
-使用 Magic 编辑器直观编排多角色场景、分配已保存的声音、指导每一次表演、预览单个对白片段，并将完整对话保存为可移植的 SSML-H。
+使用 Magic 编辑器直观编排多角色场景，分配已保存或在脚本中定义的声音，控制每段对白的语言、语速、音高、音量和表演方向，标注发音范围，预览单个对白片段，通过拖放调整顺序，并将完整对话保存为可移植的 SSML-H。
 
 <p align="center">
   <a href="assets/screenshots/generate-ui.webp">

@@ -35,18 +35,19 @@ This Hangry Labs fork is made for local use without the usual Python environment
 
 **Languages:** VoxCPM2 officially supports [30 languages and nine Chinese dialect groups](SUPPORTED_LANGUAGES.md).
 
+> [!TIP]
+> **Hear it before installing:** Open the [interactive 30-language examples gallery](https://hangry-labs.github.io/VoxCPMTTS/examples/) for voice design, cloning, and a featured Magic dialogue.
+
 Official images are published to [Docker Hub](https://hub.docker.com/r/hangrylabs/voxcpmtts/tags) and [GitHub Container Registry](https://github.com/Hangry-Labs/VoxCPMTTS/pkgs/container/voxcpmtts).
 
 > [!IMPORTANT]
 > The project-owned and upstream-derived source is Apache-2.0, but the Docker images are aggregate distributions containing model assets, NVIDIA CUDA libraries, FFmpeg, and other packages under their respective terms. Read [Third-Party Notices](THIRD_PARTY_NOTICES.md) before deployment or redistribution.
 
-**Listen first:** [30-language voice design and cloning examples](https://hangry-labs.github.io/VoxCPMTTS/examples/).
-
 Product page and installation guide: [hangrylabs.app/software/voxcpmtts](https://hangrylabs.app/software/voxcpmtts).
 
 ### Build complete dialogue scripts
 
-Use the Magic editor to assemble multi-speaker scenes visually, assign saved voices, direct each performance, preview individual turns, and save the complete dialogue as portable SSML-H.
+Use the Magic editor to assemble multi-speaker scenes visually, assign saved or script-defined voices, control each turn's language, rate, pitch, volume, and direction, mark pronunciation ranges, preview individual turns, drag them into order, and save the complete dialogue as portable SSML-H.
 
 <p align="center">
   <a href="assets/screenshots/generate-ui.webp">
@@ -384,7 +385,7 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Fixed saved-voice selection in Generate and Stream so the chosen profile reaches inference and visibly restores its language, locked seed, guidance, steps, and output-processing recipe.
 - Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.
 - Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, per-turn `h:direction` control, progressive unit streaming, explicit breaks, prosody, and profile editing.
-- Added Magic as the default structured dialogue editor, with ordered speech and pause blocks, saved-voice assignment, portraits, exact-seed turn previews, one-click capture of generated voices as reusable characters, preset or custom per-turn direction, experimental inline vocal cues, compact block reordering, live SSML-H synchronization, guarded SSML-H import, document download, and a searchable persistent script library with confirmed updates. Inline cues remain explicitly experimental because VoxCPM2 does not publish a stable supported-tag contract; use per-turn direction for dependable style control.
+- Added Magic as the default structured dialogue editor, with draggable speech and pause blocks, saved and document-defined voices, portraits, exact-seed turn previews, one-click capture of generated voices as reusable characters, per-turn language, prosody, and direction, inline `say-as` and pronunciation substitutions, experimental vocal cues, live SSML-H synchronization, guarded SSML-H import, document download, and a searchable persistent script library with confirmed updates. Inline cues remain explicitly experimental because VoxCPM2 does not publish a stable supported-tag contract; use per-turn direction for dependable style control.
 - Added optional `-16 LUFS` output normalization for complete and progressive generation, plus a compact grouped settings panel with clearer model, seed, output-processing, and speech-timing controls.
 - Added non-destructive Voice Design finishing with side-by-side original and processed playback, FFmpeg cleanup/mastering, MIT-licensed Signalsmith pitch and speed shaping, Clean and Studio presets, custom controls, explicit save-version selection, float 48 kHz output, and restorable processing recipes.
 - Unified model caches, saved voices, dialogue scripts, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.
@@ -422,10 +423,9 @@ No immutable `v1.0` image has been published yet. After publication and validati
 
 Deferred v1.0 work belongs in this list so release scope does not disappear between development sessions.
 
+- Add non-destructive Magic takes: retain generated audio per speech turn, regenerate only a selected turn, choose the active take, and reassemble the final dialogue without rerendering accepted turns while preserving breaks, boundary trimming, prosody, and deterministic seeds.
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
 - Recheck Nano-vLLM-VoxCPM upstream after the planned v1.0 product work. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
-- Benchmark an optional neural voice-restoration backend such as DeepFilterNet against the shipped FFmpeg finishing stage. Add it only if Python 3.13 binary wheels, offline model licensing, image size, CPU latency, ASR fidelity, speaker similarity, and blind listening results justify the additional runtime.
-- Extend Magic with the remaining capability-advertised controls: turn-level prosody and language, inline `say-as` and substitution ranges, editable dynamic SSML-H voice definitions, and drag reordering.
 - Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
 - Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.
 

@@ -4,7 +4,7 @@ import { AudioFinisher } from './audio-finisher.js?v=long-form-audio'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=app-organization'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
-import { MagicEditor } from './magic-editor.js'
+import { MagicEditor } from './magic-editor.js?v=capability-controls'
 import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
 import { VersionCheck } from './version-check.js?v=published-builds'
 
@@ -897,9 +897,9 @@ function magicPreviewPayload(block) {
   const fixedSeed = Number.isInteger(block.captureSeed) ? block.captureSeed : null
   return {
     ...payload,
-    text: block.voice ? magicEditor.toSSMLH([block]) : block.text.trim(),
-    input_type: block.voice ? 'ssml-h' : 'text',
-    voice_profile: block.voice || payload.voice_profile,
+    text: magicEditor.toSSMLH([block], { preview: true }),
+    input_type: 'ssml-h',
+    voice_profile: payload.voice_profile,
     output_format: 'wav',
     normalize: false,
     seed: fixedSeed ?? payload.seed,
@@ -969,6 +969,7 @@ function closeMagicCharacterDialog() {
 
 function magicCharacterRecipe(block, preview) {
   const payload = preview.payload
+  const spokenText = magicEditor.spokenText(block).trim()
   return {
     design_source: 'reference',
     clone_mode: 'transcript',
@@ -981,8 +982,8 @@ function magicCharacterRecipe(block, preview) {
     protect_long_audio: Boolean(payload.protect_long_audio),
     denoise: false,
     output_format: preview.extension || 'wav',
-    sample_text: block.text.trim(),
-    reference_text: block.text.trim(),
+    sample_text: spokenText,
+    reference_text: spokenText,
   }
 }
 
@@ -1731,6 +1732,7 @@ async function initialize() {
   state.ssmlCapabilities = ssmlCapabilities
 
   populateSelect($('#language'), languages.languages.map((language) => ({ value: language, label: languageLabel(language) })), defaults.language)
+  magicEditor.setLanguages(languages.languages.map((language) => ({ value: language, label: languageLabel(language) })))
   populateSelect($('#device'), status.hardware || [{ value: 'auto', label: t('common.auto', {}, 'Auto') }, { value: 'cpu', label: 'CPU' }], defaults.device)
   renderVoiceProfileSelect()
   renderCloneProfileList()
@@ -1975,7 +1977,7 @@ $('#magic-character-form').addEventListener('submit', async (event) => {
       file,
       designFile: file,
       portraitFile: state.magicCharacterPortraitFile,
-      refText: block.text.trim(),
+      refText: magicEditor.spokenText(block).trim(),
       control: block.direction || '',
       recipe: magicCharacterRecipe(block, preview),
     })

@@ -33,12 +33,15 @@ Esta versión de Hangry Labs está pensada para un uso local sencillo. Inicia un
 
 **Idiomas:** VoxCPM2 admite oficialmente [30 idiomas y nueve grupos de dialectos chinos](SUPPORTED_LANGUAGES.md).
 
+> [!TIP]
+> **Escúchalo antes de instalar:** Abre la [galería interactiva de ejemplos en 30 idiomas](https://hangry-labs.github.io/VoxCPMTTS/examples/) para probar diseño y clonación de voces y un diálogo Magic destacado.
+
 > [!IMPORTANT]
 > El código propio del proyecto y el derivado del proyecto original usan Apache-2.0. Sin embargo, las imágenes Docker son distribuciones agregadas que también incluyen recursos de modelos, bibliotecas NVIDIA CUDA, FFmpeg y otros paquetes bajo sus respectivas condiciones. Lee los [avisos de terceros](THIRD_PARTY_NOTICES.md) antes de implementar o redistribuir.
 
 ### Crea guiones de diálogo completos
 
-Usa el editor Magic para componer visualmente escenas con varios hablantes, asignar voces guardadas, dirigir cada interpretación, previsualizar intervenciones individuales y guardar el diálogo completo como SSML-H portátil.
+Usa el editor Magic para componer visualmente escenas con varios hablantes, asignar voces guardadas o definidas en el guion, controlar el idioma, ritmo, tono, volumen y dirección de cada intervención, marcar rangos de pronunciación, previsualizar intervenciones, reordenarlas arrastrando y guardar el diálogo completo como SSML-H portátil.
 
 <p align="center">
   <a href="assets/screenshots/generate-ui.webp">
