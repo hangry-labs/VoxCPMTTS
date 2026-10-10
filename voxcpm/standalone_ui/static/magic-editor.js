@@ -97,6 +97,7 @@ export class MagicEditor {
     this.voices = []
     this.languages = []
     this.defaultVoice = null
+    this.busy = false
     this.previewBusyId = null
     this.playingId = null
     this.previewAudio = new Audio()
@@ -137,6 +138,7 @@ export class MagicEditor {
       prosody: { rate: '', pitch: '', volume: '' },
       preview: null,
       captureSeed: null,
+      locked: false,
     }
   }
 
@@ -574,6 +576,22 @@ export class MagicEditor {
       await this.togglePreview(id)
       return
     }
+    if (action === 'regenerate') {
+      await this.ensurePreview(id, { play: true, force: true })
+      return
+    }
+    if (action === 'lock') {
+      const block = this.blocks[index]
+      if (!block.preview) return
+      block.locked = !block.locked
+      this.renderBlocks()
+      this.changed({ takesOnly: true })
+      return
+    }
+    if (action === 'download') {
+      this.downloadTake(this.blocks[index], index)
+      return
+    }
     if (action === 'save-character') {
       await this.onSaveCharacter({ ...this.blocks[index] })
       return
@@ -614,14 +632,15 @@ export class MagicEditor {
     this.changed()
   }
 
-  clearPreview(block) {
-    if (!block?.preview) return
-    if (this.playingId === block.id) {
+  clearPreview(block, { unlock = true } = {}) {
+    if (!block) return
+    if (block.preview && this.playingId === block.id) {
       this.previewAudio.pause()
       this.playingId = null
     }
-    URL.revokeObjectURL(block.preview.url)
+    if (block.preview?.url) URL.revokeObjectURL(block.preview.url)
     block.preview = null
+    if (unlock) block.locked = false
   }
 
   invalidateBlock(block) {
@@ -629,11 +648,12 @@ export class MagicEditor {
     block.captureSeed = null
   }
 
-  async ensurePreview(id, { play = false } = {}) {
+  async ensurePreview(id, { play = false, force = false } = {}) {
     const block = this.block(id)
     if (!block || block.type !== 'speech' || !block.text.trim()) return null
-    if (!block.preview) {
-      if (this.previewBusyId !== null) return null
+    if (force && block.locked) return block.preview
+    if (!block.preview || force) {
+      if (this.previewBusyId !== null || this.busy) return null
       this.previewBusyId = id
       this.renderBlocks()
       try {
@@ -641,6 +661,8 @@ export class MagicEditor {
         if (!result?.blob) return null
         this.clearPreview(block)
         block.preview = { ...result, url: URL.createObjectURL(result.blob) }
+        block.captureSeed = Number.isInteger(result.seed) ? result.seed : null
+        this.changed({ takesOnly: true, takesChanged: true })
       } finally {
         this.previewBusyId = null
         this.renderBlocks()
@@ -648,6 +670,14 @@ export class MagicEditor {
     }
     if (play && block.preview) await this.playPreview(block)
     return block.preview
+  }
+
+  downloadTake(block, index) {
+    if (!block?.preview) return
+    const link = document.createElement('a')
+    link.href = block.preview.url
+    link.download = `voxcpmtts-turn-${index + 1}.${block.preview.extension || 'wav'}`
+    link.click()
   }
 
   async togglePreview(id) {
@@ -691,15 +721,42 @@ export class MagicEditor {
     if (!Number.isInteger(seed)) return
     let speechIndex = 0
     for (const block of this.blocks) {
-      if (block.type === 'speech') this.clearPreview(block)
       if (block.type !== 'speech' || !block.text.trim()) {
-        if (block.type === 'speech') block.captureSeed = null
         continue
       }
-      block.captureSeed = (seed + speechIndex) % (2 ** 32)
+      if (!block.preview) block.captureSeed = (seed + speechIndex) % (2 ** 32)
       speechIndex += 1
     }
     this.renderBlocks()
+  }
+
+  setBusy(busy) {
+    if (this.busy === busy) return
+    this.busy = busy
+    this.renderBlocks()
+  }
+
+  speechBlocks() {
+    return this.blocks.filter((block) => block.type === 'speech' && block.text.trim())
+  }
+
+  hasCompleteTakes() {
+    const speech = this.speechBlocks()
+    return speech.length > 0 && speech.every((block) => block.preview)
+  }
+
+  applyTakes(takes, { notify = false } = {}) {
+    for (const block of this.speechBlocks()) {
+      const take = takes.get(String(block.id))
+      if (!take?.blob) continue
+      const locked = block.locked
+      this.clearPreview(block)
+      block.locked = locked
+      block.preview = { ...take, url: URL.createObjectURL(take.blob) }
+      block.captureSeed = Number.isInteger(take.seed) ? take.seed : null
+    }
+    this.renderBlocks()
+    if (notify) this.changed({ takesOnly: true, takesChanged: true })
   }
 
   activate(id) {
@@ -833,7 +890,7 @@ export class MagicEditor {
 
   renderSpeech(block, index) {
     const article = document.createElement('article')
-    article.className = `magic-turn${block.id === this.activeId ? ' active' : ''}`
+    article.className = `magic-turn${block.id === this.activeId ? ' active' : ''}${block.locked ? ' locked' : ''}`
     article.dataset.magicId = String(block.id)
 
     const heading = document.createElement('div')
@@ -844,6 +901,14 @@ export class MagicEditor {
     voice.className = 'magic-chip voice'
     voice.textContent = block.voice || t('magic.defaultVoice', {}, 'Default voice')
     metadata.append(voice)
+    if (block.locked) {
+      const locked = document.createElement('span')
+      locked.className = 'magic-chip locked'
+      const lockedIcon = document.createElement('i')
+      lockedIcon.className = 'icon-lock'
+      locked.append(lockedIcon, t('magic.takeLocked', {}, 'Locked take'))
+      metadata.append(locked)
+    }
     if (block.direction) {
       const direction = document.createElement('span')
       direction.className = 'magic-chip direction'
@@ -881,16 +946,38 @@ export class MagicEditor {
     preview.classList.add('magic-preview-action')
     preview.classList.toggle('ready', Boolean(block.preview))
     preview.classList.toggle('loading', previewing)
-    preview.disabled = !block.text.trim() || (this.previewBusyId !== null && !previewing)
+    preview.disabled = this.busy || !block.text.trim() || (this.previewBusyId !== null && !previewing)
+    const regenerate = button('icon-refresh-cw', t('magic.regenerateTake', {}, 'Regenerate this turn'), 'regenerate')
+    regenerate.disabled = this.busy || previewing || !block.preview || block.locked
+    const lock = button(
+      block.locked ? 'icon-lock' : 'icon-lock-open',
+      block.locked
+        ? t('magic.unlockTake', {}, 'Unlock this take')
+        : t('magic.lockTake', {}, 'Lock this take'),
+      'lock',
+    )
+    lock.classList.toggle('active', block.locked)
+    lock.disabled = this.busy || previewing || !block.preview
+    lock.setAttribute('aria-pressed', String(block.locked))
+    const download = button('icon-download', t('magic.downloadTake', {}, 'Download this take'), 'download')
+    download.disabled = !block.preview
+    const moveUp = button('icon-chevron-up', t('magic.moveUp', {}, 'Move turn up'), 'up')
+    const moveDown = button('icon-chevron-down', t('magic.moveDown', {}, 'Move turn down'), 'down')
+    moveUp.disabled = this.busy || index === 0
+    moveDown.disabled = this.busy || index === this.blocks.length - 1
+    const remove = button('icon-x', t('magic.remove', {}, 'Remove block'), 'remove')
+    remove.disabled = this.busy
     actions.append(
       dragHandle(t('magic.drag', {}, 'Drag to reorder')),
       preview,
-      button('icon-chevron-up', t('magic.moveUp', {}, 'Move turn up'), 'up'),
-      button('icon-chevron-down', t('magic.moveDown', {}, 'Move turn down'), 'down'),
-      button('icon-x', t('magic.remove', {}, 'Remove block'), 'remove'),
+      regenerate,
+      lock,
+      download,
+      moveUp,
+      moveDown,
+      remove,
     )
-    actions.children[2].disabled = index === 0
-    actions.children[3].disabled = index === this.blocks.length - 1
+    actions.firstElementChild.disabled = this.busy
     heading.append(metadata, actions)
 
     const textarea = document.createElement('textarea')
@@ -1052,8 +1139,8 @@ export class MagicEditor {
     this.summary.textContent = t('magic.summary', { turns: stats.turns }, `${stats.turns} turns`)
   }
 
-  changed() {
-    this.onChange(this)
+  changed(detail = {}) {
+    this.onChange(this, detail)
   }
 
   toSSMLH(blocks = this.blocks, { preview = false } = {}) {

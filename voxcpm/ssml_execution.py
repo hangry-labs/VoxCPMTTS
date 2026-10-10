@@ -6,7 +6,7 @@ import tempfile
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -50,6 +50,7 @@ PrepareVoice = Callable[[SSMLVoiceDefinition, str, str | None, int, Path], SSMLV
 ResolveVoice = Callable[[str], SSMLVoiceBinding]
 ResolveLanguage = Callable[[str], str]
 CommitProfiles = Callable[[list[PreparedSSMLVoice], Path], dict[str, str]]
+AudioTimelineItem = tuple[Literal["speech", "break"], np.ndarray | int]
 
 
 def _to_int16(audio: np.ndarray) -> np.ndarray:
@@ -153,6 +154,50 @@ def _fade(audio: np.ndarray, sample_rate: int, *, leading: bool, trailing: bool)
     return waveform
 
 
+def iter_assembled_audio(items: Iterator[AudioTimelineItem], sample_rate: int) -> Iterator[np.ndarray]:
+    """Assemble semantic speech takes and breaks using the normal SSML boundary policy."""
+    pending_audio: np.ndarray | None = None
+    pending_break_ms: int | None = None
+    leading_break_ms = 0
+    for kind, value in items:
+        if kind == "break":
+            duration_ms = int(value)
+            if pending_audio is None:
+                leading_break_ms += duration_ms
+            else:
+                pending_break_ms = (pending_break_ms or 0) + duration_ms
+            continue
+
+        current = _to_int16(np.asarray(value))
+        if pending_audio is None:
+            if leading_break_ms:
+                yield np.zeros(round(sample_rate * leading_break_ms / 1000), dtype=np.int16)
+                leading_break_ms = 0
+            pending_audio = current
+            continue
+
+        yield _trim_edge(pending_audio, sample_rate, leading=False)
+        current = _trim_edge(current, sample_rate, leading=True)
+        gap_ms = pending_break_ms if pending_break_ms is not None else IMPLICIT_HANDOFF_MS
+        if gap_ms:
+            yield np.zeros(round(sample_rate * gap_ms / 1000), dtype=np.int16)
+        pending_audio = current
+        pending_break_ms = None
+
+    if pending_audio is not None:
+        yield pending_audio
+        if pending_break_ms:
+            yield np.zeros(round(sample_rate * pending_break_ms / 1000), dtype=np.int16)
+    elif leading_break_ms:
+        yield np.zeros(round(sample_rate * leading_break_ms / 1000), dtype=np.int16)
+
+
+def assemble_audio_timeline(items: Iterator[AudioTimelineItem], sample_rate: int) -> np.ndarray:
+    chunks = list(iter_assembled_audio(items, sample_rate))
+    waveform = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.int16)
+    return _fade(waveform, sample_rate, leading=True, trailing=True)
+
+
 class SSMLExecutionSession:
     """Execute one compiled SSML document and own its temporary voice assets."""
 
@@ -244,44 +289,36 @@ class SSMLExecutionSession:
             raise RuntimeError("SSML synthesis units returned inconsistent sample rates.")
         return apply_audio_effects(waveform, sample_rate, rate=rate, pitch_semitones=pitch, volume=volume)
 
-    def _assembled_chunks(self) -> Iterator[np.ndarray]:
-        pending_audio: np.ndarray | None = None
-        pending_break_ms: int | None = None
-        leading_break_ms = 0
-        speech_index = 0
+    def speech_seed(self, unit: SSMLUnit, index: int) -> int:
+        binding = self._binding_for_unit(unit)
+        if binding.generation_seed is not None:
+            return binding.generation_seed
+        return (self.request_seed + len(self.plan.voice_definitions) + index) % (2**32)
+
+    def render_speech_take(self, speech_index: int) -> tuple[int, np.ndarray, int]:
+        if speech_index < 0:
+            raise ValueError("Speech take index cannot be negative.")
+        current_index = 0
         for unit in self.plan.units:
-            if unit.kind == "break":
-                if pending_audio is None:
-                    leading_break_ms += unit.duration_ms
-                else:
-                    pending_break_ms = (pending_break_ms or 0) + unit.duration_ms
+            if unit.kind != "speech":
                 continue
+            if current_index == speech_index:
+                waveform = self._render_speech(unit, current_index)
+                return self.sample_rate or self.default_sample_rate, waveform, self.speech_seed(unit, current_index)
+            current_index += 1
+        raise ValueError(f"Speech take index {speech_index} is outside this document.")
 
-            current = self._render_speech(unit, speech_index)
-            speech_index += 1
-            sample_rate = self.sample_rate or self.default_sample_rate
-            if pending_audio is None:
-                if leading_break_ms:
-                    yield np.zeros(round(sample_rate * leading_break_ms / 1000), dtype=np.int16)
-                    leading_break_ms = 0
-                pending_audio = current
-                continue
+    def _assembled_chunks(self) -> Iterator[np.ndarray]:
+        def timeline() -> Iterator[AudioTimelineItem]:
+            speech_index = 0
+            for unit in self.plan.units:
+                if unit.kind == "break":
+                    yield "break", unit.duration_ms
+                    continue
+                yield "speech", self._render_speech(unit, speech_index)
+                speech_index += 1
 
-            yield _trim_edge(pending_audio, sample_rate, leading=False)
-            current = _trim_edge(current, sample_rate, leading=True)
-            gap_ms = pending_break_ms if pending_break_ms is not None else IMPLICIT_HANDOFF_MS
-            if gap_ms:
-                yield np.zeros(round(sample_rate * gap_ms / 1000), dtype=np.int16)
-            pending_audio = current
-            pending_break_ms = None
-
-        sample_rate = self.sample_rate or self.default_sample_rate
-        if pending_audio is not None:
-            yield pending_audio
-            if pending_break_ms:
-                yield np.zeros(round(sample_rate * pending_break_ms / 1000), dtype=np.int16)
-        elif leading_break_ms:
-            yield np.zeros(round(sample_rate * leading_break_ms / 1000), dtype=np.int16)
+        yield from iter_assembled_audio(timeline(), self.default_sample_rate)
 
     def render_array(self) -> tuple[int, np.ndarray]:
         chunks = list(self._assembled_chunks())
@@ -327,4 +364,6 @@ __all__ = [
     "SSMLExecutionSession",
     "SSMLVoiceBinding",
     "apply_audio_effects",
+    "assemble_audio_timeline",
+    "iter_assembled_audio",
 ]

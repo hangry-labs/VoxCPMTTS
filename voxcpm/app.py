@@ -34,6 +34,11 @@ from voxcpm.dialogue_scripts import (
     resolve_dialogue_script,
     save_dialogue_script,
 )
+from voxcpm.magic_takes import (
+    MAGIC_TAKE_MEDIA_TYPE,
+    decode_pcm16_mono_wav,
+    pack_magic_take_bundle,
+)
 from voxcpm.openai_compat import (
     OPENAI_MODEL_ID,
     OPENAI_VOICE_PRESETS,
@@ -63,6 +68,7 @@ from voxcpm.ssml_execution import (
     PreparedSSMLVoice,
     SSMLExecutionSession,
     SSMLVoiceBinding,
+    assemble_audio_timeline,
 )
 from voxcpm.timestamps import align_audio_file, timestamp_backend_available
 from voxcpm.voice_profiles import (
@@ -103,6 +109,8 @@ BUILD_ID = os.getenv("BUILD_ID", "stable")
 BUILD_DATE = os.getenv("VOXCPMTTS_BUILD_DATE", "unknown")
 VCS_REF = os.getenv("VOXCPMTTS_VCS_REF", "unknown")
 MAX_REFERENCE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_REFERENCE_UPLOAD_BYTES", str(100 * 1024 * 1024)))
+MAX_MAGIC_TAKE_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_MAGIC_TAKE_UPLOAD_BYTES", str(512 * 1024 * 1024)))
+MAX_MAGIC_TAKES = 200
 REFERENCE_AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".webm"}
 REFERENCE_AUDIO_TRANSCODE_SUFFIXES = {".m4a", ".aac", ".webm"}
 MAX_PORTRAIT_UPLOAD_BYTES = int(os.getenv("VOXCPM_MAX_PORTRAIT_UPLOAD_BYTES", str(5 * 1024 * 1024)))
@@ -1010,6 +1018,25 @@ class StreamingTTSRequest(TTSRequest):
     stream_format: str = Field("mp3", description="Progressive response format. Supported: mp3.")
 
 
+class MagicTakeRequest(BaseModel):
+    payload: TTSRequest
+    speech_index: int = Field(..., ge=0, lt=MAX_MAGIC_TAKES)
+
+
+class MagicTimelineItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    kind: Literal["speech", "break"] = Field(..., alias="type")
+    id: str | None = None
+    milliseconds: int | None = Field(None, ge=0, le=10_000)
+
+
+class MagicAssemblyRequest(BaseModel):
+    items: list[MagicTimelineItem] = Field(..., min_length=1, max_length=300)
+    output_format: str = "wav"
+    normalize_loudness: bool = False
+
+
 def planned_text_sections(payload: TTSRequest) -> list[str]:
     text = payload.text.strip()
     if not payload.protect_long_audio:
@@ -1421,6 +1448,144 @@ def create_ssml_execution_session(payload: TTSRequest, used_seed: int) -> SSMLEx
         session.close()
         raise
     return session
+
+
+def _validated_magic_speech_ids(plan: SSMLPlan, speech_ids: list[str]) -> list[SSMLUnit]:
+    speech_units = [unit for unit in plan.units if unit.kind == "speech"]
+    if not speech_units:
+        raise ValueError("Magic documents must contain at least one speech turn.")
+    if len(speech_units) != len(speech_ids):
+        raise ValueError("Magic speech IDs do not match the compiled speech turns.")
+    if len(speech_ids) > MAX_MAGIC_TAKES:
+        raise ValueError(f"Magic supports at most {MAX_MAGIC_TAKES} speech takes per render.")
+    if len(set(speech_ids)) != len(speech_ids):
+        raise ValueError("Magic speech IDs must be unique.")
+    if any(not value or len(value) > 64 or not value.replace("-", "").replace("_", "").isalnum() for value in speech_ids):
+        raise ValueError("Magic speech IDs may contain only letters, numbers, hyphens, and underscores.")
+    return speech_units
+
+
+def _magic_timeline(plan: SSMLPlan, takes: dict[str, np.ndarray], speech_ids: list[str]) -> Iterator[tuple[str, Any]]:
+    speech_index = 0
+    for unit in plan.units:
+        if unit.kind == "break":
+            yield "break", unit.duration_ms
+            continue
+        take_id = speech_ids[speech_index]
+        yield "speech", takes[take_id]
+        speech_index += 1
+
+
+def render_magic_take_bundle(
+    payload: TTSRequest,
+    speech_ids: list[str],
+    retained: dict[str, tuple[int, int, np.ndarray]],
+) -> tuple[bytes, int, str, int]:
+    if payload.input_type != "ssml-h":
+        raise ValueError("Magic take rendering requires input_type='ssml-h'.")
+    output_format = normalize_output_format(payload.output_format)
+    request_seed = resolve_generation_seed(payload)
+    plan, _ = compile_ssml_request(payload)
+    _validated_magic_speech_ids(plan, speech_ids)
+    unknown = set(retained) - set(speech_ids)
+    if unknown:
+        raise ValueError(f"Retained Magic take does not belong to this document: {sorted(unknown)[0]}")
+
+    takes: dict[str, np.ndarray] = {}
+    take_seeds: dict[str, int] = {}
+    sample_rates = {sample_rate for _, sample_rate, _ in retained.values()}
+    if len(sample_rates) > 1:
+        raise ValueError("Retained Magic takes use inconsistent sample rates.")
+    session: SSMLExecutionSession | None = None
+    try:
+        if len(retained) != len(speech_ids):
+            session = create_ssml_execution_session(payload, request_seed)
+            plan = session.plan
+            _validated_magic_speech_ids(plan, speech_ids)
+            expected_rate = session.default_sample_rate
+            if sample_rates and sample_rates != {expected_rate}:
+                raise ValueError("Retained Magic takes do not match the model sample rate.")
+            for speech_index, take_id in enumerate(speech_ids):
+                if take_id in retained:
+                    seed, _, waveform = retained[take_id]
+                else:
+                    _, waveform, seed = session.render_speech_take(speech_index)
+                takes[take_id] = waveform
+                take_seeds[take_id] = seed
+            sample_rate = expected_rate
+            session.commit_profiles()
+        else:
+            sample_rate = next(iter(sample_rates), 0)
+            if not sample_rate:
+                raise ValueError("Magic render has no audio takes to assemble.")
+            for take_id, (seed, _, waveform) in retained.items():
+                takes[take_id] = waveform
+                take_seeds[take_id] = seed
+
+        waveform = assemble_audio_timeline(_magic_timeline(plan, takes, speech_ids), sample_rate)
+        if payload.normalize_loudness:
+            waveform = normalize_audio_loudness(waveform, sample_rate)
+        output = encode_audio_bytes(waveform, output_format, sample_rate)
+        packed_takes = [
+            (take_id, take_seeds[take_id], audio_to_wav_bytes(takes[take_id], sample_rate))
+            for take_id in speech_ids
+        ]
+        bundle = pack_magic_take_bundle(
+            packed_takes,
+            output,
+            sample_rate=sample_rate,
+            output_format=output_format,
+            output_media_type=OUTPUT_FORMATS[output_format]["media_type"],
+            request_seed=request_seed,
+        )
+        return bundle, request_seed, output_format, sample_rate
+    finally:
+        if session is not None:
+            session.close()
+
+
+def render_magic_take(payload: TTSRequest, speech_index: int) -> tuple[bytes, int, int]:
+    if payload.input_type != "ssml-h":
+        raise ValueError("Magic take rendering requires input_type='ssml-h'.")
+    request_seed = resolve_generation_seed(payload)
+    session = create_ssml_execution_session(payload, request_seed)
+    try:
+        sample_rate, waveform, take_seed = session.render_speech_take(speech_index)
+        return audio_to_wav_bytes(waveform, sample_rate), take_seed, sample_rate
+    finally:
+        session.close()
+
+
+def assemble_magic_uploads(
+    payload: MagicAssemblyRequest,
+    takes: dict[str, tuple[int, np.ndarray]],
+) -> tuple[bytes, str, int]:
+    output_format = normalize_output_format(payload.output_format)
+    sample_rates = {sample_rate for sample_rate, _ in takes.values()}
+    if len(sample_rates) != 1:
+        raise ValueError("Magic takes must use one consistent sample rate.")
+    sample_rate = next(iter(sample_rates))
+    used: set[str] = set()
+    total_break_ms = 0
+    timeline: list[tuple[str, Any]] = []
+    for item in payload.items:
+        if item.kind == "speech":
+            if not item.id or item.id not in takes:
+                raise ValueError(f"Magic timeline references a missing speech take: {item.id or '(empty)'}.")
+            used.add(item.id)
+            timeline.append(("speech", takes[item.id][1]))
+        else:
+            duration = item.milliseconds if item.milliseconds is not None else 0
+            total_break_ms += duration
+            if total_break_ms > 60_000:
+                raise ValueError("Magic timeline exceeds the 60000ms total break limit.")
+            timeline.append(("break", duration))
+    if not used:
+        raise ValueError("Magic timeline must contain at least one speech take.")
+    waveform = assemble_audio_timeline(iter(timeline), sample_rate)
+    if payload.normalize_loudness:
+        waveform = normalize_audio_loudness(waveform, sample_rate)
+    return encode_audio_bytes(waveform, output_format, sample_rate), output_format, sample_rate
 
 
 def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int]:
@@ -1854,6 +2019,49 @@ async def save_reference_upload(upload: UploadFile) -> str:
     finally:
         await upload.close()
     return path
+
+
+async def read_magic_take_uploads(
+    uploads: list[UploadFile],
+    metadata: list[dict[str, Any]],
+) -> dict[str, tuple[int, int, np.ndarray]]:
+    if len(uploads) != len(metadata):
+        for upload in uploads:
+            await upload.close()
+        raise HTTPException(status_code=400, detail="Magic take metadata does not match the uploaded audio.")
+    if len(uploads) > MAX_MAGIC_TAKES:
+        for upload in uploads:
+            await upload.close()
+        raise HTTPException(status_code=400, detail=f"Magic supports at most {MAX_MAGIC_TAKES} uploaded takes.")
+
+    total = 0
+    decoded: dict[str, tuple[int, int, np.ndarray]] = {}
+    try:
+        for upload, item in zip(uploads, metadata, strict=True):
+            take_id = str(item.get("id") or "").strip()
+            if not take_id or take_id in decoded:
+                raise HTTPException(status_code=400, detail="Magic uploaded take IDs must be present and unique.")
+            try:
+                seed = int(item.get("seed", 0))
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(status_code=400, detail=f"Magic take '{take_id}' has an invalid seed.") from exc
+            if not 0 <= seed <= MAX_RANDOM_SEED:
+                raise HTTPException(status_code=400, detail=f"Magic take '{take_id}' seed is outside the 32-bit range.")
+            data = bytearray()
+            while chunk := await upload.read(1024 * 1024):
+                total += len(chunk)
+                if total > MAX_MAGIC_TAKE_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Magic take audio exceeds the aggregate upload limit.")
+                data.extend(chunk)
+            try:
+                sample_rate, waveform = await asyncio.to_thread(decode_pcm16_mono_wav, bytes(data))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Magic take '{take_id}': {exc}") from exc
+            decoded[take_id] = (seed, sample_rate, waveform)
+    finally:
+        for upload in uploads:
+            await upload.close()
+    return decoded
 
 
 def normalize_reference_audio(source_path: str) -> str:
@@ -2559,6 +2767,119 @@ async def postprocess_upload(
             "Content-Disposition": 'inline; filename="voxcpmtts-processed.wav"',
             "X-VoxCPM-Post-Processing": payload.method,
             "X-VoxCPM-Post-Processing-Preset": payload.preset,
+        },
+    )
+
+
+@api.post("/tts/magic/take")
+def generate_magic_take(request: MagicTakeRequest = Body(...)) -> Response:
+    try:
+        set_generation_activity("generating", "Generating Magic speech take", active=True)
+        audio, seed, sample_rate = render_magic_take(request.payload, request.speech_index)
+        set_generation_activity("complete", "Magic speech take is ready", active=False)
+    except (FileNotFoundError, ValueError, RuntimeError, SSMLValidationError) as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=500, detail=f"Magic take generation failed: {exc}") from exc
+    return Response(
+        content=audio,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": f'inline; filename="voxcpmtts-take-{request.speech_index + 1}.wav"',
+            "X-VoxCPM-Seed": str(seed),
+            "X-VoxCPM-Sample-Rate": str(sample_rate),
+            "X-VoxCPM-Format": "wav",
+            "X-VoxCPM-Route": "/tts/magic/take",
+        },
+    )
+
+
+@api.post("/tts/magic/render")
+async def generate_magic_render(
+    payload: str = Form(...),
+    speech_ids: str = Form(...),
+    retained: str = Form("[]"),
+    takes: list[UploadFile] = File(default=[]),
+) -> Response:
+    try:
+        request = TTSRequest.model_validate_json(payload)
+        parsed_ids = json.loads(speech_ids)
+        parsed_retained = json.loads(retained)
+        if not isinstance(parsed_ids, list) or not all(isinstance(item, str) for item in parsed_ids):
+            raise ValueError("Magic speech_ids must be a JSON array of strings.")
+        if not isinstance(parsed_retained, list) or not all(isinstance(item, dict) for item in parsed_retained):
+            raise ValueError("Magic retained metadata must be a JSON array of objects.")
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        for upload in takes:
+            await upload.close()
+        raise HTTPException(status_code=422, detail=f"Invalid Magic render request: {exc}") from exc
+
+    retained_takes = await read_magic_take_uploads(takes, parsed_retained)
+    try:
+        set_generation_activity("generating", "Generating unlocked Magic speech takes", active=True)
+        bundle, seed, output_format, sample_rate = await asyncio.to_thread(
+            render_magic_take_bundle,
+            request,
+            parsed_ids,
+            retained_takes,
+        )
+        set_generation_activity("complete", "Magic dialogue is ready", active=False)
+    except (FileNotFoundError, ValueError, RuntimeError, SSMLValidationError) as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        set_generation_activity("failed", str(exc), active=False)
+        raise HTTPException(status_code=500, detail=f"Magic dialogue generation failed: {exc}") from exc
+    return Response(
+        content=bundle,
+        media_type=MAGIC_TAKE_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": 'inline; filename="voxcpmtts-magic-takes.bin"',
+            "X-VoxCPM-Seed": str(seed),
+            "X-VoxCPM-Sample-Rate": str(sample_rate),
+            "X-VoxCPM-Format": output_format,
+            "X-VoxCPM-Route": "/tts/magic/render",
+        },
+    )
+
+
+@api.post("/tts/magic/assemble-upload")
+async def assemble_magic_takes(
+    options: str = Form(...),
+    take_metadata: str = Form(...),
+    takes: list[UploadFile] = File(...),
+) -> Response:
+    try:
+        request = MagicAssemblyRequest.model_validate_json(options)
+        metadata = json.loads(take_metadata)
+        if not isinstance(metadata, list) or not all(isinstance(item, dict) for item in metadata):
+            raise ValueError("Magic take metadata must be a JSON array of objects.")
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        for upload in takes:
+            await upload.close()
+        raise HTTPException(status_code=422, detail=f"Invalid Magic assembly request: {exc}") from exc
+
+    decoded = await read_magic_take_uploads(takes, metadata)
+    assembly_takes = {take_id: (sample_rate, waveform) for take_id, (_, sample_rate, waveform) in decoded.items()}
+    try:
+        audio, output_format, sample_rate = await asyncio.to_thread(
+            assemble_magic_uploads,
+            request,
+            assembly_takes,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    extension = OUTPUT_FORMATS[output_format]["extension"]
+    return Response(
+        content=audio,
+        media_type=OUTPUT_FORMATS[output_format]["media_type"],
+        headers={
+            "Content-Disposition": f'inline; filename="voxcpmtts-magic-preview.{extension}"',
+            "X-VoxCPM-Sample-Rate": str(OUTPUT_FORMATS[output_format].get("sample_rate", sample_rate)),
+            "X-VoxCPM-Format": output_format,
+            "X-VoxCPM-Route": "/tts/magic/assemble-upload",
         },
     )
 

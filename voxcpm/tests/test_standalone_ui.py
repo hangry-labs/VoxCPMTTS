@@ -73,6 +73,7 @@ def test_static_workspace_and_assets_are_available() -> None:
                     "/static/dialogue-script-library.js",
                     "/static/i18n.js",
                     "/static/magic-editor.js",
+                    "/static/magic-takes.js",
                     "/static/magic-document.js",
                     "/static/magic-voice-definitions.js",
                     "/static/gpu-monitor.js",
@@ -94,6 +95,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "VoxCPMTTS" in responses["/"].text
     assert "voxcpmtts_logo_horizontal.webp" in responses["/"].text
     assert 'src="/assets/voxcpmtts_mascot.webp"' in responses["/"].text
+    assert 'href="mailto:contact@hangrylabs.app"' in responses["/"].text
+    assert 'class="brand-contact"' in responses["/"].text
     assert "UI v" not in responses["/"].text
     assert 'id="version-update"' in responses["/"].text
     assert 'data-tab="clone"' in responses["/"].text
@@ -187,6 +190,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     gpu_monitor = responses["/static/gpu-monitor.js"].text
     version_check = responses["/static/version-check.js"].text
     script_library = responses["/static/dialogue-script-library.js"].text
+    magic_takes = responses["/static/magic-takes.js"].text
     assert "IncrementalAudioPlayback" in script
     assert "response.body.getReader()" in script
     assert "await playback.append(value)" in script
@@ -207,6 +211,10 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "async function generateMagicPreview(" in script
     assert "async function openMagicCharacterDialog(" in script
     assert "magicEditor.markFullGeneration" in script
+    assert "export class MagicTakeStudio" in magic_takes
+    assert "'/tts/magic/render'" in magic_takes
+    assert "'/tts/magic/take'" in magic_takes
+    assert "'/tts/magic/assemble-upload'" in magic_takes
     assert "export class DialogueScriptLibrary" in script_library
     assert "this.fetchJson('/tts/dialogue-scripts')" in script_library
     assert "this.magicEditor.loadSSMLH" in script_library
@@ -247,6 +255,7 @@ def test_ui_locale_catalogs_are_valid_and_english_covers_used_keys() -> None:
             (static_dir / "audio-finisher.js").read_text(encoding="utf-8"),
             (static_dir / "dialogue-script-library.js").read_text(encoding="utf-8"),
             (static_dir / "magic-editor.js").read_text(encoding="utf-8"),
+            (static_dir / "magic-takes.js").read_text(encoding="utf-8"),
             (static_dir / "magic-voice-definitions.js").read_text(encoding="utf-8"),
             (static_dir / "gpu-monitor.js").read_text(encoding="utf-8"),
             (static_dir / "streaming-player.js").read_text(encoding="utf-8"),

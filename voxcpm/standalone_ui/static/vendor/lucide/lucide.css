@@ -26,6 +26,8 @@
 .icon-git-branch::before { content: "\e0e2"; }
 .icon-message-square-text::before { content: "\e575"; }
 .icon-mic::before { content: "\e118"; }
+.icon-lock::before { content: "\e10b"; }
+.icon-lock-open::before { content: "\e10c"; }
 .icon-pause::before { content: "\e12e"; }
 .icon-play::before { content: "\e13c"; }
 .icon-radio::before { content: "\e142"; }

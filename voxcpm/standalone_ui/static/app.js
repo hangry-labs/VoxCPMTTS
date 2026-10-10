@@ -4,7 +4,8 @@ import { AudioFinisher } from './audio-finisher.js?v=long-form-audio'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=app-organization'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
-import { MagicEditor } from './magic-editor.js?v=capability-controls'
+import { MagicEditor } from './magic-editor.js?v=turn-studio'
+import { MagicTakeStudio } from './magic-takes.js?v=turn-studio'
 import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
 import { VersionCheck } from './version-check.js?v=published-builds'
 
@@ -105,8 +106,13 @@ const state = {
   magicCharacterPortraitUrl: null,
   pendingDeleteProfile: null,
   activityTimer: null,
+  magicAssemblyTimer: null,
+  magicAssemblyRevision: 0,
+  magicAssemblyAbort: null,
+  magicGenerating: false,
 }
 
+const magicTakeStudio = new MagicTakeStudio({ responseError })
 const magicEditor = new MagicEditor($('#magic-editor-shell'), {
   onChange: handleMagicChange,
   onPreview: generateMagicPreview,
@@ -352,10 +358,54 @@ function setInputType(inputType, { syncSsmlH = true } = {}) {
   persistUiState()
 }
 
-function handleMagicChange(editorInstance) {
-  state.inputDrafts['ssml-h'] = editorInstance.toSSMLH()
-  dialogueScripts?.markDirty()
-  updateMetrics()
+function handleMagicChange(editorInstance, detail = {}) {
+  if (!detail.takesOnly) {
+    state.inputDrafts['ssml-h'] = editorInstance.toSSMLH()
+    dialogueScripts?.markDirty()
+    updateMetrics()
+  }
+  if (detail.takesChanged || !detail.takesOnly) scheduleMagicAssembly()
+}
+
+function cancelMagicAssembly() {
+  clearTimeout(state.magicAssemblyTimer)
+  state.magicAssemblyTimer = null
+  state.magicAssemblyRevision += 1
+  state.magicAssemblyAbort?.abort()
+  state.magicAssemblyAbort = null
+}
+
+function scheduleMagicAssembly() {
+  cancelMagicAssembly()
+  if (state.inputType !== 'magic' || state.generationMode !== 'generate' || state.magicGenerating) return
+  if (!magicEditor.hasCompleteTakes()) {
+    generateOutput.clear()
+    generateFinisher.clear()
+    return
+  }
+  const revision = state.magicAssemblyRevision
+  state.magicAssemblyTimer = setTimeout(() => assembleMagicPreview(revision), 300)
+}
+
+async function assembleMagicPreview(revision) {
+  if (revision !== state.magicAssemblyRevision || !magicEditor.hasCompleteTakes()) return
+  const controller = new AbortController()
+  state.magicAssemblyAbort = controller
+  try {
+    const result = await magicTakeStudio.assemble(magicEditor.blocks, {
+      outputFormat: $('#output-format').value,
+      normalizeLoudness: $('#normalize-loudness').checked,
+      signal: controller.signal,
+    })
+    if (revision !== state.magicAssemblyRevision) return
+    await generateOutput.load(result.blob, `voxcpmtts-magic.${result.extension}`)
+    generateFinisher.setSource(result.blob, result.extension)
+    setStatus(t('status.magicReassembled', {}, 'Dialogue preview updated'), 'success')
+  } catch (error) {
+    if (error.name !== 'AbortError') showToast(errorMessage(error))
+  } finally {
+    if (state.magicAssemblyAbort === controller) state.magicAssemblyAbort = null
+  }
 }
 
 function setGenerationMode(mode, { persist = true } = {}) {
@@ -892,18 +942,15 @@ async function requestAudio(options = {}) {
   }
 }
 
-function magicPreviewPayload(block) {
+function magicPreviewPayload() {
   const payload = buildPayload({ workflow: 'generate' })
-  const fixedSeed = Number.isInteger(block.captureSeed) ? block.captureSeed : null
   return {
     ...payload,
-    text: magicEditor.toSSMLH([block], { preview: true }),
+    text: magicEditor.toSSMLH(undefined, { preview: true }),
     input_type: 'ssml-h',
     voice_profile: payload.voice_profile,
     output_format: 'wav',
     normalize: false,
-    seed: fixedSeed ?? payload.seed,
-    randomize_seed: fixedSeed === null ? payload.randomize_seed : false,
   }
 }
 
@@ -912,10 +959,9 @@ async function generateMagicPreview(block) {
   startActivityPolling('generate')
   setStatus(t('status.generatingTurn', {}, 'Generating turn preview'))
   try {
-    const result = await requestAudio({
-      workflow: 'generate',
-      payloadOverride: magicPreviewPayload(block),
-    })
+    const speechIndex = magicEditor.speechBlocks().findIndex((item) => item.id === block.id)
+    if (speechIndex < 0) throw new Error(t('errors.turnMissing', {}, 'This speech turn is no longer in the dialogue.'))
+    const result = await magicTakeStudio.take(magicPreviewPayload(), speechIndex)
     setStatus(t('status.turnReady', {}, 'Turn preview ready'), 'success')
     finishActivityPolling('generate', 'complete', t('status.turnReady', {}, 'Turn preview ready'))
     return result
@@ -1060,13 +1106,15 @@ function renderInferenceProgress(workflow, activity) {
     failed: t('progress.failed', {}, 'Generation failed'),
   }
   $('.progress-copy strong', panel).textContent = phaseTitles[phase] || activity.message || phaseTitles.preparing
-  $('.progress-copy > span', panel).textContent = phase === 'loading_model'
-    ? t('progress.firstLoad', {}, 'First use can take longer while model weights enter GPU memory')
-    : phase === 'encoding'
-      ? t('progress.outputFormat', {
-          format: workflow === 'stream' ? 'MP3' : ($('#output-format').value || 'audio').toUpperCase(),
-        }, 'Preparing the selected output format')
-      : t('progress.active', {}, 'The request is active')
+  $('.progress-copy > span', panel).textContent = phase === 'complete'
+    ? phaseTitles.complete
+    : phase === 'loading_model'
+      ? t('progress.firstLoad', {}, 'First use can take longer while model weights enter GPU memory')
+      : phase === 'encoding'
+        ? t('progress.outputFormat', {
+            format: workflow === 'stream' ? 'MP3' : ($('#output-format').value || 'audio').toUpperCase(),
+          }, 'Preparing the selected output format')
+        : t('progress.active', {}, 'The request is active')
   $$('[data-stage]', panel).forEach((dot, dotIndex) => {
     dot.classList.toggle('done', phase === 'complete' || dotIndex < index)
     dot.classList.toggle('active', phase !== 'complete' && phase !== 'failed' && dotIndex === index)
@@ -1100,10 +1148,42 @@ function setGenerationBusy(active, workflow = 'generate') {
   if (workflow === 'stream') $('#stream-stop').disabled = !active
   if (['generate', 'stream'].includes(workflow)) {
     $$('.generation-mode-control button').forEach((modeButton) => { modeButton.disabled = active })
+    magicEditor.setBusy(active)
+  }
+}
+
+async function generateMagicAudio() {
+  cancelMagicAssembly()
+  state.magicGenerating = true
+  generateFinisher.clear()
+  setGenerationBusy(true, 'generate')
+  startActivityPolling('generate')
+  setStatus(t('status.generatingMagic', {}, 'Generating dialogue takes'))
+  const payload = buildPayload({ workflow: 'generate' })
+  try {
+    const result = await magicTakeStudio.render(payload, magicEditor.blocks)
+    magicEditor.applyTakes(result.takes)
+    await generateOutput.load(result.output.blob, `voxcpmtts-magic.${result.output.extension}`)
+    generateFinisher.setSource(result.output.blob, result.output.extension)
+    if (Number.isInteger(result.requestSeed)) {
+      $('#last-generated-seed').value = result.requestSeed
+      $('#seed').value = result.requestSeed
+    }
+    await alignGeneratedAudio('generate', result.output.blob, result.output.extension, payload)
+    setStatus(t('status.complete', {}, 'Generation complete'), 'success')
+    finishActivityPolling('generate', 'complete', t('progress.complete', {}, 'Audio is ready'))
+  } catch (error) {
+    setStatus(errorMessage(error), 'error')
+    showToast(errorMessage(error))
+    finishActivityPolling('generate', 'failed', errorMessage(error))
+  } finally {
+    state.magicGenerating = false
+    setGenerationBusy(false, 'generate')
   }
 }
 
 async function generateAudio(workflow = 'generate') {
+  if (workflow === 'generate' && state.inputType === 'magic') return generateMagicAudio()
   const output = workflow === 'clone' ? cloneOutput : generateOutput
   if (workflow === 'generate') generateFinisher.clear()
   if (workflow === 'clone') {
