@@ -375,13 +375,27 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
-### v1.1 Planned
+### v1.1 Snapshot
 
 The following work is intentionally deferred until after the qualified `v1.0` release:
 
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
 - Recheck Nano-vLLM-VoxCPM upstream. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
 - Split native and Nano installation metadata so the optimized image passes dependency checks without advertising native-only packages or upstream's unused `torchcodec` dependency. Keep the Nano runtime binary-wheel-only and do not add incompatible packages merely to silence metadata.
+
+The current development snapshot is published through the rolling tags from `main`:
+
+**Full image**
+
+```bash
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+```
+
+**Tiny image**
+
+```bash
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+```
 
 ### v1.0
 
