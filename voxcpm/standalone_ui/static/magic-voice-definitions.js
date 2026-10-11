@@ -1,4 +1,5 @@
 import { t } from './i18n.js'
+import { closeDialogOnBackdrop } from './dialog-utils.js?v=pointerdown-v1'
 
 const DESIGN_FIELDS = ['gender', 'age', 'pitch', 'style', 'languages', 'accent', 'dialect']
 
@@ -39,9 +40,7 @@ export class MagicVoiceDefinitions {
       this.form.elements.replace.disabled = !profile
       if (!profile) this.form.elements.replace.checked = false
     })
-    this.dialog.addEventListener('click', (event) => {
-      if (event.target === this.dialog) this.close()
-    })
+    closeDialogOnBackdrop(this.dialog, () => this.close())
     this.dialog.addEventListener('cancel', (event) => {
       event.preventDefault()
       this.close()

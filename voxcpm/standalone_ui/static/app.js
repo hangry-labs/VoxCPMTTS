@@ -2,10 +2,11 @@ import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
 import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
 import { AudioFinisher } from './audio-finisher.js?v=workspace-audio'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
-import { DialogueScriptLibrary } from './dialogue-script-library.js?v=workspace-v1'
+import { closeDialogOnBackdrop } from './dialog-utils.js?v=pointerdown-v1'
+import { DialogueScriptLibrary } from './dialogue-script-library.js?v=pointerdown-v1'
 import { GenerationToolbar } from './generation-toolbar.js?v=workflow-controls'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
-import { MagicEditor } from './magic-editor.js?v=default-direction'
+import { MagicEditor } from './magic-editor.js?v=pointerdown-v1'
 import { MagicTakeStudio } from './magic-takes.js?v=turn-studio'
 import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
 import { VersionCheck } from './version-check.js?v=published-builds'
@@ -2258,7 +2259,7 @@ $('#quick-save-form').addEventListener('submit', async (event) => {
 })
 $('#save-profile-close').addEventListener('click', closeQuickSaveDialog)
 $('#save-profile-cancel').addEventListener('click', closeQuickSaveDialog)
-$('#save-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeQuickSaveDialog() })
+closeDialogOnBackdrop($('#save-profile-dialog'), closeQuickSaveDialog)
 $('#magic-character-portrait').addEventListener('change', (event) => {
   const file = event.target.files?.[0]
   event.target.value = ''
@@ -2329,14 +2330,14 @@ $('#magic-character-form').addEventListener('submit', async (event) => {
 })
 $('#magic-character-close').addEventListener('click', closeMagicCharacterDialog)
 $('#magic-character-cancel').addEventListener('click', closeMagicCharacterDialog)
-$('#magic-character-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeMagicCharacterDialog() })
+closeDialogOnBackdrop($('#magic-character-dialog'), closeMagicCharacterDialog)
 $('#magic-character-dialog').addEventListener('cancel', (event) => {
   event.preventDefault()
   closeMagicCharacterDialog()
 })
 $('#update-profile-close').addEventListener('click', closeUpdateProfileDialog)
 $('#update-profile-cancel').addEventListener('click', closeUpdateProfileDialog)
-$('#update-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeUpdateProfileDialog() })
+closeDialogOnBackdrop($('#update-profile-dialog'), closeUpdateProfileDialog)
 $('#update-profile-confirm').addEventListener('click', async (event) => {
   const profile = state.editingProfile
   const generated = state.lastCloneGeneration
@@ -2395,7 +2396,7 @@ $('#update-profile-confirm').addEventListener('click', async (event) => {
 })
 $('#delete-profile-close').addEventListener('click', closeDeleteProfileDialog)
 $('#delete-profile-cancel').addEventListener('click', closeDeleteProfileDialog)
-$('#delete-profile-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeDeleteProfileDialog() })
+closeDialogOnBackdrop($('#delete-profile-dialog'), closeDeleteProfileDialog)
 $('#delete-profile-confirm').addEventListener('click', async (event) => {
   const profile = state.pendingDeleteProfile
   if (!profile) return

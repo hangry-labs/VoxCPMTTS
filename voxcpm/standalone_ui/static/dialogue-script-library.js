@@ -1,4 +1,5 @@
 import { t } from './i18n.js'
+import { closeDialogOnBackdrop } from './dialog-utils.js?v=pointerdown-v1'
 
 const $ = (selector, root = document) => root.querySelector(selector)
 const COLLAPSED_FOLDERS_KEY = 'voxcpmtts.script-folders.collapsed'
@@ -409,7 +410,7 @@ export class DialogueScriptLibrary {
     })
     $('#edit-script-close').addEventListener('click', () => this.closeEdit())
     $('#edit-script-cancel').addEventListener('click', () => this.closeEdit())
-    $('#edit-script-dialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) this.closeEdit() })
+    closeDialogOnBackdrop($('#edit-script-dialog'), () => this.closeEdit())
     $('#edit-script-form').addEventListener('submit', (event) => {
       event.preventDefault()
       this.updateDetails().catch((error) => this.showToast(this.errorMessage(error)))

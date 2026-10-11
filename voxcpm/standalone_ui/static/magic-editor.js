@@ -1,7 +1,7 @@
 import { t } from './i18n.js'
 import { parseMagicDocument, renderedSpeechText, serializeMagicDocument } from './magic-document.js'
 import { MagicToolbar } from './magic-toolbar.js'
-import { MagicVoiceDefinitions } from './magic-voice-definitions.js'
+import { MagicVoiceDefinitions } from './magic-voice-definitions.js?v=pointerdown-v1'
 
 const DEFAULT_BREAK_MS = 300
 
