@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import threading
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
+import torch
 
-from voxcpm.nano_backend import NanoVoxCPM, _bounded_generation_length
+from voxcpm.nano_backend import NanoVoxCPM, _bounded_generation_length, _nano_gpu_memory_utilization
 
 
 class FakeServer:
@@ -36,6 +38,54 @@ def test_generation_length_uses_nano_steps_with_a_separate_retry_threshold() -> 
 
     assert limit == 64
     assert threshold == 40.5
+
+
+@pytest.mark.parametrize(
+    ("total_gib", "expected"),
+    [
+        (8, 0.90),
+        (12, 2 / 3),
+        (16, 0.50),
+        (24, 1 / 3),
+    ],
+)
+def test_auto_gpu_memory_utilization_targets_eight_gib(
+    monkeypatch: pytest.MonkeyPatch,
+    total_gib: int,
+    expected: float,
+) -> None:
+    monkeypatch.delenv("VOXCPM_NANO_GPU_MEMORY_UTILIZATION", raising=False)
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_properties",
+        lambda _index: SimpleNamespace(total_memory=total_gib * 1024**3),
+    )
+
+    assert _nano_gpu_memory_utilization(0) == pytest.approx(expected)
+
+
+def test_explicit_gpu_memory_utilization_overrides_auto(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VOXCPM_NANO_GPU_MEMORY_UTILIZATION", "0.61")
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_properties",
+        lambda _index: pytest.fail("explicit utilization must not inspect GPU memory"),
+    )
+
+    assert _nano_gpu_memory_utilization(0) == 0.61
+
+
+@pytest.mark.parametrize("value", ["0", "1.01", "invalid"])
+def test_invalid_gpu_memory_utilization_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("VOXCPM_NANO_GPU_MEMORY_UTILIZATION", value)
+
+    with pytest.raises(ValueError):
+        _nano_gpu_memory_utilization(0)
 
 
 def test_non_streaming_generation_retries_overlong_attempt() -> None:

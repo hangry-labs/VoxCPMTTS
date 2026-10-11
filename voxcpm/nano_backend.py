@@ -20,6 +20,8 @@ from huggingface_hub import snapshot_download
 MAX_GENERATION_SEED = 0xFFFFFFFF
 NANO_BADCASE_RATIO_THRESHOLD = 4.5
 NANO_GENERATION_LIMIT_RATIO = 6.0
+NANO_GPU_MEMORY_TARGET_BYTES = 8 * 1024**3
+NANO_GPU_MEMORY_MAX_UTILIZATION = 0.90
 
 
 def _bounded_generation_length(
@@ -52,10 +54,17 @@ def _env_int(name: str, default: int) -> int:
     return value
 
 
-def _env_float(name: str, default: float) -> float:
-    value = float(os.getenv(name, str(default)))
+def _nano_gpu_memory_utilization(device_index: int) -> float:
+    raw = os.getenv("VOXCPM_NANO_GPU_MEMORY_UTILIZATION", "auto").strip().lower()
+    if raw == "auto":
+        total_memory = int(torch.cuda.get_device_properties(device_index).total_memory)
+        if total_memory <= 0:
+            raise RuntimeError("CUDA reported an invalid total memory size")
+        return min(NANO_GPU_MEMORY_MAX_UTILIZATION, NANO_GPU_MEMORY_TARGET_BYTES / total_memory)
+
+    value = float(raw)
     if not 0.0 < value <= 1.0:
-        raise ValueError(f"{name} must be in the range (0, 1]")
+        raise ValueError("VOXCPM_NANO_GPU_MEMORY_UTILIZATION must be 'auto' or in the range (0, 1]")
     return value
 
 
@@ -94,6 +103,14 @@ class NanoVoxCPM:
         from .model.utils import mask_multichar_chinese_tokens
 
         device_index = int(device.split(":", 1)[1]) if ":" in device else 0
+        gpu_memory_utilization = _nano_gpu_memory_utilization(device_index)
+        if os.getenv("VOXCPM_NANO_GPU_MEMORY_UTILIZATION", "auto").strip().lower() == "auto":
+            total_gib = torch.cuda.get_device_properties(device_index).total_memory / 1024**3
+            print(
+                "VoxCPMTTS selected Nano-vLLM GPU memory utilization "
+                f"{gpu_memory_utilization:.3f} for a {total_gib:.1f} GiB GPU",
+                flush=True,
+            )
         self.inference_timesteps = _env_int("VOXCPM_NANO_INFERENCE_TIMESTEPS", 10)
         self._generation_lock = threading.Lock()
         self._server = NanoEngine.from_pretrained(
@@ -103,7 +120,7 @@ class NanoVoxCPM:
             max_num_batched_tokens=_env_int("VOXCPM_NANO_MAX_NUM_BATCHED_TOKENS", 4096),
             max_num_seqs=_env_int("VOXCPM_NANO_MAX_NUM_SEQS", 1),
             max_model_len=_env_int("VOXCPM_NANO_MAX_MODEL_LEN", 4096),
-            gpu_memory_utilization=_env_float("VOXCPM_NANO_GPU_MEMORY_UTILIZATION", 0.49),
+            gpu_memory_utilization=gpu_memory_utilization,
             enforce_eager=_env_bool("VOXCPM_NANO_ENFORCE_EAGER", False),
         )
         model_info = self._server.get_model_info()

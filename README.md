@@ -112,7 +112,9 @@ The immutable digest is authoritative if a readable tag is ever changed. Rolling
 
 The standard runtime uses Nano-vLLM, Python 3.13, CUDA 12.8, and a prebuilt FlashAttention wheel. Triton still performs normal first-use kernel JIT compilation inside the container; Python packages and wheels are not compiled during the image build.
 
-The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.49` gives Nano-vLLM a budget of about 7.5 GiB on a 16 GiB GPU. The service canonicalizes `auto` and `cuda:0` to one cached model instance and serializes generation with concurrency one.
+The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=auto` targets an approximately 8 GiB Nano-vLLM process budget while adapting the fraction to installed VRAM: about `0.67` on a 12 GiB GPU and `0.50` on a 16 GiB GPU, capped at `0.90` on smaller cards. Set an explicit fraction in the range `(0, 1]` only when tuning for other workloads. The service canonicalizes `auto` and `cuda:0` to one cached model instance and serializes generation with concurrency one.
+
+The fixed `v1.0` image predates automatic sizing and uses `0.49`. On a 12 GiB GPU, set `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.67` in `docker run` or Compose; Nano-vLLM's v2.0.4 error incorrectly suggests lowering this value when its calculated budget is already negative.
 
 CUDA graphs are enabled by default. Set `VOXCPM_NANO_ENFORCE_EAGER=1` only for troubleshooting. `TORCHINDUCTOR_COMPILE_THREADS=1` prevents unused compile-worker pools from retaining RAM, and the image releases temporary CUDA allocator blocks after reference-audio encoding so different reference lengths do not accumulate VRAM high-water allocations.
 
@@ -377,7 +379,11 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 
 ### v1.1 Snapshot
 
-The following work is intentionally deferred until after the qualified `v1.0` release:
+Current snapshot changes:
+
+- Replaced the fixed Nano-vLLM memory percentage with an automatic approximately 8 GiB budget, allowing 12 GiB cards to receive the same practical engine budget qualified on 16 GiB hardware while preserving explicit operator overrides.
+
+The following work remains planned:
 
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
 - Recheck Nano-vLLM-VoxCPM upstream. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
