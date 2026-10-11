@@ -19,6 +19,28 @@ Easy-to-run VoxCPM2 text-to-speech Docker images with Nano-vLLM inference, a bro
 
 This Hangry Labs fork is made for local use without the usual Python environment, model download, and runtime setup work. Install Docker, run one command, open the browser interface, or connect an application to the local API.
 
+## Quick Start
+
+Choose one image and run it on the first visible NVIDIA GPU.
+
+**Full image:** includes the pinned VoxCPM2 model assets and can run offline after the image pull.
+
+```bash
+docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+```
+
+**Tiny image:** downloads the model into the persistent volume during first use.
+
+```bash
+docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+```
+
+Then open **[http://localhost:8808](http://localhost:8808)**. Interactive API documentation is available at **[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)**.
+
+Need a different operating system, registry, GPU, or network-access command? Use the [VoxCPMTTS installation command picker](https://hangrylabs.app/software/voxcpmtts/install?os=windows&hardware=nvidia&image=full&registry=dockerhub&access=computer).
+
+The `voxcpmtts_data` volume preserves model caches, saved voices, dialogue scripts, reference audio, and application state across container replacement. Full and tiny images can reuse the same volume. To select another physical GPU, change `CUDA_VISIBLE_DEVICES`; keep one VoxCPMTTS model-serving container per GPU.
+
 ## What You Get
 
 - A browser UI for voice design, voice cloning, transcript-guided cloning, local reference transcription, and optional non-destructive voice or generated-audio finishing
@@ -43,7 +65,7 @@ Official images are published to [Docker Hub](https://hub.docker.com/r/hangrylab
 > [!IMPORTANT]
 > The project-owned and upstream-derived source is Apache-2.0, but the Docker images are aggregate distributions containing model assets, NVIDIA CUDA libraries, FFmpeg, and other packages under their respective terms. Read [Third-Party Notices](THIRD_PARTY_NOTICES.md) before deployment or redistribution.
 
-Product page and installation guide: [hangrylabs.app/software/voxcpmtts](https://hangrylabs.app/software/voxcpmtts).
+Product page: [hangrylabs.app/software/voxcpmtts](https://hangrylabs.app/software/voxcpmtts).
 
 ### Build complete dialogue scripts
 
@@ -65,33 +87,12 @@ Create voices from natural-language direction or reference recordings, lock seed
   </a>
 </p>
 
-## Quick Start
+## Docker Reference
 
-Run the full image on the first visible NVIDIA GPU:
+<details>
+<summary><strong>Image tags, persistence, GPU memory, and runtime tuning</strong></summary>
 
-```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
-```
-
-Then open **[http://localhost:8808](http://localhost:8808)**. Interactive API documentation is available at **[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)**.
-
-The unified `voxcpmtts_data` volume stores model caches, saved voice profiles, dialogue scripts, reference audio, and future application settings across container replacement. The full image seeds its baked model assets into this volume on startup; the tiny image downloads into the same volume on first online use.
-
-To select another physical GPU, change `CUDA_VISIBLE_DEVICES`. Keep one VoxCPMTTS model-serving container per GPU.
-
-The full image contains its pinned VoxCPM2 model assets. After the image is pulled, normal inference can run with Hugging Face offline mode and without a host model-cache mount.
-
-## Tiny Image
-
-Use `latest_tiny` when you want the runtime dependencies in the image but prefer the model to download into a persistent volume on first online use:
-
-```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
-```
-
-Later tiny and full image versions reuse the same `voxcpmtts_data` volume. No separate Hugging Face cache volume is required.
-
-## Image Tags
+### Image Tags
 
 - `latest` - rolling full snapshot from `main`
 - `latest_tiny` - rolling tiny snapshot from `main`
@@ -108,7 +109,7 @@ hangrylabs/voxcpmtts:vX.Y@sha256:<top-level-oci-digest>
 
 The immutable digest is authoritative if a readable tag is ever changed. Rolling `latest` tags intentionally remain unpinned because they represent the current snapshot.
 
-## Runtime Profile
+### Runtime Profile
 
 The standard runtime uses Nano-vLLM, Python 3.13, CUDA 12.8, and a prebuilt FlashAttention wheel. Triton still performs normal first-use kernel JIT compilation inside the container; Python packages and wheels are not compiled during the image build.
 
@@ -122,7 +123,12 @@ Nano-vLLM fixes the diffusion step count when the engine starts. The image defau
 
 Reference transcription lazy-loads the pinned multilingual `openai/whisper-base` model on CPU, preserving GPU memory for VoxCPM2. The full image bakes the 282 MiB ASR snapshot for offline use; the tiny image stores it in the mounted Hugging Face cache after the first transcription. Set `VOXCPM_LOAD_ASR=0` to disable transcription, or override `VOXCPM_ASR_DEVICE` and the pinned model settings when maintaining a custom image.
 
+</details>
+
 ## API Usage
+
+<details>
+<summary><strong>OpenAI-compatible and native HTTP API examples</strong></summary>
 
 ### OpenAI-compatible speech
 
@@ -289,7 +295,12 @@ Runtime discovery is available from the local API:
 - Output formats: `GET /tts/formats`
 - Interactive API reference: `GET /tts/docs`
 
+</details>
+
 ## Benchmarks
+
+<details>
+<summary><strong>Baseline results and repeatable benchmark commands</strong></summary>
 
 The checked-in [benchmark suite](benchmarks/BENCHMARKS.md) measures warmed generation speed, GPU and container memory, transcript fidelity, and multi-turn SSML reliability through a fixed Qwen3-ASR comparative judge. Native and Nano backends run sequentially on one GPU with concurrency one, and raw per-call results are retained for regression tracking.
 
@@ -316,7 +327,12 @@ task benchmark-ssml -- --asr-url http://127.0.0.1:8000 --comment "description of
 
 Benchmarks are intentionally excluded from normal tests, image builds, and releases.
 
+</details>
+
 ## Local Development
+
+<details>
+<summary><strong>Docker-first development, testing, and release commands</strong></summary>
 
 This repository is validated primarily through Docker:
 
@@ -350,6 +366,8 @@ task release
 
 The release task requires a snapshot `VERSION` such as `1.0-snapshot`, validates the tiny image, checked-in tests, and full baked image, creates the local release commit and annotated `vX.Y` tag, and prepares the next minor snapshot commit. After review and push, GitHub Actions publishes matching full and tiny tags to Docker Hub and GHCR. Creating the public GitHub Release and recording Docker Hub's top-level OCI digests in the release notes remain deliberate post-publish steps.
 
+</details>
+
 ## Upstream Project
 
 VoxCPM2 is developed by OpenBMB and contributors.
@@ -374,6 +392,9 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 - Check the [upstream VoxCPM project](https://github.com/OpenBMB/VoxCPM) when the issue concerns model behavior rather than this packaging and serving layer.
 
 ## Version History
+
+<details>
+<summary><strong>v1.1 snapshot and v1.0 release notes</strong></summary>
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
@@ -437,21 +458,24 @@ The `v1.0` release is available through the immutable version tags:
 **Full image**
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.0
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.0@sha256:5a67c302f4899aeb25a421515b9fca445a27eb0b21a429a79fdabb15423429e5
 ```
 
 **Tiny image**
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.0_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.0_tiny@sha256:474fccf3c9c1a7a7020f8520d2c4d7a298f45b744d0e7ace7b6c4a728bfe5c37
 ```
 
-GitHub Actions publishes these tags from the annotated `v1.0` source tag. Add the verified Docker Hub top-level OCI index digests here before announcing the GitHub Release.
+GitHub Actions published these immutable images from the annotated `v1.0` source tag. The references above include the verified Docker Hub top-level OCI index digests.
 
 #### Release qualification
 
-- Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
-- Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.
+- Fresh full and tiny images built successfully from the final release source.
+- The baked image completed natural speech, voice design, and reference-cloning smoke rounds with Docker networking disabled, then repeated them after a container restart.
+- The release suite passed all 135 checked-in tests, and the published Docker Hub OCI index digests were verified after publication.
+
+</details>
 
 ## Responsible Use And Privacy
 
@@ -460,6 +484,9 @@ VoxCPM2 supports highly realistic voice cloning. Do not use this project for una
 Text, reference audio, and generated speech remain on the machine running the local container unless you deliberately connect the service to another system or expose it over a network. You are responsible for securing the deployment and complying with applicable laws, platform rules, and consent requirements.
 
 ## Citation
+
+<details>
+<summary><strong>VoxCPM research citations</strong></summary>
 
 If you use VoxCPM in research, cite the upstream work:
 
@@ -485,6 +512,8 @@ If you use VoxCPM in research, cite the upstream work:
   year    = {2025},
 }
 ```
+
+</details>
 
 ## License
 
