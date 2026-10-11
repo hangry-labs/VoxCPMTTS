@@ -216,7 +216,10 @@ def main() -> int:
         "model_id": status.get("model_id"),
         "cases": len(results),
         "asr_judged": bool(asr_url),
-        "minimum_similarity": min((item["similarity"] for item in results), default=None),
+        "minimum_similarity": min(
+            (item["similarity"] for item in results if "similarity" in item),
+            default=None,
+        ),
         "output_dir": str(args.output_dir.resolve()) if args.output_dir else None,
     }
     print(json.dumps(summary, ensure_ascii=False))
