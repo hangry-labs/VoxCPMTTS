@@ -383,7 +383,7 @@ The following work is intentionally deferred until after the qualified `v1.0` re
 - Recheck Nano-vLLM-VoxCPM upstream. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
 - Split native and Nano installation metadata so the optimized image passes dependency checks without advertising native-only packages or upstream's unused `torchcodec` dependency. Keep the Nano runtime binary-wheel-only and do not add incompatible packages merely to silence metadata.
 
-### v1.0 Snapshot
+### v1.0
 
 - Promoted the VoxCPM2 Nano-vLLM backend to the standard runtime with CUDA graph acceleration and ten-step generation.
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
@@ -412,21 +412,21 @@ The following work is intentionally deferred until after the qualified `v1.0` re
 - Removed upstream training workflows and inherited project material unrelated to the inference-focused fork.
 - Replaced the inherited graphics with the VoxCPMTTS WebP brand set and updated public project links to `hangrylabs.app`.
 
-The current development snapshot is published through the rolling tags from `main`:
+The `v1.0` release is available through the immutable version tags:
 
 **Full image**
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.0
 ```
 
 **Tiny image**
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.0_tiny
 ```
 
-No immutable `v1.0` image has been published yet. After publication and validation, this section must be updated with the exact `v1.0@sha256:...` and `v1.0_tiny@sha256:...` Docker Hub references before the GitHub Release is announced.
+GitHub Actions publishes these tags from the annotated `v1.0` source tag. Add the verified Docker Hub top-level OCI index digests here before announcing the GitHub Release.
 
 #### Release qualification
 

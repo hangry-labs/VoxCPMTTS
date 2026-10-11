@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voxcpm"
-version = "1.0.0.dev0"
+version = "1.0.0"
 description = "Hangry Labs Docker-first runtime packaging for VoxCPM2 text-to-speech"
 readme = "README.md"
 license = "Apache-2.0"
