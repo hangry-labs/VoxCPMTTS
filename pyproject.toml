@@ -25,7 +25,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "torch>=2.5.0",
     "torchaudio>=2.5.0",
-    "transformers>=4.36.2",
+    "transformers>=5.19.0,<6",
     "einops",
     "fastapi",
     "python-multipart>=0.0.18",
@@ -35,7 +35,7 @@ dependencies = [
     "wetext",
     "modelscope>=1.22.0",
     "datasets>=3,<4",
-    "huggingface-hub",
+    "huggingface-hub>=2.2.0,<3",
     "pydantic",
     "tqdm",
     "simplejson",

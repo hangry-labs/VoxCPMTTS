@@ -7,6 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_ROOT_USER_ACTION=ignore \
     HF_HOME=/app/.cache/huggingface \
     MODELSCOPE_CACHE=/app/.cache/modelscope \
+    VOXCPM_MODEL_REVISION=32279effe8c19989596f05d353d1447f51d9e915 \
     VOXCPM_PREFETCH_DENOISER=1 \
     VOXCPM_PREFETCH_ASR=1 \
     VOXCPM_ASR_MODEL_ID=openai/whisper-base \
@@ -53,6 +54,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_ROOT_USER_ACTION=ignore \
     HF_HOME=/app/.cache/huggingface \
     MODELSCOPE_CACHE=/app/.cache/modelscope \
+    VOXCPM_MODEL_REVISION=32279effe8c19989596f05d353d1447f51d9e915 \
     VOXCPM_PREFETCH_DENOISER=1 \
     VOXCPM_PREFETCH_ASR=1 \
     VOXCPM_ASR_MODEL_ID=openai/whisper-base \
@@ -107,7 +109,7 @@ WORKDIR /app
 
 RUN --mount=type=cache,id=hangrylabs-pip,target=/root/.cache/pip,sharing=locked \
     python -m pip install --upgrade --only-binary=:all: pip setuptools wheel \
-    && python -m pip install --only-binary=:all: huggingface-hub==1.7.1
+    && python -m pip install --only-binary=:all: huggingface-hub==2.2.0
 
 FROM nano-asset-dependencies AS nano-asset-builder
 
@@ -138,6 +140,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TRANSFORMERS_OFFLINE=1 \
     VOXCPM_DEVICE=auto \
     VOXCPM_MODEL_ID=openbmb/VoxCPM2 \
+    VOXCPM_MODEL_REVISION=32279effe8c19989596f05d353d1447f51d9e915 \
     VOXCPM_LOAD_ASR=1 \
     VOXCPM_ASR_MODEL_ID=openai/whisper-base \
     VOXCPM_ASR_MODEL_REVISION=e37978b90ca9030d5170a5c07aadb050351a65bb \

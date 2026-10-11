@@ -28,8 +28,12 @@ def _prefetch_modelscope(model_id: str) -> None:
 
 def main() -> None:
     model_id = os.getenv("VOXCPM_MODEL_ID", "openbmb/VoxCPM2")
-    print(f"Prefetching VoxCPM model: {model_id}")
-    snapshot_download(repo_id=model_id)
+    model_revision = os.getenv(
+        "VOXCPM_MODEL_REVISION",
+        "32279effe8c19989596f05d353d1447f51d9e915",
+    )
+    print(f"Prefetching VoxCPM model: {model_id}@{model_revision}")
+    snapshot_download(repo_id=model_id, revision=model_revision)
 
     if _enabled(os.getenv("VOXCPM_PREFETCH_DENOISER"), default=True):
         denoiser_id = os.getenv("ZIPENHANCER_MODEL_ID", "iic/speech_zipenhancer_ans_multiloss_16k_base")

@@ -2,8 +2,8 @@
 
 torch==2.10.0
 torchaudio==2.10.0
-transformers==5.3.0
-huggingface-hub==1.7.1
+transformers==5.19.0
+huggingface-hub==2.2.0
 fastapi==0.135.1
 python-multipart==0.0.32
 uvicorn[standard]==0.42.0

@@ -137,6 +137,7 @@ class VoxCPM:
         zipenhancer_model_id: str = "iic/speech_zipenhancer_ans_multiloss_16k_base",
         cache_dir: str = None,
         local_files_only: bool = False,
+        revision: str | None = None,
         optimize: bool = True,
         device: str | None = None,
         lora_config: Optional[LoRAConfig] = None,
@@ -154,6 +155,7 @@ class VoxCPM:
             cache_dir: Custom cache directory for the snapshot.
             local_files_only: If True, only use local files and do not attempt
                 to download.
+            revision: Optional Hugging Face model revision or commit hash.
             device: Runtime device. Use ``None``/``"auto"`` for automatic
                 fallback, or an explicit value such as ``"cpu"``, ``"mps"``,
                 ``"cuda"``, or ``"cuda:0"``.
@@ -187,6 +189,7 @@ class VoxCPM:
                 repo_id=repo_id,
                 cache_dir=cache_dir,
                 local_files_only=local_files_only,
+                revision=revision,
             )
 
         zipenhancer_model_path = _resolve_modelscope_model_path(zipenhancer_model_id) if load_denoiser else None

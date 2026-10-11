@@ -123,6 +123,7 @@ class NanoVoxCPM:
         zipenhancer_model_id: str = "iic/speech_zipenhancer_ans_multiloss_16k_base",
         cache_dir: str | None = None,
         local_files_only: bool = False,
+        revision: str | None = None,
         device: str = "cuda:0",
         **_: object,
     ) -> "NanoVoxCPM":
@@ -133,6 +134,7 @@ class NanoVoxCPM:
                 repo_id=hf_model_id,
                 cache_dir=cache_dir,
                 local_files_only=local_files_only,
+                revision=revision,
             )
         return cls(
             model_path=model_path,

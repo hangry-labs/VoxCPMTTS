@@ -31,6 +31,10 @@ offline operation:
 | [openai/whisper-base](https://huggingface.co/openai/whisper-base) | Reference-audio transcription | Apache-2.0 |
 | [iic/speech_zipenhancer_ans_multiloss_16k_base](https://www.modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base) | Audio denoising | Apache-2.0 |
 
+Release images pin `openbmb/VoxCPM2` to commit
+`32279effe8c19989596f05d353d1447f51d9e915` and `openai/whisper-base` to
+commit `e37978b90ca9030d5170a5c07aadb050351a65bb`.
+
 Model cards and accompanying files are retained in the image's Hugging Face
 and ModelScope caches. Model licenses can change between revisions, so release
 builds must verify the resolved revisions before publication.

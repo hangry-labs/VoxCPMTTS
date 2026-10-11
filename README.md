@@ -375,10 +375,18 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
+### v1.1 Planned
+
+The following work is intentionally deferred until after the qualified `v1.0` release:
+
+- Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
+- Recheck Nano-vLLM-VoxCPM upstream. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
+
 ### v1.0 Snapshot
 
 - Promoted the VoxCPM2 Nano-vLLM backend to the standard runtime with CUDA graph acceleration and ten-step generation.
 - Added Python 3.13, CUDA 12.8, and binary-wheel-only Docker builds with full baked and tiny image targets.
+- Updated the release runtime to Transformers 5.19 with a version bound that excludes the vulnerable pre-5.10 model-loading and path-handling releases.
 - Added an offline standalone browser workspace and HTTP API for multilingual generation, voice design, controllable cloning, transcript-guided cloning, browser recording and upload, waveform trimming, format conversion, progressive MP3 streaming, GPU telemetry, model status, and model purge.
 - Added an OpenAI-compatible `/v1/audio/speech` API with official request fields, stable voice aliases, saved-profile selection, model and voice discovery, optional bearer authentication, OpenAI error envelopes, six standard output formats, and native VoxCPMTTS extensions.
 - Added a unified Design workspace for direction-only creation and reference cloning, with a compact step-completion pipeline, direct seed locking, voice names, lossless normalized portraits, searchable tags, metadata-only profile updates, a full-height saved-voice library, automatic generated-reference reuse, original design-reference retention, exact matching transcripts, fully restorable fixed-seed recipes, in-workspace refinement with confirmed replacement, drag-and-drop reference audio, truthful generation stages, recording waveforms, and persistent playback volume.
@@ -419,12 +427,8 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 
 No immutable `v1.0` image has been published yet. After publication and validation, this section must be updated with the exact `v1.0@sha256:...` and `v1.0_tiny@sha256:...` Docker Hub references before the GitHub Release is announced.
 
-#### Remaining before v1.0
+#### Release qualification
 
-Deferred v1.0 work belongs in this list so release scope does not disappear between development sessions.
-
-- Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
-- Recheck Nano-vLLM-VoxCPM upstream after the planned v1.0 product work. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
 - Run final tiny and baked image qualification, including offline restart, the multi-voice API smoke suite, browser viewport checks, and immutable registry digest verification.
 - Replace the snapshot commands and placeholder notice with the published `v1.0` and `v1.0_tiny` OCI index digests.
 

@@ -100,6 +100,10 @@ def _read_version() -> str:
 
 
 DEFAULT_MODEL_ID = os.getenv("VOXCPM_MODEL_ID", "openbmb/VoxCPM2")
+DEFAULT_MODEL_REVISION = os.getenv(
+    "VOXCPM_MODEL_REVISION",
+    "32279effe8c19989596f05d353d1447f51d9e915",
+)
 DEFAULT_BACKEND = os.getenv("VOXCPM_BACKEND", "native").strip().lower()
 if DEFAULT_BACKEND not in {"native", "nano"}:
     raise ValueError("VOXCPM_BACKEND must be either 'native' or 'nano'")
@@ -401,7 +405,7 @@ def canonical_model_device(device: str) -> str:
 def get_model(device: str = DEFAULT_DEVICE, load_denoiser: bool = False) -> Any:
     requested_device = canonical_model_device(resolve_requested_device(device))
     should_load_denoiser = DEFAULT_LOAD_DENOISER and load_denoiser
-    cache_key = (DEFAULT_BACKEND, DEFAULT_MODEL_ID, requested_device)
+    cache_key = (DEFAULT_BACKEND, f"{DEFAULT_MODEL_ID}@{DEFAULT_MODEL_REVISION}", requested_device)
     with MODEL_LOCK:
         if cache_key not in MODEL_CACHE:
             if DEFAULT_BACKEND == "nano":
@@ -417,6 +421,7 @@ def get_model(device: str = DEFAULT_DEVICE, load_denoiser: bool = False) -> Any:
                 load_denoiser=False,
                 zipenhancer_model_id=ZIPENHANCER_MODEL_ID,
                 local_files_only=DEFAULT_LOCAL_ONLY,
+                revision=DEFAULT_MODEL_REVISION,
                 optimize=DEFAULT_OPTIMIZE,
                 device=requested_device,
             )
