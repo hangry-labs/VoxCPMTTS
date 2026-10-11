@@ -208,6 +208,7 @@ class SSMLExecutionSession:
         default_binding: SSMLVoiceBinding,
         request_seed: int,
         request_speed: float,
+        vary_unbound_seed_by_unit: bool,
         default_sample_rate: int,
         staging_parent: Path,
         resolve_voice: ResolveVoice,
@@ -220,6 +221,7 @@ class SSMLExecutionSession:
         self.default_binding = default_binding
         self.request_seed = request_seed
         self.request_speed = request_speed
+        self.vary_unbound_seed_by_unit = vary_unbound_seed_by_unit
         self.default_sample_rate = default_sample_rate
         self.resolve_voice = resolve_voice
         self.resolve_language = resolve_language
@@ -279,9 +281,7 @@ class SSMLExecutionSession:
         binding = self._binding_for_unit(unit)
         if unit.direction:
             binding = replace(binding, ref_text=None, control=unit.direction)
-        seed = binding.generation_seed
-        if seed is None:
-            seed = (self.request_seed + len(self.plan.voice_definitions) + index) % (2**32)
+        seed = self._speech_seed(binding, index)
         sample_rate, waveform = self.generate_speech(unit, binding, seed)
         if self.sample_rate is None:
             self.sample_rate = sample_rate
@@ -291,8 +291,13 @@ class SSMLExecutionSession:
 
     def speech_seed(self, unit: SSMLUnit, index: int) -> int:
         binding = self._binding_for_unit(unit)
+        return self._speech_seed(binding, index)
+
+    def _speech_seed(self, binding: SSMLVoiceBinding, index: int) -> int:
         if binding.generation_seed is not None:
             return binding.generation_seed
+        if not self.vary_unbound_seed_by_unit:
+            return self.request_seed
         return (self.request_seed + len(self.plan.voice_definitions) + index) % (2**32)
 
     def render_speech_take(self, speech_index: int) -> tuple[int, np.ndarray, int]:

@@ -1041,6 +1041,10 @@ class MagicTimelineItem(BaseModel):
     kind: Literal["speech", "break"] = Field(..., alias="type")
     id: str | None = None
     milliseconds: int | None = Field(None, ge=0, le=10_000)
+    normalize_loudness: bool = Field(
+        True,
+        description="Match this speech turn to the dialogue loudness target before assembly.",
+    )
 
 
 class MagicAssemblyRequest(BaseModel):
@@ -1455,6 +1459,7 @@ def create_ssml_execution_session(payload: TTSRequest, used_seed: int) -> SSMLEx
         default_binding=_default_ssml_binding(payload, profiles),
         request_seed=used_seed,
         request_speed=payload.speed,
+        vary_unbound_seed_by_unit=payload.input_type == "ssml-h",
         default_sample_rate=sample_rate,
         staging_parent=SSML_STAGING_DIR,
         resolve_voice=resolve_voice,
@@ -1501,6 +1506,7 @@ def render_magic_take_bundle(
     payload: TTSRequest,
     speech_ids: list[str],
     retained: dict[str, tuple[int, int, np.ndarray]],
+    turn_loudness: list[bool] | None = None,
 ) -> tuple[bytes, int, str, int]:
     if payload.input_type != "ssml-h":
         raise ValueError("Magic take rendering requires input_type='ssml-h'.")
@@ -1508,6 +1514,11 @@ def render_magic_take_bundle(
     request_seed = resolve_generation_seed(payload)
     plan, _ = compile_ssml_request(payload)
     _validated_magic_speech_ids(plan, speech_ids)
+    requires_profile_commit = any(definition.scope == "profile" for definition in plan.voice_definitions)
+    if turn_loudness is None:
+        turn_loudness = [True] * len(speech_ids)
+    if len(turn_loudness) != len(speech_ids):
+        raise ValueError("Magic turn loudness settings do not match the compiled speech turns.")
     unknown = set(retained) - set(speech_ids)
     if unknown:
         raise ValueError(f"Retained Magic take does not belong to this document: {sorted(unknown)[0]}")
@@ -1518,8 +1529,9 @@ def render_magic_take_bundle(
     if len(sample_rates) > 1:
         raise ValueError("Retained Magic takes use inconsistent sample rates.")
     session: SSMLExecutionSession | None = None
+    committed_profiles: dict[str, str] = {}
     try:
-        if len(retained) != len(speech_ids):
+        if len(retained) != len(speech_ids) or requires_profile_commit:
             session = create_ssml_execution_session(payload, request_seed)
             plan = session.plan
             _validated_magic_speech_ids(plan, speech_ids)
@@ -1534,7 +1546,7 @@ def render_magic_take_bundle(
                 takes[take_id] = waveform
                 take_seeds[take_id] = seed
             sample_rate = expected_rate
-            session.commit_profiles()
+            committed_profiles = session.commit_profiles()
         else:
             sample_rate = next(iter(sample_rates), 0)
             if not sample_rate:
@@ -1543,7 +1555,11 @@ def render_magic_take_bundle(
                 takes[take_id] = waveform
                 take_seeds[take_id] = seed
 
-        waveform = assemble_audio_timeline(_magic_timeline(plan, takes, speech_ids), sample_rate)
+        assembled_takes = {
+            take_id: normalize_audio_loudness(takes[take_id], sample_rate) if enabled else takes[take_id]
+            for take_id, enabled in zip(speech_ids, turn_loudness, strict=True)
+        }
+        waveform = assemble_audio_timeline(_magic_timeline(plan, assembled_takes, speech_ids), sample_rate)
         if payload.normalize_loudness:
             waveform = normalize_audio_loudness(waveform, sample_rate)
         output = encode_audio_bytes(waveform, output_format, sample_rate)
@@ -1558,6 +1574,7 @@ def render_magic_take_bundle(
             output_format=output_format,
             output_media_type=OUTPUT_FORMATS[output_format]["media_type"],
             request_seed=request_seed,
+            committed_profiles=committed_profiles,
         )
         return bundle, request_seed, output_format, sample_rate
     finally:
@@ -1587,6 +1604,7 @@ def assemble_magic_uploads(
         raise ValueError("Magic takes must use one consistent sample rate.")
     sample_rate = next(iter(sample_rates))
     used: set[str] = set()
+    leveled: dict[str, np.ndarray] = {}
     total_break_ms = 0
     timeline: list[tuple[str, Any]] = []
     for item in payload.items:
@@ -1594,7 +1612,12 @@ def assemble_magic_uploads(
             if not item.id or item.id not in takes:
                 raise ValueError(f"Magic timeline references a missing speech take: {item.id or '(empty)'}.")
             used.add(item.id)
-            timeline.append(("speech", takes[item.id][1]))
+            waveform = takes[item.id][1]
+            if item.normalize_loudness:
+                if item.id not in leveled:
+                    leveled[item.id] = normalize_audio_loudness(waveform, sample_rate)
+                waveform = leveled[item.id]
+            timeline.append(("speech", waveform))
         else:
             duration = item.milliseconds if item.milliseconds is not None else 0
             total_break_ms += duration
@@ -3020,15 +3043,23 @@ def generate_magic_take(request: MagicTakeRequest = Body(...)) -> Response:
 async def generate_magic_render(
     payload: str = Form(...),
     speech_ids: str = Form(...),
+    turn_loudness: str = Form("[]"),
     retained: str = Form("[]"),
     takes: list[UploadFile] = File(default=[]),
 ) -> Response:
     try:
         request = TTSRequest.model_validate_json(payload)
         parsed_ids = json.loads(speech_ids)
+        parsed_loudness = json.loads(turn_loudness)
         parsed_retained = json.loads(retained)
         if not isinstance(parsed_ids, list) or not all(isinstance(item, str) for item in parsed_ids):
             raise ValueError("Magic speech_ids must be a JSON array of strings.")
+        if not isinstance(parsed_loudness, list) or not all(type(item) is bool for item in parsed_loudness):
+            raise ValueError("Magic turn_loudness must be a JSON array of booleans.")
+        if not parsed_loudness:
+            parsed_loudness = [True] * len(parsed_ids)
+        if len(parsed_loudness) != len(parsed_ids):
+            raise ValueError("Magic turn_loudness must contain one setting per speech turn.")
         if not isinstance(parsed_retained, list) or not all(isinstance(item, dict) for item in parsed_retained):
             raise ValueError("Magic retained metadata must be a JSON array of objects.")
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -3044,6 +3075,7 @@ async def generate_magic_render(
             request,
             parsed_ids,
             retained_takes,
+            parsed_loudness,
         )
         set_generation_activity("complete", "Magic dialogue is ready", active=False)
     except (FileNotFoundError, ValueError, RuntimeError, SSMLValidationError) as exc:

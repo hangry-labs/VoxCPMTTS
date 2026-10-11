@@ -69,7 +69,7 @@ Product page: [hangrylabs.app/software/voxcpmtts](https://hangrylabs.app/softwar
 
 ### Build complete dialogue scripts
 
-Use the Magic editor to assemble multi-speaker scenes visually, assign saved or script-defined voices, control each turn's language, rate, pitch, volume, and direction, mark pronunciation ranges, generate and lock individual takes, rearrange speech and pauses without rerendering accepted audio, download any turn, and save the complete dialogue as portable SSML-H.
+Use the Magic editor to assemble multi-speaker scenes visually, assign saved or script-defined voices, control each turn's language, rate, pitch, volume, direction, and loudness leveling, mark pronunciation ranges, generate and lock individual takes, rearrange speech and pauses without rerendering accepted audio, download any turn, and save the complete dialogue as portable SSML-H.
 
 <p align="center">
   <a href="assets/screenshots/generate-ui.webp">
@@ -266,7 +266,7 @@ curl --no-buffer -X POST "http://localhost:8808/tts/stream" \
   -o streamed.mp3
 ```
 
-Set `normalize_loudness` to `true` to apply output-level normalization toward `-16 LUFS` with a `-1.5 dBTP` true-peak ceiling. It applies after complete SSML assembly and is also supported by progressive MP3 streaming. Text preprocessing remains the separate `normalize` option.
+Set `normalize_loudness` to `true` to apply output-level normalization toward `-16 LUFS` with a `-1.5 dBTP` true-peak ceiling. It applies after complete SSML assembly and is also supported by progressive MP3 streaming. Magic additionally levels every speech turn before assembly by default; the volume button beside each turn's Play control can preserve that turn's original generated loudness instead. Text preprocessing remains the separate `normalize` option.
 
 Long-form protection is enabled by default for native and OpenAI-compatible requests. It keeps the same seed and conditioning while dividing long text near complete sentence or clause boundaries, then joins sections with a short natural pause. Set `protect_long_audio` to `false` only when one uninterrupted model pass is explicitly required.
 
@@ -435,7 +435,7 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 - Fixed saved-voice selection in Generate and Stream so the chosen profile reaches inference and visibly restores its language, locked seed, guidance, steps, and output-processing recipe.
 - Added Nano-tuned bounded-length retries using the backend's actual generation-step units, preventing both seed-sensitive repetition and truncated SSML sentence endings.
 - Added standard SSML and SSML-H generation for multi-speaker documents, saved clone selection, request-scoped voice design, optional profile publication, per-turn `h:direction` control, progressive unit streaming, explicit breaks, prosody, and profile editing.
-- Added Magic as the default structured dialogue editor, with draggable speech and pause blocks, saved and document-defined voices, portraits, independently generated speech takes, per-turn play, regeneration, locking and download, model-free reassembly after pause or ordering changes, one-click capture of generated voices as reusable characters, per-turn language, prosody, and direction, inline `say-as` and pronunciation substitutions, experimental vocal cues, live SSML-H synchronization, guarded SSML-H import, document download, and a searchable persistent script library with confirmed updates. Inline cues remain explicitly experimental because VoxCPM2 does not publish a stable supported-tag contract; use per-turn direction for dependable style control.
+- Added Magic as the default structured dialogue editor, with draggable speech and pause blocks, saved and document-defined voices, portraits, independently generated speech takes, per-turn play, regeneration, locking, download, and reversible loudness leveling, model-free reassembly after pause or ordering changes, one-click capture of generated voices as reusable characters, per-turn language, prosody, and direction, inline `say-as` and pronunciation substitutions, experimental vocal cues, live SSML-H synchronization, guarded SSML-H import, document download, and a searchable persistent script library with confirmed updates. Inline cues remain explicitly experimental because VoxCPM2 does not publish a stable supported-tag contract; use per-turn direction for dependable style control.
 - Added optional `-16 LUFS` output normalization for complete and progressive generation, plus a compact grouped settings panel with clearer model, seed, output-processing, and speech-timing controls.
 - Added non-destructive Voice Design finishing with side-by-side original and processed playback, FFmpeg cleanup/mastering, MIT-licensed Signalsmith pitch and speed shaping, Clean and Studio presets, custom controls, explicit save-version selection, float 48 kHz output, and restorable processing recipes.
 - Unified model caches, saved voices, dialogue scripts, reference audio, and application state under one `/app/persistent` product volume; baked images seed immutable assets into it without deleting later downloads.

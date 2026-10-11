@@ -183,6 +183,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="magic-substitution-dialog"' in responses["/"].text
     assert 'id="magic-voice-definitions-dialog"' in responses["/"].text
     assert 'id="magic-character-dialog"' in responses["/"].text
+    assert 'id="magic-character-error"' in responses["/"].text
+    assert 'id="magic-definition-error"' in responses["/"].text
     assert 'data-character-scope="request"' in responses["/"].text
     assert 'data-character-scope="profile"' in responses["/"].text
     assert 'id="script-list"' in responses["/"].text
@@ -208,6 +210,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     script_library = responses["/static/dialogue-script-library.js"].text
     generation_toolbar = responses["/static/generation-toolbar.js"].text
     magic_editor = responses["/static/magic-editor.js"].text
+    magic_definitions = responses["/static/magic-voice-definitions.js"].text
     magic_takes = responses["/static/magic-takes.js"].text
     styles = responses["/static/styles.css"].text
     assert "IncrementalAudioPlayback" in script
@@ -229,6 +232,9 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "state.inputType === 'magic' ? 'ssml-h' : state.inputType" in script
     assert "async function generateMagicPreview(" in script
     assert "async function openMagicCharacterDialog(" in script
+    assert "async function persistMagicScriptCharacter(" in script
+    assert "function showMagicCharacterError(" in script
+    assert "if (event.target !== event.currentTarget) return" in script
     assert "function setMagicCharacterScope(" in script
     assert "magicEditor.addScriptCharacter(" in script
     assert "magicEditor.markFullGeneration" in script
@@ -236,10 +242,18 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "function removableChip(" in magic_editor
     assert "action.startsWith('clear-')" in magic_editor
     assert "'clear-rate', 'clear-pitch', 'clear-volume'" in magic_editor
+    custom_direction_handler = magic_editor.split("this.customDirection.addEventListener('input'", 1)[1].split(
+        "this.expressionControl.addEventListener('change'", 1
+    )[0]
+    assert "this.toolbar.sync()" in custom_direction_handler
+    assert "this.syncToolbar()" not in custom_direction_handler
+    assert "this.directionControl.value = '__custom__'" in custom_direction_handler
     assert ".magic-chip-remove" in styles
     assert "'/tts/magic/render'" in magic_takes
     assert "'/tts/magic/take'" in magic_takes
     assert "'/tts/magic/assemble-upload'" in magic_takes
+    assert "turn_loudness" in magic_takes
+    assert "normalize-loudness" in magic_editor
     assert "export class DialogueScriptLibrary" in script_library
     assert "export class GenerationToolbar" in generation_toolbar
     assert "class WorkflowValidationError" in script
@@ -254,6 +268,16 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "redoDialogue()" in magic_editor
     assert "supportsDefaultDirection" in magic_editor
     assert "addScriptCharacter(id, definition)" in magic_editor
+    assert "promoteScriptCharacter(sourceName, profileId)" in magic_editor
+    assert "adoptCommittedProfiles(profiles)" in magic_editor
+    assert "onPersistCharacter" in magic_editor
+    assert "detail.committed" in magic_editor
+    assert "async saveForm()" in magic_definitions
+    assert "await this.onPersist(" in magic_definitions
+    assert "this.showError(error)" in magic_definitions
+    assert "magicEditor.promoteScriptCharacter(" in script
+    assert "magicEditor.adoptCommittedProfiles(result.committedProfiles)" in script
+    assert "magicEditor.profileNameExists(name)" in script
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
     assert "normalize_loudness: $('#normalize-loudness').checked" in script
@@ -919,7 +943,7 @@ def test_dialogue_workspace_persists_folders_takes_and_outputs(tmp_path: Path) -
         "tags": ["launch"],
         "folder": "audio-dramas",
         "workspace": {
-            "settings": {"output_format": "mp3", "seed": 4242},
+            "settings": {"output_format": "mp3", "seed": 4242, "turn_loudness": [False]},
             "finishing": {"options": {"method": "ffmpeg"}, "stale": False},
             "takes": [{"speech_index": 0, "seed": 4242, "locked": True, "extension": "wav"}],
             "output": {"extension": "mp3"},
@@ -966,6 +990,7 @@ def test_dialogue_workspace_persists_folders_takes_and_outputs(tmp_path: Path) -
     assert listed.json()["folders"][0]["name"] == "Audio Dramas"
     assert loaded.json()["folder"] == "audio-dramas"
     assert workspace["settings"]["seed"] == 4242
+    assert workspace["settings"]["turn_loudness"] == [False]
     assert workspace["takes"][0]["locked"] is True
     assert take_audio.content == b"saved-take"
     assert output_audio.content == b"saved-output"

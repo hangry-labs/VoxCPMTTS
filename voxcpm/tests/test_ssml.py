@@ -164,7 +164,7 @@ def test_standard_ssml_generates_ordered_units() -> None:
     assert response.status_code == 200, response.text
     assert response.headers["x-voxcpm-input-type"] == "ssml"
     assert [call["text"] for call in model.calls] == ["Hello.", "World."]
-    assert [call["seed"] for call in model.calls] == [42, 43]
+    assert [call["seed"] for call in model.calls] == [42, 42]
 
 
 def test_ssml_h_profile_is_published_only_after_success() -> None:

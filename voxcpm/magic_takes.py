@@ -41,6 +41,7 @@ def pack_magic_take_bundle(
     output_format: str,
     output_media_type: str,
     request_seed: int,
+    committed_profiles: dict[str, str] | None = None,
 ) -> bytes:
     payload = bytearray()
     take_manifest: list[dict[str, int | str]] = []
@@ -61,6 +62,7 @@ def pack_magic_take_bundle(
         "version": MAGIC_TAKE_BUNDLE_VERSION,
         "request_seed": int(request_seed),
         "sample_rate": int(sample_rate),
+        "committed_profiles": committed_profiles or {},
         "takes": take_manifest,
         "output": {
             "offset": output_offset,

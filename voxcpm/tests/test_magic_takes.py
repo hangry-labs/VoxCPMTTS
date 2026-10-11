@@ -37,6 +37,19 @@ DOCUMENT = """<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
   Second turn.
 </speak>"""
 
+PROFILE_DOCUMENT = """<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+  xmlns:h="https://hangrylabs.app/ns/ssml-h/1.0" xml:lang="en-US">
+  <metadata><h:extensions version="1.0">
+    <h:voice-definition name="Host" scope="{scope}" seed="7">
+      <h:description>A warm and confident host.</h:description>
+      <h:sample xml:lang="en-US">Welcome to the show.</h:sample>
+    </h:voice-definition>
+  </h:extensions></metadata>
+  <voice name="Host">First turn.</voice>
+  <break time="100ms" />
+  <voice name="Host">Second turn.</voice>
+</speak>"""
+
 
 def _payload() -> dict:
     return {
@@ -103,6 +116,27 @@ def test_magic_render_returns_individual_takes_and_composed_output(tmp_path: Pat
     assert [call["text"] for call in model.calls] == ["First turn.", "Second turn."]
     assert _wav_frames(_bundle_audio(manifest, binary, manifest["takes"][0])) == (16_000, 16_000)
     assert _wav_frames(_bundle_audio(manifest, binary, manifest["output"]))[0] == 16_000
+
+
+def test_magic_render_levels_only_enabled_turns_before_assembly(tmp_path: Path) -> None:
+    model = _FakeModel()
+    with (
+        patch.object(runtime, "SSML_STAGING_DIR", tmp_path / "staging"),
+        patch.object(runtime, "get_model", return_value=model),
+        patch.object(runtime, "normalize_audio_loudness", side_effect=lambda audio, _rate: audio) as normalize,
+        TestClient(runtime.app) as client,
+    ):
+        response = client.post(
+            "/tts/magic/render",
+            data={
+                "payload": json.dumps(_payload()),
+                "speech_ids": '["turn-1","turn-2"]',
+                "turn_loudness": "[true,false]",
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    assert normalize.call_count == 1
 
 
 def test_magic_render_reuses_locked_take_and_generates_only_unlocked_turn(tmp_path: Path) -> None:
@@ -174,6 +208,52 @@ def test_magic_render_with_all_retained_takes_does_not_load_model(tmp_path: Path
     get_model.assert_not_called()
 
 
+def test_magic_render_commits_profile_when_all_speech_takes_are_retained(tmp_path: Path) -> None:
+    initial_model = _FakeModel()
+    request_payload = {**_payload(), "text": PROFILE_DOCUMENT.format(scope="request")}
+    with (
+        patch.object(runtime, "VOICE_PROFILE_DIR", tmp_path / "voices"),
+        patch.object(runtime, "SSML_STAGING_DIR", tmp_path / "staging"),
+        patch.object(runtime, "get_model", return_value=initial_model),
+        TestClient(runtime.app) as client,
+    ):
+        initial = client.post(
+            "/tts/magic/render",
+            data={"payload": json.dumps(request_payload), "speech_ids": '["turn-1","turn-2"]'},
+        )
+    initial_manifest, initial_binary = _unpack_bundle(initial.content)
+    audio = [_bundle_audio(initial_manifest, initial_binary, item) for item in initial_manifest["takes"]]
+
+    profile_model = _FakeModel()
+    profile_payload = {**_payload(), "text": PROFILE_DOCUMENT.format(scope="profile")}
+    with (
+        patch.object(runtime, "VOICE_PROFILE_DIR", tmp_path / "voices"),
+        patch.object(runtime, "SSML_STAGING_DIR", tmp_path / "staging"),
+        patch.object(runtime, "get_model", return_value=profile_model),
+        TestClient(runtime.app) as client,
+    ):
+        response = client.post(
+            "/tts/magic/render",
+            data={
+                "payload": json.dumps(profile_payload),
+                "speech_ids": '["turn-1","turn-2"]',
+                "retained": '[{"id":"turn-1","seed":42},{"id":"turn-2","seed":43}]',
+            },
+            files=[
+                ("takes", ("turn-1.wav", audio[0], "audio/wav")),
+                ("takes", ("turn-2.wav", audio[1], "audio/wav")),
+            ],
+        )
+        profiles = client.get("/tts/voice-profiles").json()["data"]
+
+    assert response.status_code == 200, response.text
+    assert [profile["id"] for profile in profiles] == ["host"]
+    manifest, _ = _unpack_bundle(response.content)
+    assert manifest["committed_profiles"] == {"Host": "host"}
+    assert len(profile_model.calls) == 1
+    assert profile_model.calls[0]["text"].endswith("Welcome to the show.")
+
+
 def test_magic_single_take_and_model_free_reassembly(tmp_path: Path) -> None:
     model = _FakeModel()
     with (
@@ -192,13 +272,17 @@ def test_magic_single_take_and_model_free_reassembly(tmp_path: Path) -> None:
 
     options = {
         "items": [
-            {"type": "speech", "id": "turn-1"},
+            {"type": "speech", "id": "turn-1", "normalize_loudness": True},
             {"type": "break", "milliseconds": 500},
-            {"type": "speech", "id": "turn-2"},
+            {"type": "speech", "id": "turn-2", "normalize_loudness": False},
         ],
         "output_format": "wav",
     }
-    with patch.object(runtime, "get_model") as get_model, TestClient(runtime.app) as client:
+    with (
+        patch.object(runtime, "get_model") as get_model,
+        patch.object(runtime, "normalize_audio_loudness", side_effect=lambda audio, _rate: audio) as normalize,
+        TestClient(runtime.app) as client,
+    ):
         assembled = client.post(
             "/tts/magic/assemble-upload",
             data={
@@ -214,3 +298,4 @@ def test_magic_single_take_and_model_free_reassembly(tmp_path: Path) -> None:
     assert assembled.status_code == 200, assembled.text
     assert _wav_frames(assembled.content) == (16_000, 40_000)
     get_model.assert_not_called()
+    assert normalize.call_count == 1

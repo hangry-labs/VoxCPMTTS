@@ -8,12 +8,14 @@ function cloneDefinitions(definitions) {
 }
 
 export class MagicVoiceDefinitions {
-  constructor(dialog, { onChange, onError } = {}) {
+  constructor(dialog, { onChange, onPersist, onError } = {}) {
     this.dialog = dialog
     this.form = dialog.querySelector('#magic-definition-form')
     this.list = dialog.querySelector('#magic-definition-list')
     this.summary = dialog.querySelector('#magic-definition-summary')
+    this.error = dialog.querySelector('#magic-definition-error')
     this.onChange = onChange || (() => {})
+    this.onPersist = onPersist || (async () => null)
     this.onError = onError || (() => {})
     this.definitions = []
     this.selectedIndex = -1
@@ -27,12 +29,17 @@ export class MagicVoiceDefinitions {
     this.dialog.querySelector('#magic-definition-add').addEventListener('click', () => this.startNew())
     this.dialog.querySelector('#magic-definition-delete').addEventListener('click', () => this.removeSelected())
     this.list.addEventListener('change', () => this.select(Number(this.list.value)))
-    this.form.addEventListener('submit', (event) => {
+    this.form.addEventListener('submit', async (event) => {
       event.preventDefault()
+      const button = this.form.querySelector('button[type="submit"]')
+      button.disabled = true
+      this.clearError()
       try {
-        this.saveForm()
+        await this.saveForm()
       } catch (error) {
-        this.onError(error)
+        this.showError(error)
+      } finally {
+        button.disabled = false
       }
     })
     this.form.elements.scope.addEventListener('change', () => {
@@ -42,6 +49,7 @@ export class MagicVoiceDefinitions {
     })
     closeDialogOnBackdrop(this.dialog, () => this.close())
     this.dialog.addEventListener('cancel', (event) => {
+      if (event.target !== this.dialog) return
       event.preventDefault()
       this.close()
     })
@@ -64,6 +72,7 @@ export class MagicVoiceDefinitions {
   }
 
   show() {
+    this.clearError()
     this.renderList()
     this.fillForm(this.selectedIndex >= 0 ? this.definitions[this.selectedIndex] : null)
     this.dialog.showModal()
@@ -71,12 +80,26 @@ export class MagicVoiceDefinitions {
   }
 
   close() {
+    this.clearError()
     this.dialog.close()
+  }
+
+  clearError() {
+    if (!this.error) return
+    this.error.textContent = ''
+    this.error.hidden = true
+  }
+
+  showError(error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!this.error) return this.onError(error)
+    this.error.textContent = message
+    this.error.hidden = false
   }
 
   startNew() {
     if (this.definitions.length >= this.maxDefinitions) {
-      this.onError(new Error(t(
+      this.showError(new Error(t(
         'magic.definitionLimit',
         { count: this.maxDefinitions },
         `A script can contain at most ${this.maxDefinitions} character definitions.`,
@@ -97,6 +120,7 @@ export class MagicVoiceDefinitions {
   }
 
   fillForm(definition) {
+    this.clearError()
     const value = definition || {}
     for (const element of this.form.elements) {
       if (!element.name) continue
@@ -157,8 +181,30 @@ export class MagicVoiceDefinitions {
     return definition
   }
 
-  saveForm() {
+  async saveForm() {
     const definition = this.readForm()
+    const previous = this.selectedIndex >= 0 ? this.definitions[this.selectedIndex] : null
+    if (definition.scope === 'profile') {
+      if (!previous) {
+        throw new Error(t(
+          'magic.definitionGenerateFirst',
+          {},
+          'Keep this character in the script and generate one of its turns before saving it as a voice.',
+        ))
+      }
+      const committed = await this.onPersist(definition, { ...previous })
+      if (!committed?.profileId) {
+        throw new Error(t('magic.definitionSaveFailed', {}, 'The character could not be saved as a voice.'))
+      }
+      this.definitions.splice(this.selectedIndex, 1)
+      this.selectedIndex = Math.min(this.selectedIndex, this.definitions.length - 1)
+      this.renderList()
+      this.fillForm(this.selectedIndex >= 0 ? this.definitions[this.selectedIndex] : null)
+      this.onChange(this.getDefinitions(), {
+        committed: { [previous.name]: committed.profileId },
+      })
+      return
+    }
     if (this.selectedIndex < 0) {
       this.definitions.push(definition)
       this.selectedIndex = this.definitions.length - 1

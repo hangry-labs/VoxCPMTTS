@@ -6,8 +6,8 @@ import { closeDialogOnBackdrop } from './dialog-utils.js?v=pointerdown-v1'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=pointerdown-v1'
 import { GenerationToolbar } from './generation-toolbar.js?v=workflow-controls'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
-import { MagicEditor } from './magic-editor.js?v=pointerdown-v1'
-import { MagicTakeStudio } from './magic-takes.js?v=turn-studio'
+import { MagicEditor } from './magic-editor.js?v=modal-promotion-v1'
+import { MagicTakeStudio } from './magic-takes.js?v=profile-commit-v1'
 import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
 import { VersionCheck } from './version-check.js?v=published-builds'
 
@@ -104,6 +104,7 @@ const state = {
   portraitRemoved: false,
   portraitTargetProfile: null,
   magicCharacterBlockId: null,
+  magicCharacterSourceName: null,
   magicCharacterScope: 'request',
   magicCharacterPortraitFile: null,
   magicCharacterPortraitUrl: null,
@@ -122,7 +123,9 @@ const magicTakeStudio = new MagicTakeStudio({ responseError })
 const magicEditor = new MagicEditor($('#magic-editor-shell'), {
   onChange: handleMagicChange,
   onPreview: generateMagicPreview,
+  onLevelPreview: (block) => magicTakeStudio.level(block),
   onSaveCharacter: openMagicCharacterDialog,
+  onPersistCharacter: persistMagicScriptCharacter,
   onError: (error) => showToast(errorMessage(error)),
   onHistoryChange: ({ canUndo, canRedo }) => {
     $('#dialogue-undo').disabled = !canUndo
@@ -260,6 +263,7 @@ function captureScriptWorkspace() {
       protect_long_audio: $('#protect-long-audio').checked,
       normalize_loudness: $('#normalize-loudness').checked,
       normalize_text: $('#normalize-text').checked,
+      turn_loudness: magicEditor.turnLoudness(),
     },
     finishing: {
       options: finishing.options,
@@ -300,6 +304,7 @@ async function restoreScriptWorkspace(workspace) {
   updateSeedState()
   generationToolbar.sync()
   if (['generate', 'stream'].includes(settings.generation_mode)) setGenerationMode(settings.generation_mode)
+  magicEditor.restoreTurnLoudness(settings.turn_loudness, { notify: false })
   magicEditor.restoreWorkspaceTakes(workspace.takes || [], { notify: false })
   if (workspace.output?.blob) {
     const extension = workspace.output.extension || 'wav'
@@ -479,6 +484,7 @@ function setInputType(inputType, { syncSsmlH = true } = {}) {
 }
 
 function handleMagicChange(editorInstance, detail = {}) {
+  if (detail.workspaceChanged) dialogueScripts?.markDirty()
   if (!detail.takesOnly) {
     state.inputDrafts['ssml-h'] = editorInstance.toSSMLH()
     dialogueScripts?.markDirty()
@@ -1139,7 +1145,20 @@ function setMagicCharacterPortrait(file = null) {
   $('#magic-character-portrait-placeholder').hidden = Boolean(state.magicCharacterPortraitUrl)
 }
 
+function clearMagicCharacterError() {
+  const output = $('#magic-character-error')
+  output.textContent = ''
+  output.hidden = true
+}
+
+function showMagicCharacterError(error) {
+  const output = $('#magic-character-error')
+  output.textContent = errorMessage(error)
+  output.hidden = false
+}
+
 function setMagicCharacterScope(scope = 'request') {
+  clearMagicCharacterError()
   state.magicCharacterScope = scope === 'profile' ? 'profile' : 'request'
   $$('[data-character-scope]').forEach((button) => {
     const active = button.dataset.characterScope === state.magicCharacterScope
@@ -1170,13 +1189,16 @@ async function openMagicCharacterDialog(block) {
   const preview = await magicEditor.ensurePreview(block.id)
   if (!preview) return
   state.magicCharacterBlockId = block.id
+  const scriptCharacter = magicEditor.scriptCharacter(block.voice)
+  state.magicCharacterSourceName = scriptCharacter?.name || null
+  clearMagicCharacterError()
   setMagicCharacterPortrait()
   const speechTurns = magicEditor.blocks.filter((item) => item.type === 'speech')
   const turnNumber = Math.max(1, speechTurns.findIndex((item) => item.id === block.id) + 1)
-  $('#magic-character-name').value = `character-${turnNumber}`
+  $('#magic-character-name').value = scriptCharacter?.name || `character-${turnNumber}`
   $('#magic-character-tags').value = ($('#language').value || 'English').toLowerCase()
-  $('#magic-character-description').value = block.direction || ''
-  setMagicCharacterScope('request')
+  $('#magic-character-description').value = scriptCharacter?.description || block.direction || ''
+  setMagicCharacterScope(scriptCharacter ? 'profile' : 'request')
   $('#magic-character-dialog').showModal()
   $('#magic-character-name').focus()
   $('#magic-character-name').select()
@@ -1184,7 +1206,9 @@ async function openMagicCharacterDialog(block) {
 
 function closeMagicCharacterDialog() {
   state.magicCharacterBlockId = null
+  state.magicCharacterSourceName = null
   setMagicCharacterPortrait()
+  clearMagicCharacterError()
   $('#magic-character-dialog').close()
 }
 
@@ -1206,6 +1230,36 @@ function magicCharacterRecipe(block, preview) {
     sample_text: spokenText,
     reference_text: spokenText,
   }
+}
+
+async function persistMagicScriptCharacter({ definition, block }) {
+  const preview = block.preview
+  const name = normalizedProfileName(definition.name)
+  if (!name || !preview?.blob) {
+    throw new Error(t('errors.generateTurnFirst', {}, 'Generate this turn before saving its voice.'))
+  }
+  const exists = magicEditor.profileNameExists(name)
+  if (exists && !definition.replace) {
+    throw new Error(t('magic.characterExists', { name }, `Character ${name} already exists.`))
+  }
+  const extension = preview.extension || 'wav'
+  const file = new File([preview.blob], `${name}.${extension}`, { type: preview.blob.type || 'audio/wav' })
+  const selected = $('#voice-profile').value
+  const saved = await saveProfileRequest({
+    name,
+    profileType: 'cloned',
+    description: definition.description || block.direction || '',
+    tags: [String(block.language || $('#language').value || 'English').toLowerCase()],
+    file,
+    designFile: file,
+    refText: magicEditor.spokenText(block).trim(),
+    control: block.direction || '',
+    recipe: magicCharacterRecipe(block, preview),
+    editing: exists && definition.replace,
+  })
+  await refreshProfiles(selected)
+  setStatus(t('status.voiceStored', { name: saved.id }, `Voice ${saved.id} stored`), 'success')
+  return { profileId: saved.id }
 }
 
 function renderTimestamps(workflow, result) {
@@ -1345,6 +1399,10 @@ async function generateMagicAudio() {
   try {
     const result = await magicTakeStudio.render(payload, magicEditor.blocks)
     magicEditor.applyTakes(result.takes)
+    if (Object.keys(result.committedProfiles).length) {
+      await refreshProfiles($('#voice-profile').value)
+      magicEditor.adoptCommittedProfiles(result.committedProfiles)
+    }
     await generateOutput.load(result.output.blob, `voxcpmtts-magic.${result.output.extension}`)
     generateFinisher.setSource(result.output.blob, result.output.extension)
     if (Number.isInteger(result.requestSeed)) {
@@ -2265,8 +2323,9 @@ $('#magic-character-portrait').addEventListener('change', (event) => {
   event.target.value = ''
   if (!file) return
   const allowed = ['image/png', 'image/jpeg', 'image/webp']
-  if (!allowed.includes(file.type)) return showToast(t('errors.portraitFormat', {}, 'Choose a PNG, JPEG, or WebP portrait.'))
-  if (file.size > 5 * 1024 * 1024) return showToast(t('errors.portraitSize', {}, 'Voice portraits must be 5 MB or smaller.'))
+  if (!allowed.includes(file.type)) return showMagicCharacterError(t('errors.portraitFormat', {}, 'Choose a PNG, JPEG, or WebP portrait.'))
+  if (file.size > 5 * 1024 * 1024) return showMagicCharacterError(t('errors.portraitSize', {}, 'Voice portraits must be 5 MB or smaller.'))
+  clearMagicCharacterError()
   setMagicCharacterPortrait(file)
 })
 $$('[data-character-scope]').forEach((button) => {
@@ -2277,9 +2336,16 @@ $('#magic-character-form').addEventListener('submit', async (event) => {
   const blockId = state.magicCharacterBlockId
   const block = magicEditor.block(blockId)
   const name = normalizedProfileName($('#magic-character-name').value)
-  if (!block || !name) return showToast(t('errors.nameVoice', {}, 'Name this voice before storing it.'))
-  if (magicEditor.characterNameExists(name)) {
-    return showToast(t('magic.characterExists', { name }, `Character ${name} already exists.`))
+  clearMagicCharacterError()
+  if (!block || !name) return showMagicCharacterError(t('errors.nameVoice', {}, 'Name this voice before storing it.'))
+  const promotesScriptCharacter = state.magicCharacterScope === 'profile'
+    && state.magicCharacterSourceName
+    && magicEditor.scriptCharacter(state.magicCharacterSourceName)
+  const reusesSourceName = promotesScriptCharacter
+    && state.magicCharacterSourceName.toLowerCase() === name.toLowerCase()
+  if (magicEditor.profileNameExists(name)
+      || (magicEditor.characterNameExists(name) && !reusesSourceName)) {
+    return showMagicCharacterError(t('magic.characterExists', { name }, `Character ${name} already exists.`))
   }
   const button = $('button[type="submit"]', event.currentTarget)
   button.disabled = true
@@ -2318,12 +2384,16 @@ $('#magic-character-form').addEventListener('submit', async (event) => {
       recipe: magicCharacterRecipe(block, preview),
     })
     await refreshProfiles(selected)
-    magicEditor.assignVoice(block.id, saved.id)
+    if (promotesScriptCharacter) {
+      magicEditor.promoteScriptCharacter(state.magicCharacterSourceName, saved.id)
+    } else {
+      magicEditor.assignVoice(block.id, saved.id)
+    }
     closeMagicCharacterDialog()
     showToast(t('magic.characterSaved', { name: saved.id }, `Saved ${saved.id} and assigned it to this turn.`), 'success')
     setStatus(t('status.voiceStored', { name: saved.id }, `Voice ${saved.id} stored`), 'success')
   } catch (error) {
-    showToast(errorMessage(error))
+    showMagicCharacterError(error)
   } finally {
     button.disabled = false
   }
@@ -2332,6 +2402,7 @@ $('#magic-character-close').addEventListener('click', closeMagicCharacterDialog)
 $('#magic-character-cancel').addEventListener('click', closeMagicCharacterDialog)
 closeDialogOnBackdrop($('#magic-character-dialog'), closeMagicCharacterDialog)
 $('#magic-character-dialog').addEventListener('cancel', (event) => {
+  if (event.target !== event.currentTarget) return
   event.preventDefault()
   closeMagicCharacterDialog()
 })

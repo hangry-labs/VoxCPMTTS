@@ -417,6 +417,7 @@
       </div>
       <label class="field" data-character-persistent><span><span data-i18n="profiles.tags">Tags</span> <small data-i18n="profiles.commaSeparated">Comma separated</small></span><input id="magic-character-tags" type="text" maxlength="395" placeholder="captain, dramatic, english" data-i18n-placeholder="magic.characterTagsPlaceholder" autocomplete="off"></label>
       <label class="field"><span><span data-i18n="profiles.description">Description</span> <small data-i18n="common.optional">Optional</small></span><input id="magic-character-description" type="text" maxlength="240" placeholder="Where this voice works best" data-i18n-placeholder="profiles.descriptionPlaceholder"></label>
+      <div class="dialog-status" id="magic-character-error" role="alert" hidden></div>
       <div class="dialog-actions"><button class="secondary-button" id="magic-character-cancel" type="button" data-i18n="common.cancel">Cancel</button><button class="primary-button" type="submit"><i class="icon-check"></i><span id="magic-character-submit-label" data-i18n="magic.addCharacter">Add character</span></button></div>
     </form>
   </dialog>
@@ -455,6 +456,7 @@
           <label class="field"><span data-i18n="magic.sampleLanguage">Sample language</span><input name="sampleLanguage" type="text" maxlength="40" placeholder="en-US" data-i18n-placeholder="magic.sampleLanguagePlaceholder"></label>
           <label class="toggle-field magic-definition-replace"><input name="replace" type="checkbox"><span class="toggle-track" aria-hidden="true"></span><span data-i18n="magic.definitionReplace">Replace an existing saved voice with this name</span></label>
         </div>
+        <div class="dialog-status" id="magic-definition-error" role="alert" hidden></div>
         <div class="dialog-actions"><button class="primary-button" type="submit"><i class="icon-check"></i><span data-i18n="magic.definitionApply">Apply character</span></button></div>
       </form>
     </div>

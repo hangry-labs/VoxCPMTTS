@@ -1,7 +1,8 @@
 import { t } from './i18n.js'
+import { closeDialogOnBackdrop } from './dialog-utils.js?v=pointerdown-v1'
 import { parseMagicDocument, renderedSpeechText, serializeMagicDocument } from './magic-document.js'
 import { MagicToolbar } from './magic-toolbar.js'
-import { MagicVoiceDefinitions } from './magic-voice-definitions.js?v=pointerdown-v1'
+import { MagicVoiceDefinitions } from './magic-voice-definitions.js?v=atomic-profile-v1'
 
 const DEFAULT_BREAK_MS = 300
 
@@ -105,7 +106,15 @@ function dragHandle(title) {
 }
 
 export class MagicEditor {
-  constructor(root, { onChange, onPreview, onSaveCharacter, onError, onHistoryChange } = {}) {
+  constructor(root, {
+    onChange,
+    onPreview,
+    onLevelPreview,
+    onSaveCharacter,
+    onPersistCharacter,
+    onError,
+    onHistoryChange,
+  } = {}) {
     this.root = root
     this.canvas = root.querySelector('#magic-editor')
     this.voiceControl = root.querySelector('#magic-voice-control')
@@ -120,15 +129,19 @@ export class MagicEditor {
     this.summary = root.querySelector('#magic-summary')
     this.onChange = onChange || (() => {})
     this.onPreview = onPreview || (async () => null)
+    this.onLevelPreview = onLevelPreview || (async () => null)
     this.onSaveCharacter = onSaveCharacter || (async () => {})
+    this.onPersistCharacter = onPersistCharacter || (async () => null)
     this.onError = onError || (() => {})
     this.onHistoryChange = onHistoryChange || (() => {})
     this.nextId = 1
     this.voices = []
+    this.profileIds = new Set()
     this.languages = []
     this.defaultVoice = null
     this.busy = false
     this.previewBusyId = null
+    this.levelingId = null
     this.playingId = null
     this.previewAudio = new Audio()
     this.previewAudio.addEventListener('ended', () => {
@@ -154,6 +167,7 @@ export class MagicEditor {
     this.toolbar = new MagicToolbar(root)
     this.definitionEditor = new MagicVoiceDefinitions(document.querySelector('#magic-voice-definitions-dialog'), {
       onChange: (definitions, detail) => this.updateVoiceDefinitions(definitions, detail),
+      onPersist: (definition, previous) => this.persistVoiceDefinition(definition, previous),
       onError: this.onError,
     })
     this.blocks = [this.createSpeech(t('composer.defaultText', {}, 'VoxCPM2 generates natural multilingual speech with voice design and cloning.'))]
@@ -174,8 +188,10 @@ export class MagicEditor {
       language: '',
       prosody: { rate: '', pitch: '', volume: '' },
       preview: null,
+      leveledPreview: null,
       captureSeed: null,
       locked: false,
+      normalizeLoudness: true,
     }
   }
 
@@ -221,8 +237,11 @@ export class MagicEditor {
       if (!block) return
       this.invalidateBlock(block)
       block.direction = this.customDirection.value.trim()
+      this.directionControl.value = '__custom__'
       this.renderBlocks()
-      this.syncToolbar()
+      // Keep the live input value intact so a trailing space is not trimmed
+      // and written back before the user can type the next word.
+      this.toolbar.sync()
       this.changed()
     })
     this.expressionControl.addEventListener('change', () => {
@@ -323,14 +342,16 @@ export class MagicEditor {
     })
     document.querySelector('#magic-substitution-close').addEventListener('click', closeSubstitution)
     document.querySelector('#magic-substitution-cancel').addEventListener('click', closeSubstitution)
-    substitutionDialog.addEventListener('click', (event) => { if (event.target === substitutionDialog) closeSubstitution() })
+    closeDialogOnBackdrop(substitutionDialog, closeSubstitution)
     substitutionDialog.addEventListener('cancel', (event) => {
+      if (event.target !== substitutionDialog) return
       event.preventDefault()
       closeSubstitution()
     })
   }
 
   setVoices(profiles) {
+    this.profileIds = new Set(profiles.map((profile) => String(profile.id).toLowerCase()))
     this.voices = profiles.map((profile) => ({
       id: profile.id,
       label: profile.id,
@@ -462,6 +483,16 @@ export class MagicEditor {
 
   updateVoiceDefinitions(definitions, detail = {}) {
     this.documentMeta.voiceDefinitions = definitions
+    const committed = new Map(Object.entries(detail.committed || {}).map(
+      ([sourceName, profileId]) => [sourceName.toLowerCase(), String(profileId)],
+    ))
+    if (committed.size) {
+      for (const block of this.blocks) {
+        if (block.type !== 'speech') continue
+        const profileId = committed.get(block.voice.toLowerCase())
+        if (profileId) block.voice = profileId
+      }
+    }
     if (detail.removed && !this.voices.some((voice) => voice.id === detail.removed)) {
       for (const block of this.blocks) {
         if (block.type === 'speech' && block.voice === detail.removed) {
@@ -472,6 +503,27 @@ export class MagicEditor {
     }
     this.render()
     this.changed()
+  }
+
+  async persistVoiceDefinition(definition, previous) {
+    const sourceName = String(previous?.name || '').toLowerCase()
+    const block = this.blocks.find((item) => (
+      item.type === 'speech'
+      && item.voice.toLowerCase() === sourceName
+      && item.preview
+    ))
+    if (!block) {
+      throw new Error(t(
+        'magic.definitionGenerateFirst',
+        {},
+        'Keep this character in the script and generate one of its turns before saving it as a voice.',
+      ))
+    }
+    return this.onPersistCharacter({
+      definition: { ...definition },
+      previous: { ...previous },
+      block,
+    })
   }
 
   selectedRange() {
@@ -669,8 +721,18 @@ export class MagicEditor {
       this.changed({ takesOnly: true })
       return
     }
+    if (action === 'normalize-loudness') {
+      block.normalizeLoudness = block.normalizeLoudness === false
+      if (this.playingId === block.id) {
+        this.previewAudio.pause()
+        this.playingId = null
+      }
+      this.renderBlocks()
+      this.changed({ takesOnly: true, takesChanged: true, workspaceChanged: true })
+      return
+    }
     if (action === 'download') {
-      this.downloadTake(this.blocks[index], index)
+      await this.downloadTake(this.blocks[index], index)
       return
     }
     if (action === 'save-character') {
@@ -720,7 +782,9 @@ export class MagicEditor {
       this.playingId = null
     }
     if (block.preview?.url) URL.revokeObjectURL(block.preview.url)
+    if (block.leveledPreview?.url) URL.revokeObjectURL(block.leveledPreview.url)
     block.preview = null
+    block.leveledPreview = null
     if (unlock) block.locked = false
   }
 
@@ -753,11 +817,32 @@ export class MagicEditor {
     return block.preview
   }
 
-  downloadTake(block, index) {
+  async selectedPreview(block) {
+    if (!block?.preview || block.normalizeLoudness === false) return block?.preview || null
+    if (block.leveledPreview) return block.leveledPreview
+    if (this.levelingId !== null || this.busy) return null
+    const sourcePreview = block.preview
+    this.levelingId = block.id
+    this.renderBlocks()
+    try {
+      const result = await this.onLevelPreview({ ...block })
+      if (!result?.blob) return block.preview
+      if (block.preview !== sourcePreview || block.normalizeLoudness === false) return null
+      block.leveledPreview = { ...result, url: URL.createObjectURL(result.blob) }
+      return block.leveledPreview
+    } finally {
+      this.levelingId = null
+      this.renderBlocks()
+    }
+  }
+
+  async downloadTake(block, index) {
     if (!block?.preview) return
+    const preview = await this.selectedPreview(block)
+    if (!preview) return
     const link = document.createElement('a')
-    link.href = block.preview.url
-    link.download = `voxcpmtts-turn-${index + 1}.${block.preview.extension || 'wav'}`
+    link.href = preview.url
+    link.download = `voxcpmtts-turn-${index + 1}.${preview.extension || 'wav'}`
     link.click()
   }
 
@@ -774,8 +859,10 @@ export class MagicEditor {
   }
 
   async playPreview(block) {
+    const preview = await this.selectedPreview(block)
+    if (!preview) return
     this.previewAudio.pause()
-    this.previewAudio.src = block.preview.url
+    this.previewAudio.src = preview.url
     this.playingId = block.id
     this.renderBlocks()
     try {
@@ -802,6 +889,40 @@ export class MagicEditor {
     const normalized = String(name || '').toLowerCase()
     return this.voices.some((voice) => voice.id.toLowerCase() === normalized)
       || this.documentMeta.voiceDefinitions.some((definition) => definition.name.toLowerCase() === normalized)
+  }
+
+  profileNameExists(name) {
+    return this.profileIds.has(String(name || '').toLowerCase())
+  }
+
+  scriptCharacter(name) {
+    const normalized = String(name || '').toLowerCase()
+    if (!normalized) return null
+    return this.documentMeta.voiceDefinitions.find(
+      (definition) => definition.name.toLowerCase() === normalized,
+    ) || null
+  }
+
+  promoteScriptCharacter(sourceName, profileId) {
+    if (!sourceName || !profileId) return
+    this.adoptCommittedProfiles({ [sourceName]: profileId })
+  }
+
+  adoptCommittedProfiles(profiles) {
+    const committed = new Map(Object.entries(profiles || {}).map(
+      ([sourceName, profileId]) => [sourceName.toLowerCase(), String(profileId)],
+    ))
+    if (!committed.size) return
+    this.documentMeta.voiceDefinitions = this.documentMeta.voiceDefinitions.filter(
+      (definition) => !committed.has(definition.name.toLowerCase()),
+    )
+    this.definitionEditor.setDefinitions(this.documentMeta.voiceDefinitions)
+    for (const block of this.blocks) {
+      const profileId = block.type === 'speech' ? committed.get(block.voice.toLowerCase()) : null
+      if (profileId) block.voice = profileId
+    }
+    this.render()
+    this.changed()
   }
 
   addScriptCharacter(id, definition) {
@@ -874,6 +995,19 @@ export class MagicEditor {
           }]
         : []
     ))
+  }
+
+  turnLoudness() {
+    return this.speechBlocks().map((block) => block.normalizeLoudness !== false)
+  }
+
+  restoreTurnLoudness(settings = [], { notify = true } = {}) {
+    if (!Array.isArray(settings)) return
+    this.speechBlocks().forEach((block, index) => {
+      if (typeof settings[index] === 'boolean') block.normalizeLoudness = settings[index]
+    })
+    this.renderBlocks()
+    if (notify) this.changed({ takesOnly: true, takesChanged: true, workspaceChanged: true })
   }
 
   restoreWorkspaceTakes(takes = [], { notify = true } = {}) {
@@ -1118,11 +1252,15 @@ export class MagicEditor {
     const actions = document.createElement('div')
     actions.className = 'magic-block-actions'
     const previewing = this.previewBusyId === block.id
+    const leveling = this.levelingId === block.id
+    const levelBusy = this.levelingId !== null
     const playing = this.playingId === block.id
     const preview = button(
-      previewing ? 'icon-refresh-cw' : playing ? 'icon-pause' : 'icon-play',
+      previewing || leveling ? 'icon-refresh-cw' : playing ? 'icon-pause' : 'icon-play',
       previewing
         ? t('magic.previewGenerating', {}, 'Generating turn preview')
+        : leveling
+          ? t('magic.previewLeveling', {}, 'Leveling turn preview')
         : playing
           ? t('magic.previewPause', {}, 'Pause turn preview')
           : block.preview
@@ -1132,10 +1270,21 @@ export class MagicEditor {
     )
     preview.classList.add('magic-preview-action')
     preview.classList.toggle('ready', Boolean(block.preview))
-    preview.classList.toggle('loading', previewing)
-    preview.disabled = this.busy || !block.text.trim() || (this.previewBusyId !== null && !previewing)
+    preview.classList.toggle('loading', previewing || leveling)
+    preview.disabled = this.busy || levelBusy || !block.text.trim() || (this.previewBusyId !== null && !previewing)
+    const normalizeLoudness = button(
+      'icon-volume-2',
+      block.normalizeLoudness !== false
+        ? t('magic.levelTurnOn', {}, 'Turn leveling on: match this turn in the assembled audio')
+        : t('magic.levelTurnOff', {}, 'Turn leveling off: preserve this turn\'s generated loudness'),
+      'normalize-loudness',
+    )
+    normalizeLoudness.classList.add('magic-loudness-action')
+    normalizeLoudness.classList.toggle('active', block.normalizeLoudness !== false)
+    normalizeLoudness.disabled = this.busy || previewing || levelBusy
+    normalizeLoudness.setAttribute('aria-pressed', String(block.normalizeLoudness !== false))
     const regenerate = button('icon-refresh-cw', t('magic.regenerateTake', {}, 'Regenerate this turn'), 'regenerate')
-    regenerate.disabled = this.busy || previewing || !block.preview || block.locked
+    regenerate.disabled = this.busy || previewing || levelBusy || !block.preview || block.locked
     const lock = button(
       block.locked ? 'icon-lock' : 'icon-lock-open',
       block.locked
@@ -1144,10 +1293,10 @@ export class MagicEditor {
       'lock',
     )
     lock.classList.toggle('active', block.locked)
-    lock.disabled = this.busy || previewing || !block.preview
+    lock.disabled = this.busy || previewing || levelBusy || !block.preview
     lock.setAttribute('aria-pressed', String(block.locked))
     const download = button('icon-download', t('magic.downloadTake', {}, 'Download this take'), 'download')
-    download.disabled = !block.preview
+    download.disabled = levelBusy || !block.preview
     const moveUp = button('icon-chevron-up', t('magic.moveUp', {}, 'Move turn up'), 'up')
     const moveDown = button('icon-chevron-down', t('magic.moveDown', {}, 'Move turn down'), 'down')
     moveUp.disabled = this.busy || index === 0
@@ -1157,6 +1306,7 @@ export class MagicEditor {
     actions.append(
       dragHandle(t('magic.drag', {}, 'Drag to reorder')),
       preview,
+      normalizeLoudness,
       regenerate,
       lock,
       download,
