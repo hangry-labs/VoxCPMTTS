@@ -33,6 +33,7 @@ def encoded_reference_audio(tmp_path: Path, suffix: str) -> bytes:
         ".m4a": ["-c:a", "aac", "-b:a", "128k"],
         ".aac": ["-c:a", "aac", "-b:a", "128k", "-f", "adts"],
         ".webm": ["-c:a", "libopus", "-b:a", "128k"],
+        ".opus": ["-c:a", "libopus", "-b:a", "128k", "-f", "ogg"],
     }[suffix]
     subprocess.run(
         [
@@ -160,6 +161,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert 'id="reference-record-wave"' in responses["/"].text
     assert 'class="reference-audio-surface"' in responses["/"].text
     assert 'id="reference-audio-choose"' in responses["/"].text
+    assert 'accept=".wav,.mp3,.flac,.ogg,.opus,.m4a,.aac,.webm,audio/*"' in responses["/"].text
     assert 'id="reference-audio-clear"' in responses["/"].text
     assert responses["/"].text.count('id="transcribe-reference"') == 1
     assert 'data-clone-mode="reference"' in responses["/"].text
@@ -402,7 +404,7 @@ def test_generate_upload_passes_a_temporary_reference_and_removes_it() -> None:
     assert not observed["path"].exists()
 
 
-@pytest.mark.parametrize("suffix", [".m4a", ".aac", ".webm"])
+@pytest.mark.parametrize("suffix", [".m4a", ".aac", ".webm", ".opus"])
 def test_reference_audio_normalization_produces_lossless_pcm_without_downmixing(
     tmp_path: Path,
     suffix: str,
@@ -422,7 +424,15 @@ def test_reference_audio_normalization_produces_lossless_pcm_without_downmixing(
         normalized_path.unlink(missing_ok=True)
 
 
-def test_m4a_clone_upload_is_normalized_and_removed(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("suffix", "media_type"),
+    [(".m4a", "audio/mp4"), (".opus", "audio/ogg")],
+)
+def test_compressed_clone_upload_is_normalized_and_removed(
+    tmp_path: Path,
+    suffix: str,
+    media_type: str,
+) -> None:
     observed: dict[str, object] = {}
 
     def fake_response(payload, route_name):
@@ -432,13 +442,13 @@ def test_m4a_clone_upload_is_normalized_and_removed(tmp_path: Path) -> None:
         return StreamingResponse(io.BytesIO(b"audio"), media_type="audio/mpeg")
 
     request = {"text": "Clone this voice.", "ref_text": "Reference speech."}
-    m4a_bytes = encoded_reference_audio(tmp_path, ".m4a")
+    encoded_audio = encoded_reference_audio(tmp_path, suffix)
     with patch.object(runtime, "stream_audio_response", side_effect=fake_response):
         with TestClient(runtime.app) as client:
             response = client.post(
                 "/tts/generate-upload",
                 data={"payload": json.dumps(request)},
-                files={"reference_audio": ("reference.m4a", m4a_bytes, "audio/mp4")},
+                files={"reference_audio": (f"reference{suffix}", encoded_audio, media_type)},
             )
 
     assert response.status_code == 200
