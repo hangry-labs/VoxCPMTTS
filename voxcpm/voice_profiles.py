@@ -136,7 +136,7 @@ def normalize_profile_recipe(recipe: dict[str, Any] | None) -> dict[str, Any]:
         if not 0 <= dynamics <= 100:
             raise ValueError("Voice recipe dynamics must be between 0 and 100.")
         normalized_post_processing["dynamics"] = dynamics
-        normalize_loudness = post_processing.get("normalize_loudness", True)
+        normalize_loudness = post_processing.get("normalize_loudness", False)
         if not isinstance(normalize_loudness, bool):
             raise ValueError("Voice recipe post-processing normalize_loudness must be true or false.")
         normalized_post_processing["normalize_loudness"] = normalize_loudness

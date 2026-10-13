@@ -1,8 +1,8 @@
 import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
 
 const PRESETS = {
-  clean: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: true },
-  studio: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 2, bass_db: 1, presence_db: 1, dynamics: 35, normalize_loudness: true },
+  clean: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: false },
+  studio: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 2, bass_db: 1, presence_db: 1, dynamics: 35, normalize_loudness: false },
 }
 
 function signedDecibels(value) {

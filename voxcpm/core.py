@@ -294,12 +294,20 @@ class VoxCPM:
                 if prompt_wav_path is not None:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                         temp_files.append(tmp.name)
-                    self.denoiser.enhance(prompt_wav_path, output_path=temp_files[-1])
+                    self.denoiser.enhance(
+                        prompt_wav_path,
+                        output_path=temp_files[-1],
+                        normalize_loudness=False,
+                    )
                     actual_prompt_path = temp_files[-1]
                 if reference_wav_path is not None:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                         temp_files.append(tmp.name)
-                    self.denoiser.enhance(reference_wav_path, output_path=temp_files[-1])
+                    self.denoiser.enhance(
+                        reference_wav_path,
+                        output_path=temp_files[-1],
+                        normalize_loudness=False,
+                    )
                     actual_ref_path = temp_files[-1]
 
             if actual_prompt_path is not None or actual_ref_path is not None:

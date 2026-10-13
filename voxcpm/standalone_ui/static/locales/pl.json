@@ -111,8 +111,6 @@
   "magic.previewPause": "Wstrzymaj podgląd kwestii",
   "magic.previewPlay": "Odtwórz podgląd kwestii",
   "magic.previewGenerate": "Wygeneruj tę kwestię",
-  "magic.levelTurnOn": "Wyrównanie włączone: dopasuj głośność tej kwestii w złożonym nagraniu",
-  "magic.levelTurnOff": "Wyrównanie wyłączone: zachowaj wygenerowaną głośność tej kwestii",
   "magic.regenerateTake": "Wygeneruj tę kwestię ponownie",
   "magic.lockTake": "Zablokuj to ujęcie",
   "magic.unlockTake": "Odblokuj to ujęcie",

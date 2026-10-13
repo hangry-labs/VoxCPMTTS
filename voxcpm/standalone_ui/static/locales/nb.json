@@ -111,8 +111,6 @@
   "magic.previewPause": "Sett forhåndsvisning på pause",
   "magic.previewPlay": "Spill av forhåndsvisning",
   "magic.previewGenerate": "Generer denne replikken",
-  "magic.levelTurnOn": "Replikkutjevning på: jevn ut denne replikken i den sammensatte lyden",
-  "magic.levelTurnOff": "Replikkutjevning av: behold det genererte lydnivået for denne replikken",
   "magic.regenerateTake": "Regenerer denne replikken",
   "magic.lockTake": "Lås dette opptaket",
   "magic.unlockTake": "Lås opp dette opptaket",

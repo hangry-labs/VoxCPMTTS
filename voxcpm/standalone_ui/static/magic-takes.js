@@ -62,7 +62,6 @@ export class MagicTakeStudio {
     const form = new FormData()
     form.append('payload', JSON.stringify(payload))
     form.append('speech_ids', JSON.stringify(speech.map((block) => String(block.id))))
-    form.append('turn_loudness', JSON.stringify(speech.map((block) => block.normalizeLoudness !== false)))
     form.append('retained', JSON.stringify(retained.map((block) => ({
       id: String(block.id),
       seed: Number(block.captureSeed) || 0,
@@ -91,13 +90,6 @@ export class MagicTakeStudio {
     }
   }
 
-  async level(block, { signal } = {}) {
-    return this.assemble(
-      [{ ...block, normalizeLoudness: true }],
-      { outputFormat: 'wav', normalizeLoudness: false, signal },
-    )
-  }
-
   async assemble(blocks, { outputFormat = 'wav', normalizeLoudness = false, signal } = {}) {
     const speech = speechBlocks(blocks)
     if (!speech.length || speech.some((block) => !block.preview)) {
@@ -106,7 +98,7 @@ export class MagicTakeStudio {
     const timeline = blocks.flatMap((block) => {
       if (block.type === 'break') return [{ type: 'break', milliseconds: block.milliseconds }]
       return block.text.trim()
-        ? [{ type: 'speech', id: String(block.id), normalize_loudness: block.normalizeLoudness !== false }]
+        ? [{ type: 'speech', id: String(block.id) }]
         : []
     })
     const form = new FormData()

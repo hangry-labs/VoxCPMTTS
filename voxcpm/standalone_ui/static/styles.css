@@ -564,7 +564,6 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .magic-preview-action { color: #f2b181; }
 .magic-preview-action.ready { color: #bcebd2; }
 .magic-preview-action.loading i { animation: magic-spin 850ms linear infinite; }
-.magic-loudness-action:not(.active) { color: #858890; }
 .magic-turn-content { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: stretch; }
 .magic-turn-editor { min-width: 0; }
 .magic-turn-portrait { align-self: start; display: grid; width: 38px; height: 38px; margin: 9px 0 0 8px; padding: 0; overflow: hidden; place-items: center; border: 1px dashed #4a4d55; border-radius: 4px; background: #202126; color: #858890; font-size: 1.15rem; font-weight: 800; line-height: 1; }

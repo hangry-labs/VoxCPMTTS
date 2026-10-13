@@ -108,3 +108,28 @@ def test_streaming_generation_is_bounded_without_retry() -> None:
     assert len(chunks) == 10
     assert model.last_successful_seed == 42
     assert len(model._server.calls) == 1
+
+
+def test_denoising_reference_audio_does_not_normalize_loudness() -> None:
+    model = fake_nano({42: 1})
+    denoiser_calls: list[tuple[str, bool]] = []
+
+    class FakeDenoiser:
+        def enhance(self, input_path: str, *, output_path: str, normalize_loudness: bool) -> str:
+            denoiser_calls.append((input_path, normalize_loudness))
+            return output_path
+
+    model.denoiser = FakeDenoiser()
+    model._encode_audio = lambda path: path
+
+    model.generate(
+        text="hello",
+        prompt_wav_path="prompt.wav",
+        prompt_text="prompt",
+        reference_wav_path="reference.wav",
+        denoise=True,
+        retry_badcase=False,
+        seed=42,
+    )
+
+    assert denoiser_calls == [("prompt.wav", False), ("reference.wav", False)]

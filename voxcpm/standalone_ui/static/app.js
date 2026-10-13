@@ -1,13 +1,13 @@
 import { browserLanguage, initializeI18n, languageLabel, t } from './i18n.js'
 import { AudioEditor } from './audio-editor.js?v=waveform-hitbox'
-import { AudioFinisher } from './audio-finisher.js?v=workspace-audio'
+import { AudioFinisher } from './audio-finisher.js?v=final-loudness-v1'
 import { AudioRecorder } from './audio-recorder.js?v=voice-library'
 import { closeDialogOnBackdrop } from './dialog-utils.js?v=pointerdown-v1'
 import { DialogueScriptLibrary } from './dialogue-script-library.js?v=pointerdown-v1'
 import { GenerationToolbar } from './generation-toolbar.js?v=workflow-controls'
 import { GpuMonitor } from './gpu-monitor.js?v=app-organization'
-import { MagicEditor } from './magic-editor.js?v=modal-promotion-v1'
-import { MagicTakeStudio } from './magic-takes.js?v=profile-commit-v1'
+import { MagicEditor } from './magic-editor.js?v=final-loudness-v1'
+import { MagicTakeStudio } from './magic-takes.js?v=final-loudness-v1'
 import { IncrementalAudioPlayback, StreamWaveform } from './streaming-player.js?v=app-organization'
 import { VersionCheck } from './version-check.js?v=published-builds'
 
@@ -19,8 +19,8 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)]
 const UI_SESSION_KEY = 'voxcpmtts-ui-state-v1'
 const MAX_GENERATED_REFERENCE_CHARACTERS = 320
 const POST_PROCESSING_PRESETS = {
-  clean: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: true },
-  studio: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 2, bass_db: 1, presence_db: 1, dynamics: 35, normalize_loudness: true },
+  clean: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 1, bass_db: 0, presence_db: 0.5, dynamics: 15, normalize_loudness: false },
+  studio: { pitch_semitones: 0, speed_factor: 1, noise_reduction_db: 2, bass_db: 1, presence_db: 1, dynamics: 35, normalize_loudness: false },
 }
 const SAMPLE_TEXTS = [
   t('samples.first', {}, 'VoxCPM2 generates natural multilingual speech with voice design and cloning.'),
@@ -123,7 +123,6 @@ const magicTakeStudio = new MagicTakeStudio({ responseError })
 const magicEditor = new MagicEditor($('#magic-editor-shell'), {
   onChange: handleMagicChange,
   onPreview: generateMagicPreview,
-  onLevelPreview: (block) => magicTakeStudio.level(block),
   onSaveCharacter: openMagicCharacterDialog,
   onPersistCharacter: persistMagicScriptCharacter,
   onError: (error) => showToast(errorMessage(error)),
@@ -263,7 +262,6 @@ function captureScriptWorkspace() {
       protect_long_audio: $('#protect-long-audio').checked,
       normalize_loudness: $('#normalize-loudness').checked,
       normalize_text: $('#normalize-text').checked,
-      turn_loudness: magicEditor.turnLoudness(),
     },
     finishing: {
       options: finishing.options,
@@ -304,7 +302,6 @@ async function restoreScriptWorkspace(workspace) {
   updateSeedState()
   generationToolbar.sync()
   if (['generate', 'stream'].includes(settings.generation_mode)) setGenerationMode(settings.generation_mode)
-  magicEditor.restoreTurnLoudness(settings.turn_loudness, { notify: false })
   magicEditor.restoreWorkspaceTakes(workspace.takes || [], { notify: false })
   if (workspace.output?.blob) {
     const extension = workspace.output.extension || 'wav'
@@ -691,7 +688,6 @@ function restoreProfileGenerationSettings(profile) {
   if (typeof recipe.randomize_seed === 'boolean') $('#randomize-seed').checked = recipe.randomize_seed
   else if (Number.isInteger(recipe.seed)) $('#randomize-seed').checked = false
   if (typeof recipe.normalize === 'boolean') $('#normalize-text').checked = recipe.normalize
-  if (typeof recipe.normalize_loudness === 'boolean') $('#normalize-loudness').checked = recipe.normalize_loudness
   if (typeof recipe.protect_long_audio === 'boolean') $('#protect-long-audio').checked = recipe.protect_long_audio
   if (typeof recipe.denoise === 'boolean') $('#denoise').checked = recipe.denoise
   if (recipe.output_format && [...$('#output-format').options].some((option) => option.value === recipe.output_format)) {
@@ -1009,7 +1005,7 @@ function buildPayload({ workflow = state.activeTab, streaming = false } = {}) {
     cfg_value: Number($('#guidance').value),
     inference_timesteps: Number($('#steps').value),
     normalize: !cloning && state.inputType !== 'text' ? false : $('#normalize-text').checked,
-    normalize_loudness: $('#normalize-loudness').checked,
+    normalize_loudness: cloning ? false : $('#normalize-loudness').checked,
     protect_long_audio: $('#protect-long-audio').checked,
     denoise: usesReference && $('#denoise').checked,
     seed: Number($('#seed').value || 42),
@@ -1111,6 +1107,7 @@ function magicPreviewPayload() {
     voice_profile: payload.voice_profile,
     output_format: 'wav',
     normalize: false,
+    normalize_loudness: false,
   }
 }
 
@@ -1223,7 +1220,6 @@ function magicCharacterRecipe(block, preview) {
     cfg_value: Number(payload.cfg_value),
     inference_timesteps: Number(payload.inference_timesteps),
     normalize: Boolean(payload.normalize),
-    normalize_loudness: Boolean(payload.normalize_loudness),
     protect_long_audio: Boolean(payload.protect_long_audio),
     denoise: false,
     output_format: preview.extension || 'wav',
@@ -1666,7 +1662,6 @@ function generatedVoiceRecipe(generated) {
     cfg_value: Number(payload.cfg_value),
     inference_timesteps: Number(payload.inference_timesteps),
     normalize: Boolean(payload.normalize),
-    normalize_loudness: Boolean(payload.normalize_loudness),
     protect_long_audio: Boolean(payload.protect_long_audio),
     denoise: Boolean(payload.denoise),
     output_format: payload.output_format,
@@ -1776,7 +1771,7 @@ function restorePostProcessingRecipe(profile) {
   $('#post-bass').value = recipe.bass_db ?? 0
   $('#post-presence').value = recipe.presence_db ?? 0
   $('#post-dynamics').value = recipe.dynamics ?? 0
-  $('#post-normalize').checked = recipe.normalize_loudness ?? true
+  $('#post-normalize').checked = recipe.normalize_loudness ?? false
   renderPostProcessingMethod()
   renderPostProcessingValues()
 }

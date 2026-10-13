@@ -111,8 +111,6 @@
   "magic.previewPause": "発話プレビューを一時停止",
   "magic.previewPlay": "発話プレビューを再生",
   "magic.previewGenerate": "この発話を生成",
-  "magic.levelTurnOn": "ターン音量調整オン: 結合音声でこの発話の知覚音量を揃える",
-  "magic.levelTurnOff": "ターン音量調整オフ: この発話の生成時の音量を維持する",
   "magic.regenerateTake": "この発話を再生成",
   "magic.lockTake": "このテイクをロック",
   "magic.unlockTake": "このテイクのロックを解除",

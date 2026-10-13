@@ -118,7 +118,7 @@ def test_magic_render_returns_individual_takes_and_composed_output(tmp_path: Pat
     assert _wav_frames(_bundle_audio(manifest, binary, manifest["output"]))[0] == 16_000
 
 
-def test_magic_render_levels_only_enabled_turns_before_assembly(tmp_path: Path) -> None:
+def test_magic_render_does_not_apply_legacy_turn_loudness_when_final_normalization_is_disabled(tmp_path: Path) -> None:
     model = _FakeModel()
     with (
         patch.object(runtime, "SSML_STAGING_DIR", tmp_path / "staging"),
@@ -136,7 +136,54 @@ def test_magic_render_levels_only_enabled_turns_before_assembly(tmp_path: Path) 
         )
 
     assert response.status_code == 200, response.text
+    normalize.assert_not_called()
+
+
+def test_magic_render_normalizes_complete_output_exactly_once(tmp_path: Path) -> None:
+    model = _FakeModel()
+    payload = {**_payload(), "normalize_loudness": True}
+    with (
+        patch.object(runtime, "SSML_STAGING_DIR", tmp_path / "staging"),
+        patch.object(runtime, "get_model", return_value=model),
+        patch.object(runtime, "normalize_audio_loudness", side_effect=lambda audio, _rate: audio) as normalize,
+        TestClient(runtime.app) as client,
+    ):
+        response = client.post(
+            "/tts/magic/render",
+            data={
+                "payload": json.dumps(payload),
+                "speech_ids": '["turn-1","turn-2"]',
+                "turn_loudness": "[true,true]",
+            },
+        )
+
+    assert response.status_code == 200, response.text
     assert normalize.call_count == 1
+
+
+def test_magic_assembly_false_never_normalizes_legacy_turns() -> None:
+    payload = runtime.MagicAssemblyRequest.model_validate(
+        {
+            "items": [
+                {"type": "speech", "id": "turn-1", "normalize_loudness": True},
+                {"type": "speech", "id": "turn-2", "normalize_loudness": True},
+            ],
+            "output_format": "wav",
+            "normalize_loudness": False,
+        }
+    )
+    takes = {
+        "turn-1": (16_000, np.full(800, 0.1, dtype=np.float32)),
+        "turn-2": (16_000, np.full(800, 0.2, dtype=np.float32)),
+    }
+
+    with patch.object(runtime, "normalize_audio_loudness") as normalize:
+        output, output_format, sample_rate = runtime.assemble_magic_uploads(payload, takes)
+
+    assert output.startswith(b"RIFF")
+    assert output_format == "wav"
+    assert sample_rate == 16_000
+    normalize.assert_not_called()
 
 
 def test_magic_render_reuses_locked_take_and_generates_only_unlocked_turn(tmp_path: Path) -> None:
@@ -277,6 +324,7 @@ def test_magic_single_take_and_model_free_reassembly(tmp_path: Path) -> None:
             {"type": "speech", "id": "turn-2", "normalize_loudness": False},
         ],
         "output_format": "wav",
+        "normalize_loudness": True,
     }
     with (
         patch.object(runtime, "get_model") as get_model,

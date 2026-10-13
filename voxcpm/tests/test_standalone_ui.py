@@ -254,8 +254,8 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "'/tts/magic/render'" in magic_takes
     assert "'/tts/magic/take'" in magic_takes
     assert "'/tts/magic/assemble-upload'" in magic_takes
-    assert "turn_loudness" in magic_takes
-    assert "normalize-loudness" in magic_editor
+    assert "turn_loudness" not in magic_takes
+    assert "normalize-loudness" not in magic_editor
     assert "export class DialogueScriptLibrary" in script_library
     assert "export class GenerationToolbar" in generation_toolbar
     assert "class WorkflowValidationError" in script
@@ -282,7 +282,7 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "magicEditor.profileNameExists(name)" in script
     assert "voice_profile: cloning ? (usesReference ? profileId : null) : profileId" in script
     assert "if (profile) restoreProfileGenerationSettings(profile)" in script
-    assert "normalize_loudness: $('#normalize-loudness').checked" in script
+    assert "normalize_loudness: cloning ? false : $('#normalize-loudness').checked" in script
     assert "protect_long_audio: $('#protect-long-audio').checked" in script
     assert "export class AudioFinisher" in audio_finisher
     assert "'/tts/postprocess-upload'" in audio_finisher
@@ -569,6 +569,21 @@ def test_post_processing_filter_uses_bounded_voice_finishing_controls() -> None:
     assert "deesser=i=0.12:m=0.35:f=0.5" in audio_filter
     assert "alimiter=limit=0.841:attack=5:release=50:level=disabled" in audio_filter
     assert audio_filter.endswith(runtime.LOUDNESS_NORMALIZATION_FILTER)
+
+
+def test_post_processing_does_not_normalize_loudness_unless_requested() -> None:
+    payload = runtime.PostProcessingRequest()
+
+    assert payload.normalize_loudness is False
+    assert runtime.LOUDNESS_NORMALIZATION_FILTER not in runtime.build_post_processing_filter(payload)
+
+
+def test_saved_post_processing_recipe_defaults_loudness_normalization_off() -> None:
+    recipe = runtime.normalize_profile_recipe(
+        {"post_processing": {"method": "ffmpeg", "preset": "clean"}}
+    )
+
+    assert recipe["post_processing"]["normalize_loudness"] is False
 
 
 def test_ffmpeg_post_processing_produces_float_wav(tmp_path: Path) -> None:

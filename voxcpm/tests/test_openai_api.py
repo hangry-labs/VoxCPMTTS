@@ -112,7 +112,7 @@ def test_openai_standard_request_maps_to_stable_voxcpm_request() -> None:
     assert request.speed == 1.25
     assert request.seed == 104_729
     assert request.randomize_seed is False
-    assert request.normalize_loudness is True
+    assert request.normalize_loudness is False
     assert request.protect_long_audio is True
 
 
@@ -164,7 +164,7 @@ def test_openai_saved_voice_restores_profile_recipe(tmp_path: Path) -> None:
                         "inference_timesteps": 12,
                         "clone_mode": "reference",
                         "normalize": True,
-                        "normalize_loudness": False,
+                        "normalize_loudness": True,
                     },
                     "created_at": "2026-10-10T00:00:00Z",
                 }
@@ -188,6 +188,7 @@ def test_openai_saved_voice_restores_profile_recipe(tmp_path: Path) -> None:
     assert request.inference_timesteps == 12
     assert request.clone_mode == "reference"
     assert request.normalize_text is True
+    # Stored voice recipes must not silently opt a request into destructive output processing.
     assert request.normalize_loudness is False
     saved = next(item for item in voices.json()["data"] if item["id"] == "joken")
     assert saved["profile_type"] == "designed"

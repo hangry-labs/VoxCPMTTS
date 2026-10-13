@@ -119,8 +119,6 @@
   "magic.previewPause": "Pause turn preview",
   "magic.previewPlay": "Play turn preview",
   "magic.previewGenerate": "Generate this turn",
-  "magic.levelTurnOn": "Turn leveling on: match this turn in the assembled audio",
-  "magic.levelTurnOff": "Turn leveling off: preserve this turn's generated loudness",
   "magic.regenerateTake": "Regenerate this turn",
   "magic.lockTake": "Lock this take",
   "magic.unlockTake": "Unlock this take",

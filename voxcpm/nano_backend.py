@@ -225,12 +225,20 @@ class NanoVoxCPM:
                 if prompt_wav_path:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temporary_file:
                         temporary_paths.append(temporary_file.name)
-                    self.denoiser.enhance(prompt_wav_path, output_path=temporary_paths[-1])
+                    self.denoiser.enhance(
+                        prompt_wav_path,
+                        output_path=temporary_paths[-1],
+                        normalize_loudness=False,
+                    )
                     actual_prompt_path = temporary_paths[-1]
                 if reference_wav_path:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temporary_file:
                         temporary_paths.append(temporary_file.name)
-                    self.denoiser.enhance(reference_wav_path, output_path=temporary_paths[-1])
+                    self.denoiser.enhance(
+                        reference_wav_path,
+                        output_path=temporary_paths[-1],
+                        normalize_loudness=False,
+                    )
                     actual_reference_path = temporary_paths[-1]
 
             with self._generation_lock:

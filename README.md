@@ -266,7 +266,7 @@ curl --no-buffer -X POST "http://localhost:8808/tts/stream" \
   -o streamed.mp3
 ```
 
-Set `normalize_loudness` to `true` to apply output-level normalization toward `-16 LUFS` with a `-1.5 dBTP` true-peak ceiling. It applies after complete SSML assembly and is also supported by progressive MP3 streaming. Magic additionally levels every speech turn before assembly by default; the volume button beside each turn's Play control can preserve that turn's original generated loudness instead. Text preprocessing remains the separate `normalize` option.
+Set `normalize_loudness` to `true` to apply output-level normalization toward `-16 LUFS` with a `-1.5 dBTP` true-peak ceiling. It runs once, after complete text, SSML, or Magic assembly, and is also supported by progressive MP3 streaming. Reference audio, generated Magic takes, and denoising stay unnormalized. Text preprocessing remains the separate `normalize` option.
 
 Long-form protection is enabled by default for native and OpenAI-compatible requests. It keeps the same seed and conditioning while dividing long text near complete sentence or clause boundaries, then joins sections with a short natural pause. Set `protect_long_audio` to `false` only when one uninterrupted model pass is explicitly required.
 

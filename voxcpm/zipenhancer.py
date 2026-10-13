@@ -37,7 +37,7 @@ class ZipEnhancer:
         normalized_audio = torchaudio.functional.gain(audio, -20 - loudness)
         torchaudio.save(wav_path, normalized_audio, sr)
 
-    def enhance(self, input_path: str, output_path: Optional[str] = None, normalize_loudness: bool = True) -> str:
+    def enhance(self, input_path: str, output_path: Optional[str] = None, normalize_loudness: bool = False) -> str:
         """
         Audio denoising enhancement
         Args:

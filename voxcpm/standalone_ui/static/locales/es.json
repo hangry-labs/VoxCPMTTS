@@ -111,8 +111,6 @@
   "magic.previewPause": "Pausar vista previa del turno",
   "magic.previewPlay": "Reproducir vista previa del turno",
   "magic.previewGenerate": "Generar este turno",
-  "magic.levelTurnOn": "Nivelación activada: igualar este turno en el audio ensamblado",
-  "magic.levelTurnOff": "Nivelación desactivada: conservar el volumen generado de este turno",
   "magic.regenerateTake": "Regenerar este turno",
   "magic.lockTake": "Bloquear esta toma",
   "magic.unlockTake": "Desbloquear esta toma",

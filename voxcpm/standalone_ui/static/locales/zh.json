@@ -111,8 +111,6 @@
   "magic.previewPause": "暂停对白预览",
   "magic.previewPlay": "播放对白预览",
   "magic.previewGenerate": "生成此对白",
-  "magic.levelTurnOn": "对白响度均衡已开启：在合成音频中匹配此对白的感知响度",
-  "magic.levelTurnOff": "对白响度均衡已关闭：保留此对白生成时的响度",
   "magic.regenerateTake": "重新生成此对白",
   "magic.lockTake": "锁定此片段",
   "magic.unlockTake": "解锁此片段",
