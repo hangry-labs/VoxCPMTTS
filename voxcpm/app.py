@@ -619,23 +619,53 @@ def adjust_audio_speed(audio: np.ndarray, sample_rate: int, speed: float) -> np.
 
 
 def build_post_processing_filter(payload: "PostProcessingRequest") -> str:
-    filters = ["highpass=f=50:p=2"]
+    filters = [f"highpass=f={payload.high_pass_hz:g}:p=2"]
     if payload.noise_reduction_db > 0:
         filters.append(f"afftdn=nr={payload.noise_reduction_db:g}:nf=-50:tn=1:gs=6")
-    if payload.bass_db:
+    warmth_gain = payload.warmth_db if payload.warmth_db is not None else payload.bass_db
+    warmth_frequency = payload.warmth_hz if payload.warmth_hz is not None else 110.0
+    if payload.warmth_db is None and payload.bass_db:
         filters.append(f"bass=f=110:t=q:w=0.7:g={payload.bass_db:g}:p=2:r=f32")
+    elif warmth_gain:
+        filters.append(f"equalizer=f={warmth_frequency:g}:t=q:w=0.8:g={warmth_gain:g}:r=f32")
+    if payload.mud_db:
+        filters.append(f"equalizer=f={payload.mud_hz:g}:t=q:w=1:g={payload.mud_db:g}:r=f32")
     if payload.presence_db:
-        filters.append(f"treble=f=3500:t=q:w=0.7:g={payload.presence_db:g}:p=2:r=f32")
-    if payload.dynamics:
+        if payload.presence_hz is None:
+            filters.append(f"treble=f=3500:t=q:w=0.7:g={payload.presence_db:g}:p=2:r=f32")
+        else:
+            filters.append(f"equalizer=f={payload.presence_hz:g}:t=q:w=0.8:g={payload.presence_db:g}:r=f32")
+    if payload.air_db:
+        filters.append(f"treble=f={payload.air_hz:g}:t=q:w=0.7:g={payload.air_db:g}:p=2:r=f32")
+    if payload.compression_ratio is not None and payload.compression_ratio > 1:
+        threshold = 10 ** (payload.compression_threshold_dbfs / 20.0)
+        filters.append(
+            f"acompressor=threshold={threshold:.6f}:ratio={payload.compression_ratio:g}:"
+            f"attack={payload.compression_attack_ms:g}:release={payload.compression_release_ms:g}:"
+            "knee=2.828:makeup=1:mix=1"
+        )
+    elif payload.dynamics:
         wet_mix = payload.dynamics / 100.0
         filters.append(
             "acompressor=threshold=0.125:ratio=2:attack=20:release=250:"
             f"knee=2.828:makeup=1.15:mix={wet_mix:g}"
         )
-    filters.append("deesser=i=0.12:m=0.35:f=0.5")
-    filters.append("alimiter=limit=0.841:attack=5:release=50:level=disabled")
+    deesser = 12.0 if payload.deesser_strength_percent is None else payload.deesser_strength_percent
+    if deesser > 0:
+        filters.append(f"deesser=i={deesser / 100.0:g}:m=0.35:f=0.5")
+    if payload.saturation_blend_percent > 0:
+        threshold = max(0.55, 1.0 - payload.saturation_blend_percent / 45.0)
+        filters.append(f"asoftclip=type=tanh:threshold={threshold:g}:output=1:oversample=4")
+    if payload.room_percent > 0:
+        decay = payload.room_percent / 100.0
+        filters.append(f"aecho=in_gain=0.9:out_gain=1:delays=28:decays={decay:g}")
+    peak_limit = 10 ** (payload.peak_ceiling_dbtp / 20.0)
+    filters.append(f"alimiter=limit={peak_limit:.3f}:attack=5:release=50:level=disabled")
     if payload.normalize_loudness:
-        filters.append(LOUDNESS_NORMALIZATION_FILTER)
+        filters.append(
+            f"loudnorm=I={payload.target_loudness_lufs:g}:"
+            f"TP={payload.peak_ceiling_dbtp:g}:LRA=11"
+        )
     return ",".join(filters)
 
 
@@ -1209,6 +1239,23 @@ class PostProcessingRequest(BaseModel):
     presence_db: float = Field(1.0, ge=-6.0, le=6.0, description="High-shelf gain around 3.5 kHz.")
     dynamics: int = Field(35, ge=0, le=100, description="Parallel compression amount from 0 to 100.")
     normalize_loudness: bool = Field(False, description="Finish toward -16 LUFS and -1.5 dBTP.")
+    high_pass_hz: float = Field(50.0, ge=50.0, le=150.0, description="High-pass cutoff in Hz.")
+    warmth_db: float | None = Field(None, ge=-4.0, le=6.0, description="Warmth/body bell gain in dB.")
+    warmth_hz: float | None = Field(None, ge=80.0, le=250.0, description="Warmth/body center frequency in Hz.")
+    mud_db: float = Field(0.0, ge=-5.0, le=0.0, description="Low-mid mud cut in dB.")
+    mud_hz: float = Field(300.0, ge=180.0, le=500.0, description="Low-mid mud center frequency in Hz.")
+    presence_hz: float | None = Field(None, ge=2000.0, le=5000.0, description="Presence center frequency in Hz.")
+    air_db: float = Field(0.0, ge=-3.0, le=3.0, description="Air shelf gain in dB.")
+    air_hz: float = Field(10000.0, ge=7000.0, le=14000.0, description="Air shelf frequency in Hz.")
+    compression_ratio: float | None = Field(None, ge=1.0, le=5.0, description="Full-band compressor ratio.")
+    compression_attack_ms: float = Field(12.0, ge=3.0, le=40.0, description="Compressor attack in milliseconds.")
+    compression_release_ms: float = Field(120.0, ge=50.0, le=300.0, description="Compressor release in milliseconds.")
+    compression_threshold_dbfs: float = Field(-22.0, ge=-36.0, le=-8.0, description="Compressor threshold in dBFS.")
+    saturation_blend_percent: float = Field(0.0, ge=0.0, le=20.0, description="Gentle saturation amount.")
+    deesser_strength_percent: float | None = Field(None, ge=0.0, le=100.0, description="De-esser strength.")
+    room_percent: float = Field(0.0, ge=0.0, le=10.0, description="Short room ambience amount.")
+    target_loudness_lufs: float = Field(-16.0, ge=-24.0, le=-14.0, description="Loudness target used only when normalization is requested.")
+    peak_ceiling_dbtp: float = Field(-1.5, ge=-3.0, le=-0.5, description="Peak limiter ceiling in dBTP.")
 
 
 class MetricsRequest(BaseModel):

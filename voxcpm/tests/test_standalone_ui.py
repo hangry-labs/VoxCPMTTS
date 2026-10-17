@@ -578,6 +578,46 @@ def test_post_processing_does_not_normalize_loudness_unless_requested() -> None:
     assert runtime.LOUDNESS_NORMALIZATION_FILTER not in runtime.build_post_processing_filter(payload)
 
 
+def test_post_processing_filter_exposes_voice_workshop_recipe() -> None:
+    payload = runtime.PostProcessingRequest(
+        preset="custom",
+        noise_reduction_db=2,
+        bass_db=0,
+        presence_db=1.2,
+        dynamics=0,
+        high_pass_hz=75,
+        warmth_db=1.5,
+        warmth_hz=135,
+        mud_db=-1.5,
+        mud_hz=280,
+        presence_hz=3200,
+        air_db=0.5,
+        air_hz=10000,
+        compression_ratio=2.5,
+        compression_attack_ms=12,
+        compression_release_ms=120,
+        compression_threshold_dbfs=-22,
+        saturation_blend_percent=5,
+        deesser_strength_percent=0,
+        room_percent=0,
+        target_loudness_lufs=-18,
+        peak_ceiling_dbtp=-1.5,
+        normalize_loudness=False,
+    )
+
+    audio_filter = runtime.build_post_processing_filter(payload)
+
+    assert audio_filter.startswith("highpass=f=75:p=2,afftdn=nr=2")
+    assert "equalizer=f=135:t=q:w=0.8:g=1.5:r=f32" in audio_filter
+    assert "equalizer=f=280:t=q:w=1:g=-1.5:r=f32" in audio_filter
+    assert "equalizer=f=3200:t=q:w=0.8:g=1.2:r=f32" in audio_filter
+    assert "treble=f=10000:t=q:w=0.7:g=0.5:p=2:r=f32" in audio_filter
+    assert "ratio=2.5:attack=12:release=120" in audio_filter
+    assert "asoftclip=type=tanh" in audio_filter
+    assert "deesser=" not in audio_filter
+    assert "loudnorm=" not in audio_filter
+
+
 def test_saved_post_processing_recipe_defaults_loudness_normalization_off() -> None:
     recipe = runtime.normalize_profile_recipe(
         {"post_processing": {"method": "ffmpeg", "preset": "clean"}}
