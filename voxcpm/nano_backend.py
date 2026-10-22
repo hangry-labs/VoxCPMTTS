@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import secrets
@@ -22,6 +23,57 @@ NANO_BADCASE_RATIO_THRESHOLD = 4.5
 NANO_GENERATION_LIMIT_RATIO = 6.0
 NANO_GPU_MEMORY_TARGET_BYTES = 8 * 1024**3
 NANO_GPU_MEMORY_MAX_UTILIZATION = 0.90
+
+
+class _ConcurrentNanoServer:
+    """Drive Nano's async pool from concurrent synchronous request threads."""
+
+    def __init__(self, server: object) -> None:
+        self._server = server
+        self._loop = server.loop
+        self._pool = server.server_pool
+        self._ready = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run_loop,
+            name="voxcpm-nano-event-loop",
+            daemon=True,
+        )
+        self._thread.start()
+        if not self._ready.wait(timeout=10):
+            raise RuntimeError("Nano-vLLM event loop did not start")
+
+    def _run_loop(self) -> None:
+        asyncio.set_event_loop(self._loop)
+        self._loop.call_soon(self._ready.set)
+        self._loop.run_forever()
+
+    def _result(self, awaitable: object) -> object:
+        return asyncio.run_coroutine_threadsafe(awaitable, self._loop).result()
+
+    def encode_latents(self, wav: bytes, wav_format: str) -> bytes:
+        return self._result(self._pool.encode_latents(wav, wav_format))
+
+    def generate(self, **kwargs: object) -> Generator[object, None, None]:
+        async_generator = self._pool.generate(**kwargs)
+        try:
+            while True:
+                try:
+                    yield self._result(async_generator.__anext__())
+                except StopAsyncIteration:
+                    return
+        finally:
+            self._result(async_generator.aclose())
+
+    def stop(self) -> None:
+        if self._loop.is_closed():
+            return
+        try:
+            self._result(self._pool.stop())
+        finally:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            self._thread.join(timeout=10)
+            if not self._thread.is_alive():
+                self._loop.close()
 
 
 def _bounded_generation_length(
@@ -112,25 +164,41 @@ class NanoVoxCPM:
                 flush=True,
             )
         self.inference_timesteps = _env_int("VOXCPM_NANO_INFERENCE_TIMESTEPS", 10)
-        self._generation_lock = threading.Lock()
-        self._server = NanoEngine.from_pretrained(
+        max_num_seqs = _env_int("VOXCPM_NANO_MAX_NUM_SEQS", 1)
+        self._generation_lock = threading.BoundedSemaphore(max_num_seqs)
+        raw_server = NanoEngine.from_pretrained(
             model=model_path,
             devices=[device_index],
             inference_timesteps=self.inference_timesteps,
             max_num_batched_tokens=_env_int("VOXCPM_NANO_MAX_NUM_BATCHED_TOKENS", 4096),
-            max_num_seqs=_env_int("VOXCPM_NANO_MAX_NUM_SEQS", 1),
+            max_num_seqs=max_num_seqs,
             max_model_len=_env_int("VOXCPM_NANO_MAX_MODEL_LEN", 4096),
             gpu_memory_utilization=gpu_memory_utilization,
             enforce_eager=_env_bool("VOXCPM_NANO_ENFORCE_EAGER", False),
         )
-        model_info = self._server.get_model_info()
+        model_info = raw_server.get_model_info()
+        self._server = _ConcurrentNanoServer(raw_server) if max_num_seqs > 1 else raw_server
         self.tts_model = SimpleNamespace(sample_rate=int(model_info["sample_rate"]))
         self._text_tokenizer = mask_multichar_chinese_tokens(LlamaTokenizerFast.from_pretrained(model_path))
-        self.last_successful_seed: int | None = None
+        self._generation_state = threading.local()
+        self._normalizer_lock = threading.Lock()
+        self._denoiser_lock = threading.Lock()
+        self.last_successful_seed = None
         self.text_normalizer = None
         self.denoiser = None
         if enable_denoiser and zipenhancer_model_path:
             self.enable_denoiser(zipenhancer_model_path)
+
+    @property
+    def last_successful_seed(self) -> int | None:
+        state = getattr(self, "_generation_state", None)
+        return getattr(state, "last_successful_seed", None) if state is not None else None
+
+    @last_successful_seed.setter
+    def last_successful_seed(self, value: int | None) -> None:
+        if not hasattr(self, "_generation_state"):
+            self._generation_state = threading.local()
+        self._generation_state.last_successful_seed = value
 
     @classmethod
     def from_pretrained(
@@ -202,11 +270,12 @@ class NanoVoxCPM:
             )
         text = re.sub(r"\s+", " ", text.replace("\n", " ")).strip()
         if normalize:
-            if self.text_normalizer is None:
-                from .utils.text_normalize import TextNormalizer
+            with self._normalizer_lock:
+                if self.text_normalizer is None:
+                    from .utils.text_normalize import TextNormalizer
 
-                self.text_normalizer = TextNormalizer()
-            text = self.text_normalizer.normalize(text)
+                    self.text_normalizer = TextNormalizer()
+                text = self.text_normalizer.normalize(text)
 
         generation_limit, badcase_threshold = _bounded_generation_length(
             text,
@@ -222,24 +291,25 @@ class NanoVoxCPM:
         actual_reference_path = reference_wav_path
         try:
             if denoise and self.denoiser is not None:
-                if prompt_wav_path:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temporary_file:
-                        temporary_paths.append(temporary_file.name)
-                    self.denoiser.enhance(
-                        prompt_wav_path,
-                        output_path=temporary_paths[-1],
-                        normalize_loudness=False,
-                    )
-                    actual_prompt_path = temporary_paths[-1]
-                if reference_wav_path:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temporary_file:
-                        temporary_paths.append(temporary_file.name)
-                    self.denoiser.enhance(
-                        reference_wav_path,
-                        output_path=temporary_paths[-1],
-                        normalize_loudness=False,
-                    )
-                    actual_reference_path = temporary_paths[-1]
+                with self._denoiser_lock:
+                    if prompt_wav_path:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temporary_file:
+                            temporary_paths.append(temporary_file.name)
+                        self.denoiser.enhance(
+                            prompt_wav_path,
+                            output_path=temporary_paths[-1],
+                            normalize_loudness=False,
+                        )
+                        actual_prompt_path = temporary_paths[-1]
+                    if reference_wav_path:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temporary_file:
+                            temporary_paths.append(temporary_file.name)
+                        self.denoiser.enhance(
+                            reference_wav_path,
+                            output_path=temporary_paths[-1],
+                            normalize_loudness=False,
+                        )
+                        actual_reference_path = temporary_paths[-1]
 
             with self._generation_lock:
                 prompt_latents = self._encode_audio(actual_prompt_path) if actual_prompt_path else None

@@ -133,7 +133,9 @@ The immutable digest is authoritative if a readable tag is ever changed. Rolling
 
 The standard runtime uses Nano-vLLM, Python 3.13, CUDA 12.8, and a prebuilt FlashAttention wheel. Triton still performs normal first-use kernel JIT compilation inside the container; Python packages and wheels are not compiled during the image build.
 
-The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=auto` targets an approximately 8 GiB Nano-vLLM process budget while adapting the fraction to installed VRAM: about `0.67` on a 12 GiB GPU and `0.50` on a 16 GiB GPU, capped at `0.90` on smaller cards. Set an explicit fraction in the range `(0, 1]` only when tuning for other workloads. The service canonicalizes `auto` and `cuda:0` to one cached model instance and serializes generation with concurrency one.
+The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=auto` targets an approximately 8 GiB Nano-vLLM process budget while adapting the fraction to installed VRAM: about `0.67` on a 12 GiB GPU and `0.50` on a 16 GiB GPU, capped at `0.90` on smaller cards. Set an explicit fraction in the range `(0, 1]` only when tuning for other workloads. The service canonicalizes `auto` and `cuda:0` to one cached model instance and defaults to concurrency one.
+
+For throughput-oriented API workloads, set `VOXCPM_NANO_MAX_NUM_SEQS=2` to schedule two requests against the same loaded model. This raises aggregate throughput without loading a second copy of the weights, but increases individual request latency and fixed-seed output can vary with concurrent batch composition. Keep the default of `1` when exact seed repeatability matters.
 
 The fixed `v1.0` image predates automatic sizing and uses `0.49`. On a 12 GiB GPU, set `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.67` in `docker run` or Compose; Nano-vLLM's v2.0.4 error incorrectly suggests lowering this value when its calculated budget is already negative.
 

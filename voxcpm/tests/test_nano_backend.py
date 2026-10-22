@@ -1,13 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import threading
+import time
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
 
-from voxcpm.nano_backend import NanoVoxCPM, _bounded_generation_length, _nano_gpu_memory_utilization
+from voxcpm.nano_backend import (
+    NanoVoxCPM,
+    _ConcurrentNanoServer,
+    _bounded_generation_length,
+    _nano_gpu_memory_utilization,
+)
 
 
 class FakeServer:
@@ -24,6 +32,8 @@ class FakeServer:
 def fake_nano(chunk_counts: dict[int, int]) -> NanoVoxCPM:
     model = object.__new__(NanoVoxCPM)
     model._generation_lock = threading.Lock()
+    model._normalizer_lock = threading.Lock()
+    model._denoiser_lock = threading.Lock()
     model._server = FakeServer(chunk_counts)
     model._text_tokenizer = lambda _text: [1, 2]
     model.inference_timesteps = 10
@@ -133,3 +143,52 @@ def test_denoising_reference_audio_does_not_normalize_loudness() -> None:
     )
 
     assert denoiser_calls == [("prompt.wav", False), ("reference.wav", False)]
+
+
+def test_concurrent_server_runs_generators_on_one_background_loop() -> None:
+    class FakeAsyncPool:
+        def __init__(self) -> None:
+            self.active = 0
+            self.peak_active = 0
+
+        async def generate(self, **kwargs):
+            self.active += 1
+            self.peak_active = max(self.peak_active, self.active)
+            try:
+                await asyncio.sleep(0.05)
+                yield kwargs["seed"]
+            finally:
+                self.active -= 1
+
+        async def stop(self) -> None:
+            return None
+
+    pool = FakeAsyncPool()
+    raw_server = SimpleNamespace(loop=asyncio.new_event_loop(), server_pool=pool)
+    server = _ConcurrentNanoServer(raw_server)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            started = time.perf_counter()
+            results = list(executor.map(lambda seed: list(server.generate(seed=seed)), [41, 42]))
+            elapsed = time.perf_counter() - started
+    finally:
+        server.stop()
+
+    assert results == [[41], [42]]
+    assert pool.peak_active == 2
+    assert elapsed < 0.09
+
+
+def test_successful_seed_is_isolated_per_request_thread() -> None:
+    model = object.__new__(NanoVoxCPM)
+    model._generation_state = threading.local()
+
+    def round_trip(seed: int) -> int | None:
+        model.last_successful_seed = seed
+        threading.Event().wait(0.02)
+        return model.last_successful_seed
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(round_trip, [51, 52]))
+
+    assert results == [51, 52]
