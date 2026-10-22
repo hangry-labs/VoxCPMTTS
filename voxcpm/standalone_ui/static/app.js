@@ -2011,7 +2011,29 @@ async function refreshSystemStatus() {
 }
 
 async function refreshSystem() {
-  await Promise.all([refreshSystemStatus(), gpuMonitor.refresh()])
+  const [, settings] = await Promise.all([refreshSystemStatus(), fetchJson('/system/settings'), gpuMonitor.refresh()])
+  $('#mcp-enabled').checked = Boolean(settings.mcp?.enabled)
+  $('#mcp-advanced-enabled').checked = Boolean(settings.mcp?.advanced_enabled)
+}
+
+async function saveMcpSettings() {
+  const controls = [$('#mcp-enabled'), $('#mcp-advanced-enabled')]
+  controls.forEach((control) => { control.disabled = true })
+  try {
+    const result = await fetchJson('/system/settings/mcp', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: controls[0].checked, advanced_enabled: controls[1].checked }),
+    })
+    controls[0].checked = Boolean(result.mcp.enabled)
+    controls[1].checked = Boolean(result.mcp.advanced_enabled)
+    showToast(t('system.mcpSaved', {}, 'MCP access settings saved.'), 'success')
+  } catch (error) {
+    showToast(errorMessage(error))
+    await refreshSystem().catch(() => {})
+  } finally {
+    controls.forEach((control) => { control.disabled = false })
+  }
 }
 
 function activateTab(tab) {
@@ -2033,7 +2055,7 @@ function activateTab(tab) {
   gpuMonitor.stop()
   if (tab === 'api') refreshApi().catch((error) => showToast(errorMessage(error)))
   if (tab === 'system') {
-    refreshSystemStatus()
+    refreshSystem().catch((error) => showToast(errorMessage(error)))
     gpuMonitor.start()
   }
   refreshFormatOptions()
@@ -2494,6 +2516,8 @@ $('#reset-controls').addEventListener('click', resetControls)
 $$('[data-generation-reset]').forEach((button) => button.addEventListener('click', resetControls))
 $('#api-refresh').addEventListener('click', () => refreshApi().catch((error) => showToast(errorMessage(error))))
 $('#system-refresh').addEventListener('click', refreshSystem)
+$('#mcp-enabled').addEventListener('change', saveMcpSettings)
+$('#mcp-advanced-enabled').addEventListener('change', saveMcpSettings)
 $('#purge-models').addEventListener('click', async () => {
   try {
     const result = await fetchJson('/tts/purge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })

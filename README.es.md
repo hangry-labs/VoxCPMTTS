@@ -25,6 +25,7 @@ Esta versión de Hangry Labs está pensada para un uso local sencillo. Inicia un
 - Perfiles de voz y guiones de diálogo persistentes con recetas, retratos, búsqueda, importación y exportación SSML-H y reutilización entre sesiones
 - SSML y SSML-H para narraciones, diálogos con varios hablantes y obras de audio
 - API de voz compatible con OpenAI (`/v1/audio/speech`) y API HTTP nativa para aplicaciones e integraciones locales
+- Endpoints MCP opcionales (`/mcp/` y `/mcp/advanced/`) con enlaces de audio temporales para otros servicios locales
 - Generación en los 30 idiomas compatibles con VoxCPM2
 - Salida WAV, MP3, FLAC, OGG, Opus, AAC y PCM
 - Inferencia Nano-vLLM con aceleración mediante grafos CUDA

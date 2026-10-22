@@ -50,6 +50,8 @@ Major direct runtime dependencies include:
 | PyTorch and TorchAudio | BSD-style licenses |
 | Transformers, Hugging Face Hub, Python Multipart, ModelScope, Datasets, WeText, Spaces, Safetensors, SSML-H Tools | Apache-2.0 |
 | FastAPI, Pydantic, Einops, Inflect, Addict | MIT-style licenses |
+| Model Context Protocol Python SDK | MIT |
+| HTTPX | BSD-3-Clause |
 | Uvicorn, SoundFile, NumPy | BSD and other permissive licenses |
 | defusedxml | Python Software Foundation License |
 | Librosa | ISC |
@@ -64,6 +66,16 @@ Complete license texts, copyright notices, and bundled-component notices are
 retained inside installed Python package metadata, normally under
 `/usr/local/lib/python3.13/site-packages/*.dist-info/licenses/`. The CPython
 license is retained at `/usr/local/lib/python3.13/LICENSE.txt`.
+
+### Model Context Protocol Python SDK
+
+- Project: [modelcontextprotocol/python-sdk](https://github.com/modelcontextprotocol/python-sdk)
+- Version currently used: `2.3.0`
+- Copyright: the Model Context Protocol authors and contributors
+- License: MIT
+- Use here: opt-in Streamable HTTP MCP endpoints and protocol types
+
+The installed distribution includes its MIT license text in package metadata.
 
 ### Nano-vLLM-VoxCPM and Nano-vLLM
 

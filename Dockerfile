@@ -147,6 +147,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VOXCPM_ASR_DEVICE=cpu \
     VOXCPM_LOAD_DENOISER=1 \
     VOXCPM_OPTIMIZE=0 \
+    VOXCPM_ENABLE_MCP=0 \
+    VOXCPM_ENABLE_ADVANCED_MCP=0 \
+    VOXCPM_MCP_INPUT_DIR=/app/persistent/mcp-input \
+    VOXCPM_MCP_OUTPUT_DIR=/app/persistent/mcp-output \
+    VOXCPM_MCP_DNS_REBINDING_PROTECTION=1 \
     PORT=8808 \
     HOST=0.0.0.0 \
     UVICORN_RELOAD=0
@@ -155,7 +160,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential ffmpeg libsndfile1 \
-    && mkdir -p /app/persistent/models/huggingface /app/persistent/models/modelscope /app/persistent/app /app/persistent/voices /tmp/voxcpmtts-ssml \
+    && mkdir -p /app/persistent/models/huggingface /app/persistent/models/modelscope /app/persistent/app /app/persistent/voices /app/persistent/mcp-input /app/persistent/mcp-output /tmp/voxcpmtts-ssml \
     && rm -rf /var/lib/apt/lists/*
 
 ARG BUILD_DATE=unknown

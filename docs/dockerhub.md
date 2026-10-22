@@ -64,6 +64,7 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 
 - Offline browser Design workspace for direction-only creation, controllable cloning, transcript-guided cloning, local reference transcription, recording, upload, waveform trimming, restorable design recipes, and reusable saved voices
 - OpenAI-compatible speech API plus the complete native API for applications and automation
+- Opt-in compact and advanced Streamable HTTP MCP endpoints with expiring audio links
 - SSML and SSML-H for multi-speaker discussions, plays, saved clone voices, and designed speakers
 - VoxCPM2 multilingual generation across 30 officially supported languages
 - 48 kHz output when using the VoxCPM2 AudioVAE V2 model
@@ -72,6 +73,14 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 - Nano-vLLM inference with a single cached GPU engine
 - Offline-friendly usage with the standard full image once it is available locally
 - Common TTS compatibility fields such as `voice`, `use_gpu`, `/tts/voices`, `/tts/speakers`, `/tts/stream-formats`, and `/tts/stream`
+
+## MCP
+
+Enable the compact endpoint in **System > MCP access**, then connect to `http://localhost:8808/mcp/`. It provides five focused tools for health, languages, saved voices, speech inspection, and recommended simple generation. The separately controlled `http://localhost:8808/mcp/advanced/` endpoint adds SSML/SSML-H, voice design, one-off reference cloning, and saved-profile management.
+
+Both endpoints are off by default, have no separate application authentication, and should be enabled only for trusted clients or behind an authenticated reverse proxy. Settings persist in `voxcpmtts_data`.
+
+Generated speech is returned as an expiring download URL rather than raw audio in protocol context. The default TTL is one hour and the accepted range is 60 to 86,400 seconds. Set `VOXCPM_MCP_BASE_URL` to the externally reachable server origin when clients or other containers need to consume those URLs. Advanced local reference files belong in `/app/persistent/mcp-input`; expiring output is stored in `/app/persistent/mcp-output`.
 
 ## API Example
 

@@ -300,6 +300,7 @@ pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .system-controls { display: grid; min-width: 0; gap: 14px; }
 .system-controls .aligner-settings-card { grid-template-columns: 1fr; gap: 16px; margin-top: 0; }
 .system-controls .runtime-settings-card { margin: 0; }
+.mcp-settings-card code { color: #e5e6e9; font-size: 0.68rem; }
 .system-grid .data-output { min-height: 320px; margin-top: 0; }
 .gpu-system-panel { min-width: 0; }
 .gpu-monitor { margin-top: 0; }

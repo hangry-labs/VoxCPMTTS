@@ -4,6 +4,9 @@ vars:
   IMAGE: voxcpmtts:test
   TINY_IMAGE: voxcpmtts:tiny
   PORT: '8808'
+  MCP_BASE_URL: 'http://localhost:{{.PORT}}'
+  LOCAL_MCP_URL: 'http://127.0.0.1:{{.PORT}}/mcp/'
+  LOCAL_ADVANCED_MCP_URL: 'http://127.0.0.1:{{.PORT}}/mcp/advanced/'
   GPU_DEVICE: '0'
   APP_DEVICE: 'auto'
   APP_OPTIMIZE: '0'
@@ -77,6 +80,23 @@ tasks:
         {{.TINY_IMAGE}}
         -lc "python -m pip install --quiet --only-binary=:all: 'pytest>=8,<10' && python -m pytest -q voxcpm/tests"
 
+  mcp-test:
+    desc: Run deterministic MCP artifact, schema, transport, and remote-input tests
+    cmds:
+      - >-
+        docker run --rm --entrypoint sh
+        -v "{{.TASKFILE_DIR}}\voxcpm:/workspace/voxcpm:ro"
+        -w /workspace
+        {{.TINY_IMAGE}}
+        -lc "python -m pip install --quiet --only-binary=:all: 'pytest>=8,<10' && python -m pytest -q voxcpm/tests/test_artifacts.py voxcpm/tests/test_mcp_server.py voxcpm/tests/test_remote_audio.py voxcpm/tests/test_settings.py"
+
+  mcp-live-test:
+    desc: Verify both MCP tiers and generate downloadable audio through the live compact endpoint
+    cmds:
+      - 'cmd /c curl.exe -sS --retry 60 --retry-delay 2 --retry-connrefused http://localhost:{{.PORT}}/tts/ping >nul'
+      - 'cmd /c curl.exe -sS -X PUT http://localhost:{{.PORT}}/system/settings/mcp -H "Content-Type: application/json" -d "{\"enabled\":true,\"advanced_enabled\":true}" >nul'
+      - 'cmd /c "set LOCAL_MCP_URL={{.LOCAL_MCP_URL}}&& set LOCAL_ADVANCED_MCP_URL={{.LOCAL_ADVANCED_MCP_URL}}&& python voxcpm\tests\run_mcp_live_test.py"'
+
   cli-help:
     desc: Show VoxCPM CLI help
     cmds:
@@ -116,12 +136,12 @@ tasks:
   deps:
     desc: Regenerate native Linux/Python 3.13 requirements.txt from requirements.in
     cmds:
-      - uv pip compile requirements.in --python-version 3.13 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --no-header --no-annotate --output-file requirements.txt
+      - uv pip compile requirements.in --python-version 3.13 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --emit-index-url --no-header --no-annotate --output-file requirements.txt
 
   deps-nano:
     desc: Regenerate Linux/Python 3.13 Nano-vLLM requirements
     cmds:
-      - uv pip compile requirements.nano.in --python-version 3.13 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --no-header --no-annotate --output-file requirements.nano.txt
+      - uv pip compile requirements.nano.in --python-version 3.13 --python-platform x86_64-manylinux_2_36 --index-strategy unsafe-best-match --upgrade --emit-index-url --no-header --no-annotate --output-file requirements.nano.txt
 
   benchmark-build:
     desc: Prepare the historical native and current Nano benchmark images
@@ -229,7 +249,7 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e VOXCPM_MCP_BASE_URL={{.MCP_BASE_URL}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   imagerun-tiny:
@@ -238,7 +258,7 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.DATA_VOLUME}}:/app/persistent {{.TINY_IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e VOXCPM_MCP_BASE_URL={{.MCP_BASE_URL}} -e PORT=8808 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v {{.DATA_VOLUME}}:/app/persistent {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER}}"
 
   localrun:
@@ -247,7 +267,7 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e VOXCPM_MCP_BASE_URL={{.MCP_BASE_URL}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   localrun-tiny:
@@ -256,7 +276,7 @@ tasks:
       - cmd /c docker rm -f {{.CONTAINER}} >nul 2>&1
       - cmd /c docker rm -f {{.CONTAINER_LOCAL}} >nul 2>&1
       - cmd /c docker volume create {{.DATA_VOLUME}} >nul
-      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.TINY_IMAGE}}
+      - cmd /c docker run -d --name {{.CONTAINER_LOCAL}} -p {{.PORT}}:8808 --gpus all -e CUDA_VISIBLE_DEVICES={{.GPU_DEVICE}} -e VOXCPM_DEVICE={{.APP_DEVICE}} -e VOXCPM_NANO_GPU_MEMORY_UTILIZATION={{.NANO_GPU_MEMORY_UTILIZATION}} -e VOXCPM_NANO_ENFORCE_EAGER={{.NANO_ENFORCE_EAGER}} -e TORCHINDUCTOR_COMPILE_THREADS={{.NANO_COMPILE_THREADS}} -e VOXCPM_MCP_BASE_URL={{.MCP_BASE_URL}} -e PORT=8808 -e UVICORN_RELOAD=0 -e HF_TOKEN={{.HF_TOKEN}} -e HF_HUB_OFFLINE={{.HF_HUB_OFFLINE}} -e TRANSFORMERS_OFFLINE={{.TRANSFORMERS_OFFLINE}} -v {{.DATA_VOLUME}}:/app/persistent -v "{{.TASKFILE_DIR}}\voxcpm:/app/voxcpm" -v "{{.TASKFILE_DIR}}\assets:/app/assets:ro" -v "{{.TASKFILE_DIR}}\VERSION:/app/VERSION:ro" {{.TINY_IMAGE}}
       - cmd /c docker ps --filter "name={{.CONTAINER_LOCAL}}"
 
   imageweb:

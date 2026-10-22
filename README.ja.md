@@ -25,6 +25,7 @@ Nano-vLLM 推論、ローカルのブラウザー UI、HTTP API を備えた、�
 - デザイン設定、画像、検索、SSML-H の読み込みと書き出しを備え、セッションをまたいで再利用できる永続音声プロファイルと対話スクリプト
 - ナレーション、複数話者の対話、音声劇に対応する SSML と SSML-H
 - OpenAI 互換音声 API（`/v1/audio/speech`）と、アプリケーションやローカル連携向けのネイティブ HTTP API
+- 他のローカルサービスから利用できる期限付き音声 URL を返す、任意の MCP エンドポイント（`/mcp/` と `/mcp/advanced/`）
 - VoxCPM2 が対応する 30 言語での生成
 - WAV、MP3、FLAC、OGG、Opus、AAC、PCM 出力
 - CUDA グラフで高速化された Nano-vLLM 推論

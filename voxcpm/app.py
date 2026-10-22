@@ -7,6 +7,7 @@ import json
 import os
 import secrets
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -46,6 +47,7 @@ from voxcpm.magic_takes import (
     decode_pcm16_mono_wav,
     pack_magic_take_bundle,
 )
+from voxcpm.mcp_server import attach_mcp
 from voxcpm.openai_compat import (
     OPENAI_MODEL_ID,
     OPENAI_VOICE_PRESETS,
@@ -62,6 +64,7 @@ from voxcpm.openai_compat import (
 )
 from voxcpm.standalone_ui.gpu import GPU_MONITOR
 from voxcpm.standalone_ui.server import attach_ui
+from voxcpm.settings import RuntimeSettingsStore
 from voxcpm.text_planning import split_long_text
 from voxcpm.ssml import (
     SSMLPlan,
@@ -129,6 +132,14 @@ PORTRAIT_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 VOICE_PROFILE_DIR = Path(os.getenv("VOXCPM_VOICE_PROFILE_DIR", "/app/persistent/voices"))
 DIALOGUE_SCRIPT_DIR = Path(os.getenv("VOXCPM_DIALOGUE_SCRIPT_DIR", "/app/persistent/scripts"))
 SSML_STAGING_DIR = Path(os.getenv("VOXCPM_SSML_STAGING_DIR", "/tmp/voxcpmtts-ssml"))
+RUNTIME_SETTINGS = RuntimeSettingsStore()
+MCP_DEFAULT_ENABLED = os.getenv("VOXCPM_ENABLE_MCP", "0").strip().lower() in {"1", "true", "yes", "on"}
+MCP_ADVANCED_DEFAULT_ENABLED = os.getenv("VOXCPM_ENABLE_ADVANCED_MCP", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 MAX_RANDOM_SEED = 2**32 - 1
 TIMESTAMP_MODEL = os.getenv("VOXCPM_TIMESTAMP_MODEL", "base")
 TIMESTAMP_DEVICE = os.getenv("VOXCPM_TIMESTAMP_DEVICE", "cpu")
@@ -1284,6 +1295,11 @@ class PurgeRequest(BaseModel):
     device: Optional[str] = Field(None, description="Optional cached device to clear. Omit to clear all cached models.")
 
 
+class MCPSettingsUpdate(BaseModel):
+    enabled: bool = False
+    advanced_enabled: bool = False
+
+
 class TranscriptionRequest(BaseModel):
     audio_path: str = Field(..., description="Container-visible audio path to transcribe.")
     language: str = Field("auto", description="ASR language hint. Use auto for detection.")
@@ -1703,6 +1719,26 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int]:
             set_generation_activity("failed", str(exc), active=False)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     return output_format, sample_rate, waveform, int(successful_seed)
+
+
+def synthesize_complete_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int, list[str]]:
+    """Render a complete request for non-HTTP callers using the same final processing rules."""
+    if payload.input_type == "text":
+        output_format, sample_rate, waveform, seed = synthesize_payload(payload)
+        created_profiles: list[str] = []
+    else:
+        output_format = normalize_output_format(payload.output_format)
+        seed = resolve_generation_seed(payload)
+        session = create_ssml_execution_session(payload, seed)
+        try:
+            sample_rate, waveform = session.render_array()
+            created_profiles = list(session.commit_profiles().values())
+        finally:
+            session.close()
+    if payload.normalize_loudness:
+        waveform = normalize_audio_loudness(waveform, sample_rate)
+    set_generation_activity("complete", "Audio is ready", active=False)
+    return output_format, sample_rate, waveform, seed, created_profiles
 
 
 def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, Iterator[np.ndarray], int]:
@@ -2553,6 +2589,36 @@ def status() -> dict:
     return get_status_payload()
 
 
+@api.get("/system/settings", tags=["System"])
+def system_settings() -> dict[str, Any]:
+    return {
+        "mcp": {
+            "enabled": RUNTIME_SETTINGS.mcp_enabled(default=MCP_DEFAULT_ENABLED),
+            "advanced_enabled": RUNTIME_SETTINGS.mcp_advanced_enabled(
+                default=MCP_ADVANCED_DEFAULT_ENABLED
+            ),
+            "compact_endpoint": "/mcp/",
+            "advanced_endpoint": "/mcp/advanced/",
+        }
+    }
+
+
+@api.put("/system/settings/mcp", tags=["System"])
+def save_mcp_settings(payload: MCPSettingsUpdate) -> dict[str, Any]:
+    RUNTIME_SETTINGS.set_mcp_access(
+        enabled=payload.enabled,
+        advanced_enabled=payload.advanced_enabled,
+    )
+    return {
+        "mcp": {
+            "enabled": payload.enabled,
+            "advanced_enabled": payload.advanced_enabled,
+            "compact_endpoint": "/mcp/",
+            "advanced_endpoint": "/mcp/advanced/",
+        }
+    }
+
+
 @api.get("/tts/activity")
 def activity() -> dict:
     return get_generation_activity()
@@ -3209,7 +3275,7 @@ def purge_models(payload: PurgeRequest | None = Body(None)) -> dict:
         return {"purged": purged, "remaining_model_devices": []}
 
 
-app = attach_ui(api_app=api)
+app = attach_ui(api_app=attach_mcp(api_app=api, runtime=sys.modules[__name__]))
 
 
 def main() -> None:

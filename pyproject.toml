@@ -28,6 +28,8 @@ dependencies = [
     "transformers>=5.19.0,<6",
     "einops",
     "fastapi",
+    "httpx>=0.27,<1",
+    "mcp==2.3.0",
     "python-multipart>=0.0.18",
     "uvicorn[standard]",
     "inflect",

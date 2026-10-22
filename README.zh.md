@@ -25,6 +25,7 @@
 - 持久化声音配置和对话脚本，支持设计参数、头像、搜索、SSML-H 导入导出以及跨会话重复使用
 - 使用 SSML 和 SSML-H 创建旁白、多角色对话和广播剧
 - OpenAI 兼容语音 API（`/v1/audio/speech`）以及面向应用程序和本地集成的原生 HTTP API
+- 可选的 MCP 端点（`/mcp/` 和 `/mcp/advanced/`），通过限时音频链接与其他本地服务集成
 - 支持 VoxCPM2 的 30 种语言
 - 输出 WAV、MP3、FLAC、OGG、Opus、AAC 和 PCM
 - 使用 CUDA 图加速的 Nano-vLLM 推理

@@ -47,6 +47,7 @@ The `voxcpmtts_data` volume preserves model caches, saved voices, dialogue scrip
 - Persistent saved voices and dialogue scripts with restorable recipes, portraits, search, SSML-H import/export, and reuse across sessions
 - SSML and SSML-H documents for timed narration, multi-speaker discussions, and plays
 - An OpenAI-compatible speech API plus the complete native API for applications and local integrations
+- Opt-in compact and advanced Streamable HTTP MCP endpoints with expiring audio links
 - Multilingual generation across 30 VoxCPM2 languages
 - WAV, MP3, FLAC, OGG, Opus, AAC, and raw PCM output
 - Nano-vLLM inference with CUDA graph acceleration
@@ -86,6 +87,25 @@ Create voices from natural-language direction or reference recordings, lock seed
     <img src="assets/screenshots/design-ui.webp" alt="VoxCPMTTS Design workspace showing a locked-seed studio narrator and reusable saved voice library" width="1200">
   </a>
 </p>
+
+## MCP
+
+VoxCPMTTS provides two opt-in Streamable HTTP MCP endpoints on the existing application port. Open **System > MCP access** to enable either endpoint; the choices are stored in the persistent product volume and take effect immediately without restarting the container.
+
+- `http://localhost:8808/mcp/` is the recommended compact endpoint. Its five tools cover health, language search, saved-voice discovery, speech inspection, and simple MP3 generation. `talk_simple` requires only `text`; language, voice, and link TTL are optional.
+- `http://localhost:8808/mcp/advanced/` includes the compact tools plus SSML/SSML-H generation, one-off reference cloning, voice design, and persistent saved-voice creation or deletion.
+
+Both endpoints are disabled by default and have no separate application authentication. Enable them only for trusted clients or behind an authenticated reverse proxy. Advanced mutation tools must be used only when the caller intends to change persistent voices.
+
+Generation returns metadata and an expiring capability URL rather than embedding audio or base64 in protocol context. The default TTL is one hour and callers can request 60 to 86,400 seconds. Another local service, including speech recognition, can fetch that URL before expiry. Generated files live under `/app/persistent/mcp-output` and are removed after expiry; advanced local-reference tools accept files only from `/app/persistent/mcp-input` or bounded HTTP(S) URLs.
+
+When the client or downstream service connects through another host, set `VOXCPM_MCP_BASE_URL` to the externally reachable origin so returned links are usable from that network:
+
+```bash
+docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e VOXCPM_ENABLE_MCP=1 -e VOXCPM_MCP_BASE_URL=http://192.168.1.20:8808 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+```
+
+The environment switches are startup defaults. Values saved in the System tab take precedence afterward. `task mcp-live-test` verifies both catalogs, calls `talk_simple`, follows its temporary URL, and validates the downloaded MP3.
 
 ## Docker Reference
 
@@ -294,6 +314,7 @@ Runtime discovery is available from the local API:
 - Supported languages: `GET /tts/languages`
 - Output formats: `GET /tts/formats`
 - Interactive API reference: `GET /tts/docs`
+- Compact MCP: `/mcp/`; advanced MCP: `/mcp/advanced/`; persistent controls: `GET /system/settings` and `PUT /system/settings/mcp`
 
 </details>
 
@@ -349,6 +370,8 @@ task smoke
 
 `task image-tiny` prepares the test/runtime base, and `task test` runs the checked-in suite in an ephemeral CPU-only container based on that image. `task image` builds the full baked image. `task imagerun` runs it without an external model-cache mount so the image proves its baked assets. `task imagerun-tiny` covers the online first-use cache workflow. `task smoke` checks natural speech, two designed voices, and reference cloning against the running API; add `-- --asr-url http://qwen3-asr-host:8010` to judge transcript fidelity. All Docker dependency installs require binary wheels.
 
+`task mcp-test` runs deterministic MCP schema, transport, artifact-expiry, and guarded remote-input checks inside the image. With a deployment running, `task mcp-live-test` enables both tiers and verifies real linked-audio generation.
+
 Hot-swap local package code into the selected image without rebuilding:
 
 ```bash
@@ -399,6 +422,8 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
 ### v1.1 Snapshot
+
+- Added independently gated compact and advanced Streamable HTTP MCP endpoints, persistent System controls, saved-voice discovery and management, guarded reference inputs, and expiring generated-audio URLs suitable for other local services.
 
 Current snapshot changes:
 
