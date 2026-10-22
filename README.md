@@ -137,7 +137,7 @@ The default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=auto` targets an approximately 8
 
 For throughput-oriented API workloads, set `VOXCPM_NANO_MAX_NUM_SEQS=2` to schedule two requests against the same loaded model. This raises aggregate throughput without loading a second copy of the weights, but increases individual request latency and fixed-seed output can vary with concurrent batch composition. Keep the default of `1` when exact seed repeatability matters.
 
-The fixed `v1.0` image predates automatic sizing and uses `0.49`. On a 12 GiB GPU, set `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.67` in `docker run` or Compose; Nano-vLLM's v2.0.4 error incorrectly suggests lowering this value when its calculated budget is already negative.
+The fixed `v1.0` image predates automatic sizing and uses `0.49`. On a 12 GiB GPU, set `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.67` in `docker run` or Compose; older images may incorrectly suggest lowering this value when the calculated budget is already negative.
 
 CUDA graphs are enabled by default. Set `VOXCPM_NANO_ENFORCE_EAGER=1` only for troubleshooting. `TORCHINDUCTOR_COMPILE_THREADS=1` prevents unused compile-worker pools from retaining RAM, and the image releases temporary CUDA allocator blocks after reference-audio encoding so different reference lengths do not accumulate VRAM high-water allocations.
 
@@ -430,11 +430,12 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 Current snapshot changes:
 
 - Replaced the fixed Nano-vLLM memory percentage with an automatic approximately 8 GiB budget, allowing 12 GiB cards to receive the same practical engine budget qualified on 16 GiB hardware while preserving explicit operator overrides.
+- Updated Nano-vLLM-VoxCPM from 2.0.4 to 2.0.5 and carried its merged PR 89 block-cache fix while awaiting the next upstream release. The controlled synchronization benchmark found established performance parity and byte-identical output across all 312 paired calls; see the [full report](benchmarks/nano_upstream_sync/DETAILS.md).
 
 The following work remains planned:
 
 - Select and validate a binary-wheel-only, offline-capable alignment backend, then enable generated segment, word, and character timestamps in the standard images. Evaluate Qwen3-ForcedAligner, already exposed by the separate Qwen3-ASR service, as the first candidate. The current StableTS integration remains capability-gated because `stable-ts` does not publish a Python 3.13 wheel.
-- Recheck Nano-vLLM-VoxCPM upstream. If its pending memory and CUDA-graph fixes are still unreleased, create a Hangry Labs fork, merge the selected upstream pull requests, publish a versioned pure-Python wheel pinned by SHA-256, and qualify it with the full benchmark, GPU memory soak, voice-cloning, and offline image suites before adoption.
+- Evaluate upstream's optional decode-only CUDA-graph work as a separate memory-focused experiment on 8 GiB hardware; do not combine it with routine runtime synchronization because it trades performance for memory and spans a substantially larger patch surface.
 - Split native and Nano installation metadata so the optimized image passes dependency checks without advertising native-only packages or upstream's unused `torchcodec` dependency. Keep the Nano runtime binary-wheel-only and do not add incompatible packages merely to silence metadata.
 
 The current development snapshot is published through the rolling tags from `main`:

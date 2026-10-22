@@ -27,6 +27,7 @@ The result supports Nano as the default backend: it provides the expected fourfo
 | [GPU memory](memory/gpu/BENCHMARKS.md) | `task benchmark-baseline` | One VoxCPMTTS backend at a time; remote ASR judge | Whole-device VRAM delta and container RAM |
 | [Speech quality](speech-quality/BENCHMARKS.md) | `task benchmark-baseline` | Staged TTS followed by Qwen3-ASR judging | Exact transcript rate, normalized similarity, and repeat consistency |
 | [Backend pilot](backend_comparison/BENCHMARKS.md) | `task benchmark-backends` | One VoxCPMTTS container at a time | Compact four-scenario diagnostic comparison |
+| [Nano 2.0.5 sync](nano_upstream_sync/DETAILS.md) | Manual paired `benchmark-baseline` runs | Preserved before/after images with stable call seeds | Runtime speed, output identity, VRAM, and RAM |
 | [SSML dialogue](ssml/BENCHMARKS.md) | `task benchmark-ssml` | Paired staged SSML and SSML-H generation followed by Qwen3-ASR | Ten turn endings, final-tail completion, similarity, latency, and RTF |
 
 Prepare the preserved historical native image and current Nano image before an official comparison:
@@ -36,4 +37,6 @@ task benchmark-build
 task benchmark-baseline -- --comment "description of the change"
 ```
 
-The baseline computes the intersection of VoxCPM and Qwen3-ASR languages, preserves raw measurements in each suite's `runs.json`, and regenerates summary and detail tables. The ASR service may run on another trusted machine so it does not consume the measured GPU. Do not compare runs collected with different model assets, generation settings, hardware, language sets, or concurrent GPU workloads.
+For paired Nano-only runtime or dependency comparisons, preserve each image under a distinct tag and run the full workload with `--backends nano --nano-image <tag>`. Calls use a stable seed derived from `call_id`, allowing exact output-hash comparisons when both runtimes honor deterministic generation.
+
+The baseline computes the intersection of VoxCPM and Qwen3-ASR languages, stores one canonical raw history in the git-ignored `benchmark-artifacts/baseline-results/runs.json`, and regenerates the reviewed summary and detail tables. Pass `--results <path>` when another local result destination is required. The ASR service may run on another trusted machine so it does not consume the measured GPU. Do not compare runs collected with different model assets, generation settings, hardware, language sets, or concurrent GPU workloads.

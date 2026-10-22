@@ -43,6 +43,7 @@ from benchmarks.backend_comparison.run_benchmark import (  # noqa: E402
 MANIFEST_PATH = ROOT / "examples" / "assets" / "manifest.json"
 REFERENCE_PATH = ROOT / "examples" / "original_clone.mp3"
 ARTIFACTS_ROOT = ROOT / "benchmark-artifacts" / "speech-quality"
+DEFAULT_RESULTS_PATH = ROOT / "benchmark-artifacts" / "baseline-results" / "runs.json"
 SUITES = {
     "speed": ROOT / "benchmarks" / "speed",
     "memory": ROOT / "benchmarks" / "memory" / "gpu",
@@ -159,6 +160,7 @@ def load_workload(
 
 
 def tts_payload(item: dict[str, Any]) -> dict[str, Any]:
+    stable_seed = int.from_bytes(hashlib.sha256(item["call_id"].encode("utf-8")).digest()[:4], "big")
     payload = {
         "text": item["text"],
         "language": item["language"],
@@ -168,6 +170,8 @@ def tts_payload(item: dict[str, Any]) -> dict[str, Any]:
         "inference_timesteps": 10,
         "normalize": False,
         "denoise": False,
+        "seed": stable_seed,
+        "randomize_seed": False,
     }
     if item["mode"] == "clone":
         payload["ref_audio"] = CONTAINER_REFERENCE_PATH
@@ -246,6 +250,7 @@ def transcribe(asr_url: str, audio: bytes, language: str, filename: str) -> tupl
 
 
 def append_run(path: Path, run: dict[str, Any]) -> dict[str, Any]:
+    path.parent.mkdir(parents=True, exist_ok=True)
     data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"schema": 1, "runs": []}
     data.setdefault("runs", []).append(run)
     data["latest"] = run
@@ -471,7 +476,7 @@ def render_speed(data: dict[str, Any]) -> None:
         "",
         f"Run `{run['run_id']}`; 10 inference steps; concurrency 1; warmed requests.",
         "RTF is wall-clock generation time divided by generated audio duration. Lower is better.",
-        "Generation is unseeded because the VoxCPM API does not expose a shared deterministic seed.",
+        "Each call uses a stable seed derived from its call ID so compatible runtimes can be compared exactly.",
         "",
     ]
     for backend in run["backends"]:
@@ -554,7 +559,7 @@ def render_quality(data: dict[str, Any]) -> None:
         f"Run `{run['run_id']}` across {len(run['languages'])} common languages.",
         "Text is normalized with Unicode NFKC, case folding, and removal of non-letter/non-number characters.",
         "Similarity uses a normalized sequence ratio; exact means the normalized transcript equals the prompt.",
-        "Generation is stochastic; repeated samples characterize the distribution rather than paired identical outputs.",
+        "Each call uses a stable seed derived from its call ID; repeated cases still measure within-runtime consistency.",
         "",
     ]
     for item in run["backends"]:
@@ -581,6 +586,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the controlled VoxCPM native/Nano multilingual baseline.")
     parser.add_argument("--native-image", default="voxcpmtts:benchmark-native")
     parser.add_argument("--nano-image", default="voxcpmtts:benchmark-nano")
+    parser.add_argument(
+        "--backends",
+        default="native,nano",
+        help="Comma-separated backends to run: native, nano, or both (default: native,nano).",
+    )
     parser.add_argument("--container", default="voxcpmtts_benchmark")
     parser.add_argument("--port", type=int, default=8811)
     parser.add_argument("--gpu-index", type=int, default=0)
@@ -593,12 +603,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--clone-repeats", type=int, default=3)
     parser.add_argument("--languages", default="")
     parser.add_argument("--sample-interval", type=float, default=0.1)
+    parser.add_argument(
+        "--results",
+        type=Path,
+        default=DEFAULT_RESULTS_PATH,
+        help="Local raw-result history (default: benchmark-artifacts/baseline-results/runs.json).",
+    )
     parser.add_argument("--stop-container", action="append", default=[])
     parser.add_argument("--comment", default="")
     parser.add_argument("--no-write", action="store_true")
     args = parser.parse_args()
     if min(args.design_sentences, args.repeats) < 1 or args.clone_repeats < 0:
         parser.error("design sentences and repeats must be positive; clone repeats must not be negative")
+    args.backends = tuple(dict.fromkeys(item.strip().lower() for item in args.backends.split(",") if item.strip()))
+    if not args.backends or any(item not in {"native", "nano"} for item in args.backends):
+        parser.error("backends must contain native, nano, or both")
     args.base_url = f"http://127.0.0.1:{args.port}"
     args.run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     return args
@@ -621,7 +640,8 @@ def main() -> int:
     hardware = gpu_snapshot(args.gpu_index)
     if hardware is None:
         raise RuntimeError(f"Cannot inspect GPU {args.gpu_index}")
-    images = {"native": args.native_image, "nano": args.nano_image}
+    available_images = {"native": args.native_image, "nano": args.nano_image}
+    images = {backend: available_images[backend] for backend in args.backends}
     for image in images.values():
         image_metadata(image)
     docker("volume", "inspect", args.cache_volume)
@@ -665,7 +685,7 @@ def main() -> int:
             "design_repeats": args.repeats,
             "clone_repeats": args.clone_repeats,
             "sample_interval_seconds": args.sample_interval,
-            "seed_policy": "unseeded; VoxCPM API does not expose a shared deterministic seed",
+            "seed_policy": "stable 32-bit SHA-256-derived seed per call_id; randomize_seed=false",
         },
         "languages": languages,
         "language_selection": {
@@ -686,11 +706,14 @@ def main() -> int:
     if args.no_write:
         print("Baseline smoke completed; no history was written.", flush=True)
         return 0
-    datasets = {name: append_run(directory / "runs.json", run) for name, directory in SUITES.items()}
-    render_speed(datasets["speed"])
-    render_memory(datasets["memory"])
-    render_quality(datasets["quality"])
-    print("Updated speed, GPU-memory, and speech-quality reports.", flush=True)
+    dataset = append_run(args.results, run)
+    render_speed(dataset)
+    render_memory(dataset)
+    render_quality(dataset)
+    print(
+        f"Updated speed, GPU-memory, and speech-quality reports; raw results: {args.results}",
+        flush=True,
+    )
     return 0
 
 

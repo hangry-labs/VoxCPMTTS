@@ -66,7 +66,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-ARG NANO_VLLM_VERSION=2.0.4
+ARG NANO_VLLM_VERSION=2.0.5
 ARG FLASH_ATTN_WHEEL_URL=https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu12torch2.8cxx11abiTRUE-cp313-cp313-linux_x86_64.whl
 ARG FLASH_ATTN_WHEEL_SHA256=7dd8c64a414130c82d83a472f5498c1b899fba37a30e2a793a7a4dc5dd61a062
 
