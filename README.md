@@ -425,7 +425,7 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
-### v1.1 Snapshot
+### v1.1
 
 Current snapshot changes:
 
@@ -448,18 +448,18 @@ The following work remains planned:
 - Evaluate upstream's optional decode-only CUDA-graph work as a separate memory-focused experiment on 8 GiB hardware; do not combine it with routine runtime synchronization because it trades performance for memory and spans a substantially larger patch surface.
 - Split native and Nano installation metadata so the optimized image passes dependency checks without advertising native-only packages or upstream's unused `torchcodec` dependency. Keep the Nano runtime binary-wheel-only and do not add incompatible packages merely to silence metadata.
 
-The current development snapshot is published through the rolling tags from `main`:
+The `v1.1` release is available through the immutable version tags:
 
 **Full image**
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1
 ```
 
 **Tiny image**
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny
 ```
 
 ### v1.0
