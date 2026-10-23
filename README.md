@@ -425,6 +425,24 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
+### v1.2 Snapshot
+
+- No changes yet.
+
+The current development snapshot is published through the rolling tags from `main`:
+
+**Full image**
+
+```bash
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+```
+
+**Tiny image**
+
+```bash
+docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+```
+
 ### v1.1
 
 Current snapshot changes:
