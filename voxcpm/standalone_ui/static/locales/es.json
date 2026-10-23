@@ -572,6 +572,7 @@
   "timestamps.title": "Tiempos del habla",
   "timestamps.unavailable": "No disponible",
   "timestamps.words": "Palabras",
+  "progress.queued": "Esperando inferencia",
   "updates.releaseAvailable": "Nueva versión disponible",
   "updates.releaseTitle": "Abrir la última versión de VoxCPMTTS",
   "updates.snapshotAvailable": "Nueva compilación snapshot",

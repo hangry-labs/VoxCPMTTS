@@ -223,6 +223,14 @@ tasks:
         --no-write
         {{.CLI_ARGS}}
 
+  benchmark-queue:
+    desc: Compare sequential and FIFO-queued API throughput on one GPU worker
+    cmds:
+      - >-
+        python benchmarks/inference_queue/run_benchmark.py
+        --base-url http://127.0.0.1:8808
+        {{.CLI_ARGS}}
+
   benchmark-ssml:
     desc: Append paired standard SSML and SSML-H dialogue reliability results
     cmds:

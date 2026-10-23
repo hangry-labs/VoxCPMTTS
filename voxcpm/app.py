@@ -11,9 +11,12 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 import wave
+from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -47,6 +50,7 @@ from voxcpm.magic_takes import (
     decode_pcm16_mono_wav,
     pack_magic_take_bundle,
 )
+from voxcpm.inference_queue import InferenceQueueFullError, QueueStatusCallback
 from voxcpm.mcp_server import attach_mcp
 from voxcpm.openai_compat import (
     OPENAI_MODEL_ID,
@@ -306,6 +310,9 @@ MODEL_LOCK = threading.Lock()
 ASR_MODEL = None
 ASR_LOCK = threading.RLock()
 ACTIVITY_LOCK = threading.Lock()
+CURRENT_REQUEST_ID: ContextVar[str | None] = ContextVar("voxcpm_request_id", default=None)
+REQUEST_ACTIVITIES: OrderedDict[str, dict[str, Any]] = OrderedDict()
+MAX_REQUEST_ACTIVITIES = 256
 GENERATION_ACTIVITY: dict[str, Any] = {
     "active": False,
     "phase": "ready",
@@ -314,19 +321,98 @@ GENERATION_ACTIVITY: dict[str, Any] = {
 }
 
 
-def set_generation_activity(phase: str, message: str, *, active: bool) -> None:
+def set_generation_activity(
+    phase: str,
+    message: str,
+    *,
+    active: bool,
+    request_id: str | None = None,
+    **details: Any,
+) -> None:
+    activity = {
+        "active": active,
+        "phase": phase,
+        "message": message,
+        "updated_at": time.time(),
+        **details,
+    }
+    tracked_request_id = request_id or CURRENT_REQUEST_ID.get()
     with ACTIVITY_LOCK:
-        GENERATION_ACTIVITY.update(
-            active=active,
-            phase=phase,
-            message=message,
-            updated_at=time.time(),
+        GENERATION_ACTIVITY.update(activity)
+        if tracked_request_id:
+            REQUEST_ACTIVITIES[tracked_request_id] = {"request_id": tracked_request_id, **activity}
+            REQUEST_ACTIVITIES.move_to_end(tracked_request_id)
+            while len(REQUEST_ACTIVITIES) > MAX_REQUEST_ACTIVITIES:
+                REQUEST_ACTIVITIES.popitem(last=False)
+
+
+def get_inference_queue_status() -> dict[str, Any]:
+    with MODEL_LOCK:
+        models = list(MODEL_CACHE.values())
+    for model in models:
+        for candidate in (model, getattr(model, "tts_model", None)):
+            status = getattr(candidate, "queue_status", None)
+            if callable(status):
+                return status()
+    return {
+        "workers": int(os.getenv("VOXCPM_NANO_MAX_NUM_SEQS", "1")),
+        "capacity": int(os.getenv("VOXCPM_NANO_QUEUE_SIZE", "8")),
+        "queued": 0,
+        "active": 0,
+        "pending_job_ids": [],
+        "active_job_ids": [],
+    }
+
+
+def get_generation_activity(request_id: str | None = None) -> dict[str, Any]:
+    with ACTIVITY_LOCK:
+        if request_id:
+            activity = dict(
+                REQUEST_ACTIVITIES.get(
+                    request_id,
+                    {
+                        "request_id": request_id,
+                        "active": True,
+                        "phase": "preparing",
+                        "message": "Preparing request",
+                        "updated_at": time.time(),
+                    },
+                )
+            )
+        else:
+            activity = dict(GENERATION_ACTIVITY)
+    activity["inference_queue"] = get_inference_queue_status()
+    return activity
+
+
+def generation_progress_callback() -> QueueStatusCallback:
+    request_id = CURRENT_REQUEST_ID.get()
+
+    def update(event: str, details: dict[str, Any]) -> None:
+        if event == "queued":
+            position = int(details.get("queue_position", 0))
+            message = f"Waiting for inference slot (queue position {position})"
+            set_generation_activity("queued", message, active=True, request_id=request_id, **details)
+        elif event == "running":
+            set_generation_activity(
+                "generating",
+                "Generating speech",
+                active=True,
+                request_id=request_id,
+                **details,
+            )
+
+    return update
+
+
+def generation_http_exception(exc: Exception) -> HTTPException:
+    if isinstance(exc, InferenceQueueFullError):
+        return HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": "2"},
         )
-
-
-def get_generation_activity() -> dict[str, Any]:
-    with ACTIVITY_LOCK:
-        return dict(GENERATION_ACTIVITY)
+    return HTTPException(status_code=400, detail=str(exc))
 
 
 def _close_model(model: Any) -> None:
@@ -974,7 +1060,13 @@ def resolve_generation_seed(payload: "TTSRequest") -> int:
     return 42 if payload.seed is None else payload.seed
 
 
-def build_generate_kwargs(payload: "TTSRequest", model: Any, *, seed: int | None = None) -> dict:
+def build_generate_kwargs(
+    payload: "TTSRequest",
+    model: Any,
+    *,
+    seed: int | None = None,
+    progress_callback: QueueStatusCallback | None = None,
+) -> dict:
     ref_audio = payload.ref_audio or payload.reference_audio
     prompt_audio = payload.prompt_audio
     prompt_text = payload.prompt_text
@@ -1009,6 +1101,8 @@ def build_generate_kwargs(payload: "TTSRequest", model: Any, *, seed: int | None
         "denoise": payload.denoise,
         "seed": resolve_generation_seed(payload) if seed is None else seed,
     }
+    if progress_callback is not None and callable(getattr(model, "queue_status", None)):
+        kwargs["progress_callback"] = progress_callback
     if not prompt_audio:
         kwargs["prompt_text"] = None
     if not ref_audio:
@@ -1097,11 +1191,18 @@ def planned_text_sections(payload: TTSRequest) -> list[str]:
     return split_long_text(text)
 
 
-def generate_planned_waveform(payload: TTSRequest, model: Any, seed: int) -> np.ndarray:
+def generate_planned_waveform(
+    payload: TTSRequest,
+    model: Any,
+    seed: int,
+    *,
+    progress_callback: QueueStatusCallback | None = None,
+) -> np.ndarray:
     sections = planned_text_sections(payload)
     generated: list[np.ndarray] = []
     sample_rate = int(model.tts_model.sample_rate)
     silence = np.zeros(round(sample_rate * LONG_TEXT_JOIN_SECONDS), dtype=np.float32)
+    progress_callback = progress_callback or generation_progress_callback()
     for index, section in enumerate(sections):
         if len(sections) > 1:
             set_generation_activity(
@@ -1110,7 +1211,18 @@ def generate_planned_waveform(payload: TTSRequest, model: Any, seed: int) -> np.
                 active=True,
             )
         section_payload = payload.model_copy(update={"text": section})
-        generated.append(to_float32_audio(model.generate(**build_generate_kwargs(section_payload, model, seed=seed))))
+        generated.append(
+            to_float32_audio(
+                model.generate(
+                    **build_generate_kwargs(
+                        section_payload,
+                        model,
+                        seed=seed,
+                        progress_callback=progress_callback,
+                    )
+                )
+            )
+        )
         if index + 1 < len(sections):
             generated.append(silence)
     return np.concatenate(generated) if generated else np.zeros(0, dtype=np.float32)
@@ -1120,9 +1232,12 @@ def iter_planned_waveform_chunks(
     payload: StreamingTTSRequest,
     model: Any,
     seed: int,
+    *,
+    progress_callback: QueueStatusCallback | None = None,
 ) -> Iterator[np.ndarray]:
     sections = planned_text_sections(payload)
     sample_rate = int(model.tts_model.sample_rate)
+    progress_callback = progress_callback or generation_progress_callback()
     for index, section in enumerate(sections):
         if len(sections) > 1:
             set_generation_activity(
@@ -1131,7 +1246,14 @@ def iter_planned_waveform_chunks(
                 active=True,
             )
         section_payload = payload.model_copy(update={"text": section})
-        chunks = model.generate_streaming(**build_generate_kwargs(section_payload, model, seed=seed))
+        chunks = model.generate_streaming(
+            **build_generate_kwargs(
+                section_payload,
+                model,
+                seed=seed,
+                progress_callback=progress_callback,
+            )
+        )
         try:
             yield from chunks
         finally:
@@ -1418,6 +1540,7 @@ def _default_ssml_binding(payload: TTSRequest, profiles: dict[str, dict[str, Any
 
 def create_ssml_execution_session(payload: TTSRequest, used_seed: int) -> SSMLExecutionSession:
     plan, profiles = compile_ssml_request(payload)
+    progress_callback = generation_progress_callback()
     requested_device = resolve_requested_device(payload.device, payload.use_gpu)
     canonical_device = canonical_model_device(requested_device)
     cache_key = (DEFAULT_BACKEND, DEFAULT_MODEL_ID, canonical_device)
@@ -1458,7 +1581,12 @@ def create_ssml_execution_session(payload: TTSRequest, used_seed: int) -> SSMLEx
             use_gpu=payload.use_gpu,
             output_format="wav",
         )
-        return generate_planned_waveform(unit_payload, model, seed)
+        return generate_planned_waveform(
+            unit_payload,
+            model,
+            seed,
+            progress_callback=progress_callback,
+        )
 
     def prepare_voice(
         definition: SSMLVoiceDefinition,
@@ -1700,7 +1828,7 @@ def synthesize_payload(payload: TTSRequest) -> tuple[str, int, np.ndarray, int]:
         wav = generate_planned_waveform(payload, model, seed)
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         set_generation_activity("failed", str(exc), active=False)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise generation_http_exception(exc) from exc
     except Exception as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"VoxCPM generation failed: {exc}") from exc
@@ -1762,10 +1890,15 @@ def synthesize_payload_chunks(payload: StreamingTTSRequest) -> tuple[str, int, I
         model = get_model(requested_device, load_denoiser=payload.denoise)
         set_generation_activity("streaming", "Generating the live audio stream", active=True)
         seed = resolve_generation_seed(payload)
-        chunks = iter_planned_waveform_chunks(payload, model, seed)
+        chunks = iter_planned_waveform_chunks(
+            payload,
+            model,
+            seed,
+            progress_callback=generation_progress_callback(),
+        )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         set_generation_activity("failed", str(exc), active=False)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise generation_http_exception(exc) from exc
     except Exception as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"VoxCPM streaming failed: {exc}") from exc
@@ -1836,7 +1969,7 @@ def ssml_audio_response(payload: TTSRequest, route_name: str) -> StreamingRespon
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         set_generation_activity("failed", str(exc), active=False)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise generation_http_exception(exc) from exc
     except Exception as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"SSML generation failed: {exc}") from exc
@@ -1859,7 +1992,7 @@ def ssml_progressive_audio_response(
         for path in cleanup_paths:
             Path(path).unlink(missing_ok=True)
         set_generation_activity("failed", str(exc), active=False)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise generation_http_exception(exc) from exc
     except Exception as exc:
         for path in cleanup_paths:
             Path(path).unlink(missing_ok=True)
@@ -2022,6 +2155,7 @@ def get_status_payload() -> dict:
         "optimize": DEFAULT_OPTIMIZE,
         "languages": SUPPORTED_LANGUAGES,
         "loaded_model_devices": loaded_devices,
+        "inference_queue": get_inference_queue_status(),
         "output_formats": get_supported_output_formats(),
         "stream_formats": STREAM_FORMATS,
         "post_processing": {
@@ -2473,6 +2607,69 @@ api = FastAPI(
     lifespan=app_lifespan,
 )
 
+GENERATION_REQUEST_PATHS = {
+    "/v1/audio/speech",
+    "/tts/convert",
+    "/tts/generate",
+    "/tts/generate-upload",
+    "/tts/magic/render",
+    "/tts/magic/take",
+    "/tts/stream",
+    "/tts/stream-upload",
+}
+
+
+def normalize_request_id(value: str | None) -> str:
+    if value:
+        try:
+            return str(uuid.UUID(value.strip()))
+        except (ValueError, AttributeError):
+            pass
+    return str(uuid.uuid4())
+
+
+class RequestActivityMiddleware:
+    """Track generation progress without buffering streaming response bodies."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        raw_request_id = headers.get(b"x-voxcpm-request-id")
+        request_id = normalize_request_id(raw_request_id.decode("latin-1") if raw_request_id else None)
+        token = CURRENT_REQUEST_ID.set(request_id)
+
+        async def send_with_request_id(message: dict[str, Any]) -> None:
+            if message.get("type") == "http.response.start":
+                response_headers = list(message.get("headers", []))
+                response_headers = [
+                    (key, value)
+                    for key, value in response_headers
+                    if key.lower() != b"x-voxcpm-request-id"
+                ]
+                response_headers.append((b"x-voxcpm-request-id", request_id.encode("ascii")))
+                message["headers"] = response_headers
+            await send(message)
+
+        try:
+            if scope.get("path") in GENERATION_REQUEST_PATHS:
+                set_generation_activity(
+                    "preparing",
+                    "Preparing request",
+                    active=True,
+                    request_id=request_id,
+                )
+            await self.app(scope, receive, send_with_request_id)
+        finally:
+            CURRENT_REQUEST_ID.reset(token)
+
+
+api.add_middleware(RequestActivityMiddleware)
+
 
 @api.exception_handler(OpenAIAPIError)
 async def openai_api_error_handler(_: Request, exc: OpenAIAPIError) -> JSONResponse:
@@ -2620,8 +2817,8 @@ def save_mcp_settings(payload: MCPSettingsUpdate) -> dict[str, Any]:
 
 
 @api.get("/tts/activity")
-def activity() -> dict:
-    return get_generation_activity()
+def activity(request_id: str | None = Query(None)) -> dict:
+    return get_generation_activity(normalize_request_id(request_id) if request_id else None)
 
 
 @api.get("/tts/defaults")
@@ -3116,7 +3313,7 @@ def generate_magic_take(request: MagicTakeRequest = Body(...)) -> Response:
         set_generation_activity("complete", "Magic speech take is ready", active=False)
     except (FileNotFoundError, ValueError, RuntimeError, SSMLValidationError) as exc:
         set_generation_activity("failed", str(exc), active=False)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise generation_http_exception(exc) from exc
     except Exception as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"Magic take generation failed: {exc}") from exc
@@ -3165,7 +3362,7 @@ async def generate_magic_render(
         set_generation_activity("complete", "Magic dialogue is ready", active=False)
     except (FileNotFoundError, ValueError, RuntimeError, SSMLValidationError) as exc:
         set_generation_activity("failed", str(exc), active=False)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise generation_http_exception(exc) from exc
     except Exception as exc:
         set_generation_activity("failed", str(exc), active=False)
         raise HTTPException(status_code=500, detail=f"Magic dialogue generation failed: {exc}") from exc

@@ -602,6 +602,7 @@
   "languages.thai": "Thai",
   "languages.turkish": "Turkish",
   "languages.vietnamese": "Vietnamese",
+  "progress.queued": "Waiting for inference",
   "updates.releaseAvailable": "New version available",
   "updates.releaseTitle": "Open the latest VoxCPMTTS release",
   "updates.snapshotAvailable": "New snapshot build",

@@ -3,19 +3,23 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import re
 import secrets
 import tempfile
 import threading
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Generator, Sequence
+from typing import Any, Callable, Generator, Sequence
 
 import numpy as np
 import torch
 from huggingface_hub import snapshot_download
+
+from .inference_queue import ByteLRUCache, InferenceScheduler, QueueStatusCallback
 
 
 MAX_GENERATION_SEED = 0xFFFFFFFF
@@ -23,6 +27,13 @@ NANO_BADCASE_RATIO_THRESHOLD = 4.5
 NANO_GENERATION_LIMIT_RATIO = 6.0
 NANO_GPU_MEMORY_TARGET_BYTES = 8 * 1024**3
 NANO_GPU_MEMORY_MAX_UTILIZATION = 0.90
+
+
+@dataclass(frozen=True)
+class _PreparedAudio:
+    data: bytes
+    audio_format: str
+    cache_key: str
 
 
 class _ConcurrentNanoServer:
@@ -106,6 +117,13 @@ def _env_int(name: str, default: int) -> int:
     return value
 
 
+def _env_nonnegative_int(name: str, default: int) -> int:
+    value = int(os.getenv(name, str(default)))
+    if value < 0:
+        raise ValueError(f"{name} cannot be negative")
+    return value
+
+
 def _nano_gpu_memory_utilization(device_index: int) -> float:
     raw = os.getenv("VOXCPM_NANO_GPU_MEMORY_UTILIZATION", "auto").strip().lower()
     if raw == "auto":
@@ -165,6 +183,8 @@ class NanoVoxCPM:
             )
         self.inference_timesteps = _env_int("VOXCPM_NANO_INFERENCE_TIMESTEPS", 10)
         max_num_seqs = _env_int("VOXCPM_NANO_MAX_NUM_SEQS", 1)
+        queue_size = _env_nonnegative_int("VOXCPM_NANO_QUEUE_SIZE", 8)
+        self._max_num_seqs = max_num_seqs
         self._generation_lock = threading.BoundedSemaphore(max_num_seqs)
         raw_server = NanoEngine.from_pretrained(
             model=model_path,
@@ -178,6 +198,15 @@ class NanoVoxCPM:
         )
         model_info = raw_server.get_model_info()
         self._server = _ConcurrentNanoServer(raw_server) if max_num_seqs > 1 else raw_server
+        self._scheduler = (
+            InferenceScheduler(workers=max_num_seqs, queue_size=queue_size)
+            if queue_size
+            else None
+        )
+        self._latent_cache = ByteLRUCache(
+            max_entries=_env_nonnegative_int("VOXCPM_NANO_LATENT_CACHE_ENTRIES", 32),
+            max_bytes=_env_nonnegative_int("VOXCPM_NANO_LATENT_CACHE_BYTES", 256 * 1024**2),
+        )
         self.tts_model = SimpleNamespace(sample_rate=int(model_info["sample_rate"]))
         self._text_tokenizer = mask_multichar_chinese_tokens(LlamaTokenizerFast.from_pretrained(model_path))
         self._generation_state = threading.local()
@@ -235,12 +264,23 @@ class NanoVoxCPM:
 
         self.denoiser = ZipEnhancer(zipenhancer_model_path)
 
-    def _encode_audio(self, path: str) -> bytes:
+    def _prepare_audio(self, path: str) -> _PreparedAudio:
         audio_path = Path(path)
         if not audio_path.is_file():
             raise FileNotFoundError(f"Audio file does not exist: {path}")
         audio_format = audio_path.suffix.lstrip(".").lower() or "wav"
-        return self._server.encode_latents(audio_path.read_bytes(), audio_format)
+        data = audio_path.read_bytes()
+        digest = hashlib.sha256(audio_format.encode("ascii") + b"\0" + data).hexdigest()
+        return _PreparedAudio(data=data, audio_format=audio_format, cache_key=digest)
+
+    def _encode_prepared_audio(self, audio: _PreparedAudio) -> bytes:
+        return self._latent_cache.get_or_create(
+            audio.cache_key,
+            lambda: self._server.encode_latents(audio.data, audio.audio_format),
+        )
+
+    def _encode_audio(self, path: str) -> bytes:
+        return self._encode_prepared_audio(self._prepare_audio(path))
 
     def _generate_chunks(
         self,
@@ -257,6 +297,7 @@ class NanoVoxCPM:
         retry_badcase_max_times: int = 3,
         retry_badcase_ratio_threshold: float = NANO_BADCASE_RATIO_THRESHOLD,
         seed: int | None = None,
+        progress_callback: QueueStatusCallback | None = None,
         **_: object,
     ) -> Generator[np.ndarray, None, None]:
         if not isinstance(text, str) or not text.strip():
@@ -286,6 +327,7 @@ class NanoVoxCPM:
         if retry_badcase_max_times < 1:
             raise ValueError("retry_badcase_max_times must be greater than zero")
 
+        current_seed = _materialize_seed(seed)
         temporary_paths: list[str] = []
         actual_prompt_path = prompt_wav_path
         actual_reference_path = reference_wav_path
@@ -311,10 +353,13 @@ class NanoVoxCPM:
                         )
                         actual_reference_path = temporary_paths[-1]
 
-            with self._generation_lock:
-                prompt_latents = self._encode_audio(actual_prompt_path) if actual_prompt_path else None
-                reference_latents = self._encode_audio(actual_reference_path) if actual_reference_path else None
-                current_seed = _materialize_seed(seed)
+            prepared_prompt = self._prepare_audio(actual_prompt_path) if actual_prompt_path else None
+            prepared_reference = self._prepare_audio(actual_reference_path) if actual_reference_path else None
+            successful_seed: dict[str, int] = {}
+
+            def run_generation() -> Generator[np.ndarray, None, None]:
+                prompt_latents = self._encode_prepared_audio(prepared_prompt) if prepared_prompt else None
+                reference_latents = self._encode_prepared_audio(prepared_reference) if prepared_reference else None
                 generation_kwargs = {
                     "target_text": text,
                     "prompt_latents": prompt_latents,
@@ -325,25 +370,49 @@ class NanoVoxCPM:
                 }
                 if not retry_badcase:
                     for chunk in self._server.generate(**generation_kwargs, seed=current_seed):
-                        self.last_successful_seed = current_seed
                         yield np.asarray(chunk, dtype=np.float32).reshape(-1)
+                    successful_seed["value"] = current_seed
                     return
 
+                attempt_seed = current_seed
                 for attempt in range(retry_badcase_max_times):
                     chunks = [
                         np.asarray(chunk, dtype=np.float32).reshape(-1)
-                        for chunk in self._server.generate(**generation_kwargs, seed=current_seed)
+                        for chunk in self._server.generate(**generation_kwargs, seed=attempt_seed)
                     ]
                     is_badcase = len(chunks) >= badcase_threshold
                     if is_badcase and attempt + 1 < retry_badcase_max_times:
-                        current_seed = (current_seed + 1) & MAX_GENERATION_SEED
+                        attempt_seed = (attempt_seed + 1) & MAX_GENERATION_SEED
                         continue
-                    self.last_successful_seed = current_seed
+                    successful_seed["value"] = attempt_seed
                     yield from chunks
                     break
-        finally:
+
+            if self._scheduler is not None:
+                scheduled = self._scheduler.stream(run_generation, callback=progress_callback)
+            else:
+                def run_direct() -> Generator[np.ndarray, None, None]:
+                    if progress_callback is not None:
+                        progress_callback("running", {"queue_position": 0})
+                    with self._generation_lock:
+                        yield from run_generation()
+
+                scheduled = run_direct()
+
+            def consume() -> Generator[np.ndarray, None, None]:
+                try:
+                    yield from scheduled
+                finally:
+                    if "value" in successful_seed:
+                        self.last_successful_seed = successful_seed["value"]
+                    for temporary_path in temporary_paths:
+                        Path(temporary_path).unlink(missing_ok=True)
+
+            return consume()
+        except BaseException:
             for temporary_path in temporary_paths:
                 Path(temporary_path).unlink(missing_ok=True)
+            raise
 
     def generate(self, *args: object, **kwargs: object) -> np.ndarray:
         chunks = list(self._generate_chunks(*args, **kwargs))
@@ -355,9 +424,33 @@ class NanoVoxCPM:
         if kwargs.pop("retry_badcase", False):
             warnings.warn("Retry on bad cases is not supported in streaming mode, setting retry_badcase=False.")
         kwargs["retry_badcase"] = False
-        yield from self._generate_chunks(*args, **kwargs)
+        return self._generate_chunks(*args, **kwargs)
 
     def close(self) -> None:
+        scheduler, self._scheduler = self._scheduler, None
+        if scheduler is not None:
+            scheduler.close()
+        self._latent_cache.clear()
         server, self._server = self._server, None
         if server is not None:
             server.stop()
+
+    def queue_status(self) -> dict[str, Any]:
+        scheduler = self._scheduler
+        scheduler_status = (
+            scheduler.snapshot()
+            if scheduler is not None
+            else {
+                "workers": self._max_num_seqs,
+                "capacity": 0,
+                "queued": 0,
+                "active": 0,
+                "pending_job_ids": [],
+                "active_job_ids": [],
+                "enabled": False,
+            }
+        )
+        return {
+            **scheduler_status,
+            "latent_cache": self._latent_cache.snapshot(),
+        }

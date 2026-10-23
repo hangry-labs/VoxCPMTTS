@@ -218,11 +218,11 @@ def test_static_workspace_and_assets_are_available() -> None:
     assert "IncrementalAudioPlayback" in script
     assert "response.body.getReader()" in script
     assert "await playback.append(value)" in script
-    assert "startActivityPolling('stream')" in script
+    assert "startActivityPolling('stream', requestId)" in script
     assert "workflow === 'stream' ? 'generate' : workflow" in script
     assert "class StreamWaveform" in streaming_player
     assert "class IncrementalAudioPlayback" in streaming_player
-    assert "fetchJson('/tts/activity'" in script
+    assert "fetchJson(`/tts/activity${query}`" in script
     assert "HISTORY_RETENTION_MS = 10 * 60 * 1000" in gpu_monitor
     assert "export class GpuMonitor" in gpu_monitor
     assert "sessionStorage.setItem(SESSION_KEY" in gpu_monitor

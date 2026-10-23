@@ -572,6 +572,7 @@
   "timestamps.title": "Czasy mowy",
   "timestamps.unavailable": "Niedostępne",
   "timestamps.words": "Słowa",
+  "progress.queued": "Oczekiwanie na generowanie",
   "updates.releaseAvailable": "Dostępna nowa wersja",
   "updates.releaseTitle": "Otwórz najnowszą wersję VoxCPMTTS",
   "updates.snapshotAvailable": "Dostępna nowa kompilacja snapshot",

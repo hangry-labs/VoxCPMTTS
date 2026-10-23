@@ -244,6 +244,15 @@ async function fetchJson(path, options) {
   return response.json()
 }
 
+function generationRequestId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const value = Math.floor(Math.random() * 16)
+    const nibble = character === 'x' ? value : (value & 0x3) | 0x8
+    return nibble.toString(16)
+  })
+}
+
 function captureScriptWorkspace() {
   const finishing = generateFinisher.snapshot()
   return {
@@ -1064,7 +1073,7 @@ function prepareAudioRequest(options = {}) {
 }
 
 async function requestAudioResponse(options = {}) {
-  const { workflow = state.activeTab, streaming = false, signal } = options
+  const { workflow = state.activeTab, streaming = false, signal, requestId } = options
   const { payload, reference } = prepareAudioRequest(options)
   const needsReference = workflow === 'clone' && payload.voice === 'reference'
 
@@ -1074,11 +1083,19 @@ async function requestAudioResponse(options = {}) {
     const form = new FormData()
     form.append('payload', JSON.stringify(payload))
     form.append('reference_audio', reference, reference.name)
-    response = await fetch(`${route}-upload`, { method: 'POST', body: form, signal })
+    response = await fetch(`${route}-upload`, {
+      method: 'POST',
+      headers: requestId ? { 'X-VoxCPM-Request-ID': requestId } : {},
+      body: form,
+      signal,
+    })
   } else {
     response = await fetch(route, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(requestId ? { 'X-VoxCPM-Request-ID': requestId } : {}),
+      },
       body: JSON.stringify(payload),
       signal,
     })
@@ -1112,14 +1129,15 @@ function magicPreviewPayload() {
 }
 
 async function generateMagicPreview(block) {
+  const requestId = generationRequestId()
   setGenerationBusy(true, 'generate')
-  startActivityPolling('generate')
+  startActivityPolling('generate', requestId)
   setStatus(t('status.generatingTurn', {}, 'Generating turn preview'))
   try {
     const speechIndex = magicEditor.speechBlocks().findIndex((item) => item.id === block.id)
     if (speechIndex < 0) throw new Error(t('errors.turnMissing', {}, 'This speech turn is no longer in the dialogue.'))
     const payload = magicPreviewPayload()
-    const result = { ...await magicTakeStudio.take(payload, speechIndex), payload }
+    const result = { ...await magicTakeStudio.take(payload, speechIndex, { requestId }), payload }
     setStatus(t('status.turnReady', {}, 'Turn preview ready'), 'success')
     finishActivityPolling('generate', 'complete', t('status.turnReady', {}, 'Turn preview ready'))
     return result
@@ -1307,6 +1325,7 @@ async function alignGeneratedAudio(workflow, blob, extension, payload) {
 const ACTIVITY_STAGE_INDEX = {
   preparing: 0,
   loading_model: 0,
+  queued: 0,
   generating: 1,
   streaming: 1,
   encoding: 2,
@@ -1324,6 +1343,7 @@ function renderInferenceProgress(workflow, activity) {
   const phaseTitles = {
     preparing: t('progress.preparing', {}, 'Preparing request'),
     loading_model: t('progress.loadingModel', {}, 'Loading model'),
+    queued: t('progress.queued', {}, 'Waiting for inference'),
     generating: t('progress.generating', {}, 'Generating speech'),
     streaming: t('progress.streaming', {}, 'Streaming speech'),
     encoding: t('progress.encoding', {}, 'Encoding audio'),
@@ -1339,19 +1359,22 @@ function renderInferenceProgress(workflow, activity) {
         ? t('progress.outputFormat', {
             format: workflow === 'stream' ? 'MP3' : ($('#output-format').value || 'audio').toUpperCase(),
           }, 'Preparing the selected output format')
-        : t('progress.active', {}, 'The request is active')
+        : phase === 'queued'
+          ? activity.message || t('progress.queued', {}, 'Waiting for inference')
+          : t('progress.active', {}, 'The request is active')
   $$('[data-stage]', panel).forEach((dot, dotIndex) => {
     dot.classList.toggle('done', phase === 'complete' || dotIndex < index)
     dot.classList.toggle('active', phase !== 'complete' && phase !== 'failed' && dotIndex === index)
   })
 }
 
-function startActivityPolling(workflow) {
+function startActivityPolling(workflow, requestId) {
   clearInterval(state.activityTimer)
   renderInferenceProgress(workflow, { phase: 'preparing', message: t('progress.preparing', {}, 'Preparing request') })
   state.activityTimer = setInterval(async () => {
     try {
-      renderInferenceProgress(workflow, await fetchJson('/tts/activity', { cache: 'no-store' }))
+      const query = requestId ? `?request_id=${encodeURIComponent(requestId)}` : ''
+      renderInferenceProgress(workflow, await fetchJson(`/tts/activity${query}`, { cache: 'no-store' }))
     } catch {
       // The generation request remains authoritative if progress polling is interrupted.
     }
@@ -1386,14 +1409,15 @@ async function generateMagicAudio() {
     return
   }
   cancelMagicAssembly()
+  const requestId = generationRequestId()
   state.magicGenerating = true
   generateFinisher.clear()
   setGenerationBusy(true, 'generate')
-  startActivityPolling('generate')
+  startActivityPolling('generate', requestId)
   setStatus(t('status.generatingMagic', {}, 'Generating dialogue takes'))
   const payload = prepared.payload
   try {
-    const result = await magicTakeStudio.render(payload, magicEditor.blocks)
+    const result = await magicTakeStudio.render(payload, magicEditor.blocks, { requestId })
     magicEditor.applyTakes(result.takes)
     if (Object.keys(result.committedProfiles).length) {
       await refreshProfiles($('#voice-profile').value)
@@ -1429,6 +1453,7 @@ async function generateAudio(workflow = 'generate') {
     return
   }
   const output = workflow === 'clone' ? cloneOutput : generateOutput
+  const requestId = generationRequestId()
   if (workflow === 'generate') generateFinisher.clear()
   if (workflow === 'clone') {
     state.lastCloneGeneration = null
@@ -1436,13 +1461,14 @@ async function generateAudio(workflow = 'generate') {
     renderVoiceSaveState()
   }
   setGenerationBusy(true, workflow)
-  startActivityPolling(workflow)
+  startActivityPolling(workflow, requestId)
   setStatus(t('status.generating', {}, 'Generating audio'))
   try {
     const { blob, extension, seed, payload, reference } = await requestAudio({
       workflow,
       payloadOverride: prepared.payload,
       referenceOverride: prepared.reference,
+      requestId,
     })
     await output.load(blob, `voxcpmtts${workflow === 'clone' ? '-clone' : ''}.${extension}`)
     if (workflow === 'generate') generateFinisher.setSource(blob, extension)
@@ -1495,13 +1521,14 @@ async function streamAudio() {
     return
   }
   const controller = new AbortController()
+  const requestId = generationRequestId()
   const chunks = []
   let playback = null
   let completedSeed = null
   state.streamAbort = controller
   generateFinisher.clear()
   setGenerationBusy(true, 'stream')
-  startActivityPolling('stream')
+  startActivityPolling('stream', requestId)
   streamWaveform.surface.hidden = false
   streamWaveform.stateElement.textContent = t('stream.preparing', {}, 'Preparing stream')
   streamWaveform.detailElement.textContent = t('stream.buffered', { size: 0 }, '0 KiB buffered')
@@ -1515,6 +1542,7 @@ async function streamAudio() {
       signal: controller.signal,
       payloadOverride: prepared.payload,
       referenceOverride: prepared.reference,
+      requestId,
     })
     const seed = response.headers.get('X-VoxCPM-Seed')
     if (seed !== null) {

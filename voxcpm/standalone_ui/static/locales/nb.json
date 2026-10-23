@@ -572,6 +572,7 @@
   "timestamps.title": "Tidsmarkering av tale",
   "timestamps.unavailable": "Utilgjengelig",
   "timestamps.words": "Ord",
+  "progress.queued": "Venter på inferens",
   "updates.releaseAvailable": "Ny versjon tilgjengelig",
   "updates.releaseTitle": "Åpne den nyeste VoxCPMTTS-versjonen",
   "updates.snapshotAvailable": "Ny øyeblikksbygging",

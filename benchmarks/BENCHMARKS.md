@@ -28,6 +28,7 @@ The result supports Nano as the default backend: it provides the expected fourfo
 | [Speech quality](speech-quality/BENCHMARKS.md) | `task benchmark-baseline` | Staged TTS followed by Qwen3-ASR judging | Exact transcript rate, normalized similarity, and repeat consistency |
 | [Backend pilot](backend_comparison/BENCHMARKS.md) | `task benchmark-backends` | One VoxCPMTTS container at a time | Compact four-scenario diagnostic comparison |
 | [Nano 2.0.5 sync](nano_upstream_sync/DETAILS.md) | Manual paired `benchmark-baseline` runs | Preserved before/after images with stable call seeds | Runtime speed, output identity, VRAM, and RAM |
+| [Inference queue](inference_queue/BENCHMARKS.md) | `task benchmark-queue` | One loaded model and one GPU worker | Sequential versus queued API throughput and exact fixed-seed output identity |
 | [SSML dialogue](ssml/BENCHMARKS.md) | `task benchmark-ssml` | Paired staged SSML and SSML-H generation followed by Qwen3-ASR | Ten turn endings, final-tail completion, similarity, latency, and RTF |
 
 Prepare the preserved historical native image and current Nano image before an official comparison:

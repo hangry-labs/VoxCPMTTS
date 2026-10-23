@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import torch
 
+from voxcpm.inference_queue import ByteLRUCache
 from voxcpm.nano_backend import (
     NanoVoxCPM,
     _ConcurrentNanoServer,
@@ -28,19 +29,46 @@ class FakeServer:
         for _ in range(self.chunk_counts[kwargs["seed"]]):
             yield np.ones(4, dtype=np.float32)
 
+    def encode_latents(self, wav: bytes, wav_format: str) -> bytes:
+        return wav_format.encode("ascii") + b":" + wav
+
+
+class ImmediateScheduler:
+    def stream(self, run, *, callback=None):
+        if callback:
+            callback("running", {"job_id": "test", "queue_position": 0})
+        return run()
+
+    def snapshot(self):
+        return {"workers": 1, "capacity": 1, "queued": 0, "active": 0}
+
 
 def fake_nano(chunk_counts: dict[int, int]) -> NanoVoxCPM:
     model = object.__new__(NanoVoxCPM)
-    model._generation_lock = threading.Lock()
+    model._max_num_seqs = 1
+    model._generation_lock = threading.BoundedSemaphore(1)
     model._normalizer_lock = threading.Lock()
     model._denoiser_lock = threading.Lock()
     model._server = FakeServer(chunk_counts)
+    model._scheduler = ImmediateScheduler()
+    model._latent_cache = ByteLRUCache(max_entries=4, max_bytes=1024)
     model._text_tokenizer = lambda _text: [1, 2]
     model.inference_timesteps = 10
     model.last_successful_seed = None
     model.text_normalizer = None
     model.denoiser = None
     return model
+
+
+def test_disabled_queue_uses_direct_generation_path() -> None:
+    model = fake_nano({42: 2})
+    model._scheduler = None
+
+    audio = model.generate(text="hello", seed=42, retry_badcase=False)
+
+    assert audio.shape == (8,)
+    assert model.last_successful_seed == 42
+    assert model.queue_status()["enabled"] is False
 
 
 def test_generation_length_uses_nano_steps_with_a_separate_retry_threshold() -> None:
@@ -130,7 +158,6 @@ def test_denoising_reference_audio_does_not_normalize_loudness() -> None:
             return output_path
 
     model.denoiser = FakeDenoiser()
-    model._encode_audio = lambda path: path
 
     model.generate(
         text="hello",
@@ -143,6 +170,19 @@ def test_denoising_reference_audio_does_not_normalize_loudness() -> None:
     )
 
     assert denoiser_calls == [("prompt.wav", False), ("reference.wav", False)]
+
+
+def test_reference_latents_are_cached_without_changing_generation_input(tmp_path) -> None:
+    model = fake_nano({42: 1})
+    reference = tmp_path / "voice.wav"
+    reference.write_bytes(b"stable-reference")
+
+    first = model.generate(text="hello", reference_wav_path=str(reference), retry_badcase=False, seed=42)
+    second = model.generate(text="hello", reference_wav_path=str(reference), retry_badcase=False, seed=42)
+
+    assert np.array_equal(first, second)
+    assert model._server.calls[0]["ref_audio_latents"] == model._server.calls[1]["ref_audio_latents"]
+    assert model._latent_cache.snapshot()["hits"] == 1
 
 
 def test_concurrent_server_runs_generators_on_one_background_loop() -> None:

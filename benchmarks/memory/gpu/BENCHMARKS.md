@@ -8,3 +8,5 @@ Whole-device VRAM deltas subtract the pre-load baseline. Container RAM uses cgro
 | 20261007-184048 | nano | 2101 MiB | 8491 MiB | 7533 MiB | 3118.0 MiB | 3376.5 MiB |
 | 20261022-052037 | nano | 3008 MiB | 7932 MiB | 7158 MiB | 6905.4 MiB | 7521.0 MiB |
 | 20261022-054748 | nano | 3520 MiB | 8330 MiB | 7288 MiB | 7614.8 MiB | 7870.3 MiB |
+| 20261022-080929 | nano | 2470 MiB | 7914 MiB | 7813 MiB | 8549.1 MiB | 8802.4 MiB |
+| 20261022-085849 | nano | 2314 MiB | 7911 MiB | 7907 MiB | 7283.5 MiB | 7540.3 MiB |

@@ -55,7 +55,7 @@ export class MagicTakeStudio {
     this.responseError = responseError
   }
 
-  async render(payload, blocks, { signal } = {}) {
+  async render(payload, blocks, { signal, requestId } = {}) {
     const speech = speechBlocks(blocks)
     if (!speech.length) throw new Error('Add at least one speech turn before generating.')
     const retained = speech.filter((block) => block.locked && block.preview)
@@ -67,7 +67,12 @@ export class MagicTakeStudio {
       seed: Number(block.captureSeed) || 0,
     }))))
     retained.forEach((block) => form.append('takes', takeFile(block)))
-    const response = await fetch('/tts/magic/render', { method: 'POST', body: form, signal })
+    const response = await fetch('/tts/magic/render', {
+      method: 'POST',
+      headers: requestId ? { 'X-VoxCPM-Request-ID': requestId } : {},
+      body: form,
+      signal,
+    })
     if (!response.ok) throw new Error(await this.responseError(response))
     if (!response.headers.get('Content-Type')?.startsWith(BUNDLE_MEDIA_TYPE)) {
       throw new Error('Magic render returned an unexpected response type.')
@@ -75,10 +80,13 @@ export class MagicTakeStudio {
     return unpackBundle(response)
   }
 
-  async take(payload, speechIndex, { signal } = {}) {
+  async take(payload, speechIndex, { signal, requestId } = {}) {
     const response = await fetch('/tts/magic/take', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(requestId ? { 'X-VoxCPM-Request-ID': requestId } : {}),
+      },
       body: JSON.stringify({ payload, speech_index: speechIndex }),
       signal,
     })
