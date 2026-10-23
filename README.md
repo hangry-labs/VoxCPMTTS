@@ -26,13 +26,13 @@ Choose one image and run it on the first visible NVIDIA GPU.
 **Full image:** includes the pinned VoxCPM2 model assets and can run offline after the image pull.
 
 ```bash
-docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
 **Tiny image:** downloads the model into the persistent volume during first use.
 
 ```bash
-docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest_tiny
+docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny@sha256:ca0b5ca41289a931238410d2fcb7c7b8462ed71d4e0a69d8cb6b8cbb17ac2fe6
 ```
 
 Then open **[http://localhost:8808](http://localhost:8808)**. Interactive API documentation is available at **[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)**.
@@ -102,7 +102,7 @@ Generation returns metadata and an expiring capability URL rather than embedding
 When the client or downstream service connects through another host, set `VOXCPM_MCP_BASE_URL` to the externally reachable origin so returned links are usable from that network:
 
 ```bash
-docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e VOXCPM_ENABLE_MCP=1 -e VOXCPM_MCP_BASE_URL=http://192.168.1.20:8808 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e VOXCPM_ENABLE_MCP=1 -e VOXCPM_MCP_BASE_URL=http://192.168.1.20:8808 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
 The environment switches are startup defaults. Values saved in the System tab take precedence afterward. `task mcp-live-test` verifies both catalogs, calls `talk_simple`, follows its temporary URL, and validates the downloaded MP3.
@@ -221,7 +221,7 @@ curl -X POST "http://localhost:8808/tts/generate" \
 Mount a reference directory when using container-local cloning paths:
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v "$(pwd)/samples:/data:ro" -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:latest
+docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v "$(pwd)/samples:/data:ro" -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
 ```bash
@@ -421,7 +421,7 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 ## Version History
 
 <details>
-<summary><strong>v1.1 snapshot and v1.0 release notes</strong></summary>
+<summary><strong>v1.2 snapshot and v1.1/v1.0 release notes</strong></summary>
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
@@ -445,7 +445,7 @@ docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus al
 
 ### v1.1
 
-Current snapshot changes:
+Release changes:
 
 - Added independently gated compact and advanced Streamable HTTP MCP endpoints, persistent System controls, saved-voice discovery and management, guarded local and remote reference inputs, and expiring generated-audio URLs suitable for other local services.
 - Replaced the fixed Nano-vLLM memory percentage with an automatic approximately 8 GiB budget, allowing 12 GiB cards to receive the same practical engine budget qualified on 16 GiB hardware while preserving explicit operator overrides.
@@ -471,14 +471,16 @@ The `v1.1` release is available through the immutable version tags:
 **Full image**
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1
+docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
 **Tiny image**
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny
+docker run -d --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny@sha256:ca0b5ca41289a931238410d2fcb7c7b8462ed71d4e0a69d8cb6b8cbb17ac2fe6
 ```
+
+Docker Hub and GHCR expose the same verified top-level OCI index digests for both `v1.1` images. The references above pin Docker Hub to those immutable release indexes.
 
 ### v1.0
 

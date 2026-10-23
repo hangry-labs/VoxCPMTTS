@@ -27,13 +27,13 @@ VoxCPM2 supports highly realistic voice cloning. Do not use this image for unaut
 Run with NVIDIA GPU support:
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1
+docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
 Run on another physical GPU, for example index `1`:
 
 ```bash
-docker run --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=1 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1
+docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=1 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
 Then open:
@@ -57,7 +57,7 @@ The UI can transcribe uploaded or freshly recorded reference samples before tran
 The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face cache is warmed on first online use:
 
 ```bash
-docker run --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny
+docker run -d --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny@sha256:ca0b5ca41289a931238410d2fcb7c7b8462ed71d4e0a69d8cb6b8cbb17ac2fe6
 ```
 
 ## What You Get
@@ -170,7 +170,12 @@ http://localhost:8808/tts/docs
 - Release documentation pins Docker Hub's top-level OCI digest as `vX.Y@sha256:...` for reproducible deployment.
 - Every published tag is mirrored to `ghcr.io/hangry-labs/voxcpmtts`.
 
-The `v1.0` and `v1.0_tiny` tags are published from the annotated source tag. Add verified top-level OCI index digests after publication.
+The current immutable release references are:
+
+- Full: `hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9`
+- Tiny: `hangrylabs/voxcpmtts:v1.1_tiny@sha256:ca0b5ca41289a931238410d2fcb7c7b8462ed71d4e0a69d8cb6b8cbb17ac2fe6`
+
+Docker Hub and GHCR expose these same verified top-level OCI index digests. Both images were published from the annotated `v1.1` source tag.
 
 ## Measured Runtime
 
