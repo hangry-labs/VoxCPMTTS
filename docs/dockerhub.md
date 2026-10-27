@@ -1,86 +1,163 @@
 <p align="center">
-  <a href="https://hangrylabs.app/">
-    <img src="https://github.com/Hangry-Labs/VoxCPMTTS/raw/main/assets/voxcpmtts_logo_horizontal.webp" alt="Hangry Labs VoxCPMTTS logo">
+  <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=en">
+    <img src="https://raw.githubusercontent.com/hangry-labs/VoxCPMTTS/main/assets/voxcpmtts_logo_horizontal.webp" alt="Hangry Labs VoxCPMTTS logo" width="900">
   </a>
 </p>
 
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=en">English</a> · <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=nb">Norsk bokmål</a> · <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=pl">Polski</a> · <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=ja">日本語</a> · <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=zh">简体中文</a> · <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=es">Español</a></p>
+
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=en"><strong>🎧 Listen to voice examples</strong></a></p>
+
 # Hangry Labs VoxCPMTTS
 
-Easy-to-run VoxCPM2 text-to-speech Docker images with Nano-vLLM inference, a browser UI, and an HTTP API included.
+Local VoxCPM2 speech generation, voice design and reference cloning in one Docker
+container, with Nano-vLLM inference, a browser Studio, streaming audio,
+OpenAI-compatible speech and optional MCP tools.
 
-This Hangry Labs fork is built for people who want realistic multilingual text to speech, voice design, and voice cloning without a long setup. Install Docker, run one command, open the local UI, or call the API from your own application.
-
-## Responsible Use
-
-VoxCPM2 supports highly realistic voice cloning. Do not use this image for unauthorized voice cloning, impersonation, fraud, harassment, scams, or any illegal or unethical activity. Only clone voices when you have the rights and consent to do so.
-
-## Project Links
-
-- GitHub repository: https://github.com/Hangry-Labs/VoxCPMTTS
-- Project page: https://hangry-labs.github.io/VoxCPMTTS/examples/
-- Upstream VoxCPM project: https://github.com/OpenBMB/VoxCPM
-- Upstream model: https://huggingface.co/openbmb/VoxCPM2
-- Hangry Labs: https://hangrylabs.app/
+The commands below run the published **v1.1** release, pinned to matching verified
+Docker Hub and GHCR OCI indexes.
 
 ## Quick Start
 
-Run with NVIDIA GPU support:
+With Docker, NVIDIA GPU support and a CUDA 12.8-compatible driver installed, run:
+
+**Full image**, with the pinned VoxCPM2 and multilingual Whisper Base assets for
+offline use after pulling:
 
 ```bash
-docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
+docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
-Run on another physical GPU, for example index `1`:
+Open **[http://localhost:8808](http://localhost:8808)**. Interactive API docs are at
+**[http://localhost:8808/tts/docs](http://localhost:8808/tts/docs)**.
+
+For a smaller initial download, choose the **tiny image**:
 
 ```bash
-docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=1 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
+docker run -d --name voxcpmtts --restart unless-stopped -p 127.0.0.1:8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny@sha256:ca0b5ca41289a931238410d2fcb7c7b8462ed71d4e0a69d8cb6b8cbb17ac2fe6
 ```
 
-Then open:
+Tiny downloads the models into the same volume on first use. Keep it online until
+the required models are cached. Choose either full or tiny, and keep one VoxCPMTTS
+model-serving container per GPU. Change `CUDA_VISIBLE_DEVICES=0` to select another
+physical GPU.
 
-http://localhost:8808
+The `voxcpmtts_data` volume preserves model caches, saved voices, reference audio,
+dialogue scripts and settings across container replacement. Full images seed
+baked assets into it; tiny images reuse the same cache.
 
-The standard full image (`latest` or a fixed `vX.Y` release) includes the VoxCPM2 and multilingual Whisper Base model assets for offline use after the image is pulled.
-
-The unified `voxcpmtts_data` volume stores model caches, saved voice profiles, reference samples, and future application settings across container replacement. Full images seed baked assets into it; tiny images download into it on first online use.
-
-The runtime uses Nano-vLLM on Python 3.13 with CUDA 12.8 and a prebuilt FlashAttention wheel. Triton performs normal first-use kernel JIT compilation inside the container. Image builds install binary Python wheels only.
-
-The rolling images default `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=auto`, targeting an approximately 8 GiB engine budget: about `0.67` on a 12 GiB GPU and `0.50` on a 16 GiB GPU, capped at `0.90` on smaller cards. Run one VoxCPMTTS container per GPU. The service reuses one cached model for `auto` and `cuda:0` and defaults to concurrency one. Set `VOXCPM_NANO_MAX_NUM_SEQS=2` for higher aggregate API throughput against the same model copy; individual latency rises and fixed-seed output can vary with concurrent batch composition, so keep `1` when exact repeatability matters. At concurrency one, a bounded eight-call FIFO (`VOXCPM_NANO_QUEUE_SIZE`) overlaps CPU preparation and final encoding around the single GPU worker; set the queue size to `0` to retain the original semaphore path for purely sequential workloads. Reference-conditioning latents are cached as exact content-addressed bytes in CPU memory, with defaults of 32 entries and 256 MiB (`VOXCPM_NANO_LATENT_CACHE_ENTRIES`, `VOXCPM_NANO_LATENT_CACHE_BYTES`); set either limit to `0` to disable caching. CUDA graphs are enabled for Nano-vLLM acceleration; set `VOXCPM_NANO_ENFORCE_EAGER=1` only for troubleshooting. `TORCHINDUCTOR_COMPILE_THREADS=1` prevents unused compile-worker pools from retaining RAM between engine reloads. The image also releases temporary CUDA allocator blocks after reference-audio encoding so different reference lengths do not accumulate VRAM high-water allocations.
-
-The fixed `v1.0` images use `0.49`. For a 12 GiB GPU, add `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.67` to the container environment. Despite the Nano-vLLM v2.0.4 error wording, lowering the value after a negative KV-cache block calculation reduces its available budget further.
-
-Nano-vLLM fixes the diffusion step count at engine startup. The image default is 10; set `VOXCPM_NANO_INFERENCE_TIMESTEPS` before startup to change it, and use the same value in API requests.
-
-The UI can transcribe uploaded or freshly recorded reference samples before transcript-guided cloning. The pinned `openai/whisper-base` model loads only when requested and uses CPU by default so VoxCPM2 retains the GPU budget. Set `VOXCPM_LOAD_ASR=0` to disable this feature. The full image contains the ASR assets; the tiny image downloads them into its Hugging Face cache on first use.
-
-The moving tiny tag is `latest_tiny`; fixed releases use the `vX.Y_tiny` pattern. Tiny images keep runtime dependencies but skip baked model assets, and are intended for persistent-volume workflows where the Hugging Face cache is warmed on first online use:
-
-```bash
-docker run -d --name voxcpmtts-tiny --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1_tiny@sha256:ca0b5ca41289a931238410d2fcb7c7b8462ed71d4e0a69d8cb6b8cbb17ac2fe6
-```
+Need a command for another operating system, registry or network-access mode?
+Use the [installation command picker](https://hangrylabs.app/software/voxcpmtts/install?os=windows&hardware=nvidia&image=full&registry=dockerhub&access=computer).
 
 ## What You Get
 
-- Offline browser Design workspace for direction-only creation, controllable cloning, transcript-guided cloning, local reference transcription, recording, upload, waveform trimming, restorable design recipes, and reusable saved voices
-- OpenAI-compatible speech API plus the complete native API for applications and automation
-- Opt-in compact and advanced Streamable HTTP MCP endpoints with expiring audio links
-- SSML and SSML-H for multi-speaker discussions, plays, saved clone voices, and designed speakers
-- VoxCPM2 multilingual generation across 30 officially supported languages
-- 48 kHz output when using the VoxCPM2 AudioVAE V2 model
-- WAV, MP3, FLAC, OGG, Opus, AAC, and raw PCM output support
-- GPU support when Docker/NVIDIA support is available
-- Nano-vLLM inference with a single cached GPU engine
-- Offline-friendly usage with the standard full image once it is available locally
-- Common TTS compatibility fields such as `voice`, `use_gpu`, `/tts/voices`, `/tts/speakers`, `/tts/stream-formats`, and `/tts/stream`
+- Create voices from natural-language direction, or clone authorized reference recordings
+- Choose directed reference cloning or transcript-guided continuation
+- Build multi-speaker scenes in Magic, with SSML and SSML-H import/export
+- Adjust per-turn direction, language, rate, pitch, volume and loudness leveling
+- Generate and lock individual takes, rearrange speech and pauses, and reuse accepted audio
+- Save voices and scripts with portraits, tags, search and restorable creation recipes
+- Record, upload, trim and transcribe reference audio locally
+- Compare original and processed audio, with optional non-destructive finishing
+- Generate long-form speech with protection that splits near natural boundaries
+- Play progressive MP3 streams, with queue progress, cancellation and timing feedback
+- Connect OpenAI-compatible speech, native HTTP APIs or separately enabled MCP tools
+- Use the Studio in English, Norwegian Bokmål, Polish, Japanese, Simplified Chinese or Spanish
 
-## MCP
+VoxCPM2 supports [30 languages and nine Chinese dialect groups](https://hangry-labs.github.io/VoxCPMTTS/SUPPORTED_LANGUAGES.html).
+Interface language and speech language are separate choices. The
+[listening gallery](https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=en) includes voice-variety samples,
+translated introductions, cross-language cloning and a featured Magic dialogue.
 
-Enable the compact endpoint in **System > MCP access**, then connect to `http://localhost:8808/mcp/`. It provides five focused tools for health, languages, saved voices, speech inspection, and recommended simple generation. The separately controlled `http://localhost:8808/mcp/advanced/` endpoint adds SSML/SSML-H, voice design, one-off reference cloning, and saved-profile management.
+VoxCPM supports delivery direction with reference cloning. Transcript-guided
+continuation uses the reference transcript instead; the Studio keeps these two
+conditioning modes separate.
 
-Both endpoints are off by default, have no separate application authentication, and should be enabled only for trusted clients or behind an authenticated reverse proxy. Settings persist in `voxcpmtts_data`.
+## Browser UI
 
-Generated speech is returned as an expiring download URL rather than raw audio in protocol context. The default TTL is one hour and the accepted range is 60 to 86,400 seconds. Set `VOXCPM_MCP_BASE_URL` to the externally reachable server origin when clients or other containers need to consume those URLs. Advanced local reference files belong in `/app/persistent/mcp-input`; expiring output is stored in `/app/persistent/mcp-output`.
+### Build complete dialogue scripts
+
+Assemble scenes in Magic, assign saved or script-defined voices, set each turn's
+delivery, generate and lock takes, and save the complete script as portable SSML-H.
+
+<p align="center">
+  <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=en#build-complete-dialogue-scripts">
+    <img src="https://raw.githubusercontent.com/hangry-labs/VoxCPMTTS/main/assets/screenshots/generate-ui.webp" alt="VoxCPMTTS Generate workspace showing a directed three-speaker dialogue and saved scripts" width="1200">
+  </a>
+</p>
+
+### Design, clone and reuse voices
+
+Create voices from direction or recordings, lock seeds for consistency, attach
+portraits and tags, refine the audio, and reuse saved characters across scripts.
+
+<p align="center">
+  <a href="https://hangry-labs.github.io/VoxCPMTTS/?lang=en#design-clone-and-reuse-voices">
+    <img src="https://raw.githubusercontent.com/hangry-labs/VoxCPMTTS/main/assets/screenshots/design-ui.webp" alt="VoxCPMTTS Design workspace showing a locked-seed narrator and reusable saved voices" width="1200">
+  </a>
+</p>
+
+## Image Tags
+
+| Variant | Stable release | Rolling tag | Model assets |
+| --- | --- | --- | --- |
+| Full | `v1.1` | `latest` | VoxCPM2 and reference-transcription models baked in |
+| Tiny | `v1.1_tiny` | `latest_tiny` | Download into the persistent cache on first use |
+
+Both variants are published to `hangrylabs/voxcpmtts` and
+`ghcr.io/hangry-labs/voxcpmtts`. The pinned full/tiny commands above use verified
+top-level OCI index digests. For GHCR, replace `hangrylabs/voxcpmtts` with
+`ghcr.io/hangry-labs/voxcpmtts` and keep the same tag and digest.
+
+Rolling tags deliberately follow `main` and remain unpinned. Fixed releases use
+`vX.Y` or `vX.Y.Z`, with the corresponding `_tiny` tag. Historical fixed commands
+remain in the [README version history](https://hangry-labs.github.io/VoxCPMTTS/#version-history).
+
+## Persistent Data And Runtime Settings
+
+Reuse `voxcpmtts_data` at `/app/persistent` when replacing the container. Deleting
+the volume removes its stored models, voices, recordings, scripts and settings.
+The Quick Start binds the service to this computer only; use the command picker
+for other access modes. Recording requires localhost or HTTPS and permission.
+
+The runtime uses Python 3.13, CUDA 12.8 and a prebuilt FlashAttention wheel.
+Image builds install binary Python wheels; Triton performs normal first-use
+kernel compilation inside the container.
+
+| Setting | Default and behavior |
+| --- | --- |
+| `CUDA_VISIBLE_DEVICES=0` | Select the first physical NVIDIA GPU |
+| `VOXCPM_NANO_GPU_MEMORY_UTILIZATION=auto` | Target an approximately 8 GiB engine budget relative to card capacity, capped at 90% |
+| `VOXCPM_NANO_MAX_NUM_SEQS=1` | Keep exact fixed-seed repeatability; opt into `2` for higher aggregate throughput with batching-dependent output |
+| `VOXCPM_NANO_QUEUE_SIZE=8` | Bounded waiting FIFO at concurrency one; `0` retains the semaphore path |
+| `VOXCPM_NANO_LATENT_CACHE_ENTRIES=32` | Bounded CPU cache of exact reference-conditioning bytes; `0` disables it |
+| `VOXCPM_NANO_LATENT_CACHE_BYTES=268435456` | Reference-cache limit of 256 MiB; `0` disables it |
+| `VOXCPM_NANO_INFERENCE_TIMESTEPS=10` | Diffusion steps fixed at engine startup; requests must use the same value |
+| `VOXCPM_NANO_ENFORCE_EAGER=0` | Keep CUDA graphs enabled; set `1` for troubleshooting |
+| `TORCHINDUCTOR_COMPILE_THREADS=1` | Avoid retaining unused compiler-worker pools between engine reloads |
+| `VOXCPM_LOAD_ASR=1` | Enable on-demand reference transcription |
+| `VOXCPM_ASR_DEVICE=cpu` | Keep optional Whisper transcription off the TTS GPU |
+| `VOXCPMTTS_API_KEY` | Optional Bearer key for `/v1` routes |
+
+The automatic GPU fraction is about `0.67` on a 12 GiB card and `0.50` on a
+16 GiB card. At concurrency one, CPU preparation and final encoding can overlap
+around the single GPU worker. Concurrency two can raise aggregate throughput
+and individual latency; keep one when exact output repeatability matters.
+
+The UI can transcribe uploaded or recorded reference samples before guided
+cloning. Pinned `openai/whisper-base` loads only when requested and defaults to
+CPU. Full includes these assets; tiny downloads them into the cache. Set
+`VOXCPM_LOAD_ASR=0` to disable transcription, or enter transcripts manually.
+
+<details markdown="1">
+<summary><strong>Older v1.0 images on 12 GiB GPUs</strong></summary>
+
+The fixed `v1.0` images use a `0.49` memory fraction. Add
+`VOXCPM_NANO_GPU_MEMORY_UTILIZATION=0.67` for a 12 GiB card. Despite the old
+Nano-vLLM v2.0.4 error wording, lowering the value after a negative KV-cache block
+calculation reduces the available budget further.
+
+</details>
 
 ## API Example
 
@@ -124,12 +201,14 @@ curl -X POST "http://localhost:8808/tts/generate" \
   -o designed.mp3
 ```
 
-Voice cloning can be called with a reference audio path that is visible inside the container:
+Voice cloning accepts a reference path visible inside the container. Place the
+reference at `/app/persistent/reference.wav` in the mounted product volume, or
+use the upload routes described in the [API guide](https://hangry-labs.github.io/VoxCPMTTS/#api-usage):
 
 ```bash
 curl -X POST "http://localhost:8808/tts/generate" \
   -H "Content-Type: application/json" \
-  -d '{"text":"This voice follows the reference sample.","ref_audio":"/data/ref.wav","output_format":"mp3"}' \
+  -d '{"text":"This voice follows the reference sample.","ref_audio":"/app/persistent/reference.wav","output_format":"mp3"}' \
   -o cloned.mp3
 ```
 
@@ -138,7 +217,7 @@ Transcript-guided cloning:
 ```bash
 curl -X POST "http://localhost:8808/tts/generate" \
   -H "Content-Type: application/json" \
-  -d '{"text":"The model continues from the reference voice.","ref_audio":"/data/ref.wav","ref_text":"Transcript of the reference audio.","output_format":"mp3"}' \
+  -d '{"text":"The model continues from the reference voice.","ref_audio":"/app/persistent/reference.wav","ref_text":"Transcript of the reference audio.","output_format":"mp3"}' \
   -o ultimate.mp3
 ```
 
@@ -163,23 +242,45 @@ API docs are available at:
 
 http://localhost:8808/tts/docs
 
-## Image Tags
+## MCP
 
-- `latest` and `latest_tiny` are rolling development snapshots from `main`.
-- Immutable releases use `vX.Y` / `vX.Y.Z` and matching `_tiny` tags.
-- Release documentation pins Docker Hub's top-level OCI digest as `vX.Y@sha256:...` for reproducible deployment.
-- Every published tag is mirrored to `ghcr.io/hangry-labs/voxcpmtts`.
+Enable the compact endpoint in **System > MCP access**, then connect to `http://localhost:8808/mcp/`. It provides five focused tools for health, languages, saved voices, speech inspection, and recommended simple generation. The separately controlled `http://localhost:8808/mcp/advanced/` endpoint adds SSML/SSML-H, voice design, one-off reference cloning, and saved-profile management.
 
-The current immutable release references are:
+Both endpoints are off by default, have no separate application authentication, and should be enabled only for trusted clients or behind an authenticated reverse proxy. Settings persist in `voxcpmtts_data`.
 
-- Full: `hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9`
-- Tiny: `hangrylabs/voxcpmtts:v1.1_tiny@sha256:ca0b5ca41289a931238410d2fcb7c7b8462ed71d4e0a69d8cb6b8cbb17ac2fe6`
-
-Docker Hub and GHCR expose these same verified top-level OCI index digests. Both images were published from the annotated `v1.1` source tag.
+Generated speech is returned as an expiring download URL rather than raw audio in protocol context. The default TTL is one hour and the accepted range is 60 to 86,400 seconds. Set `VOXCPM_MCP_BASE_URL` to the externally reachable server origin when clients or other containers need to consume those URLs. Advanced local reference files belong in `/app/persistent/mcp-input`; expiring output is stored in `/app/persistent/mcp-output`.
 
 ## Measured Runtime
 
-The controlled 24-language baseline measured Nano-vLLM at `0.271` median real-time factor versus `1.134` for the native backend, a **4.19x speedup**, with comparable aggregate transcript fidelity. The complete methodology, raw results, VRAM measurements, and language tables are available in the [benchmark suite](https://github.com/Hangry-Labs/VoxCPMTTS/tree/main/benchmarks).
+On an RTX 5070 Ti, the controlled 24-language baseline measured Nano-vLLM at
+`0.271` median real-time factor versus `1.134` for the native backend, a **4.19x
+speedup**. Both used 10 inference steps and concurrency one. Aggregate transcript
+fidelity was comparable. See the [benchmark suite](https://hangry-labs.github.io/VoxCPMTTS/benchmarks/BENCHMARKS.html)
+for the workload, VRAM measurements, language tables and later paired regressions.
+
+## Responsible Use And Privacy
+
+VoxCPM2 supports highly realistic voice cloning. Do not use this image for unauthorized voice cloning, impersonation, fraud, harassment, scams, or any illegal or unethical activity. Only clone voices when you have the rights and consent to do so.
+
+
+Generation runs locally. First-use model downloads contact the model host.
+Reference transcription uses the local pinned Whisper model when requested.
+Saved recordings and scripts remain in the persistent product volume; review
+what you share or export. Native routes and MCP require trusted access or
+appropriate network controls; the optional Bearer key protects `/v1` only.
+
+## Project Links
+
+- [Project website and documentation](https://hangry-labs.github.io/VoxCPMTTS/)
+- [Listening gallery](https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=en)
+- [GitHub repository](https://github.com/hangry-labs/VoxCPMTTS)
+- [API and integration guide](https://hangry-labs.github.io/VoxCPMTTS/#api-usage)
+- [Supported languages](https://hangry-labs.github.io/VoxCPMTTS/SUPPORTED_LANGUAGES.html)
+- [Local development](https://hangry-labs.github.io/VoxCPMTTS/#local-development)
+- [Docker Hub tags](https://hub.docker.com/r/hangrylabs/voxcpmtts/tags)
+- [Upstream VoxCPM project](https://github.com/OpenBMB/VoxCPM)
+- [VoxCPM2 model](https://huggingface.co/openbmb/VoxCPM2)
+- [Hangry Labs](https://hangrylabs.app/)
 
 ## Attribution
 
