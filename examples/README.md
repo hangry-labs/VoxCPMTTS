@@ -1,10 +1,16 @@
+---
+layout: default
+title: Examples guide
+permalink: /examples/guide/
+---
 # VoxCPMTTS Examples
 
 This directory contains the static project page and browser-side examples for Hangry Labs VoxCPMTTS.
 
 ## Static Project Page
 
-- `index.html` is the GitHub Pages landing page for Hangry Labs VoxCPMTTS.
+- `index.md` integrates the gallery into the shared GitHub Pages website.
+- `index.html` remains the standalone gallery, with local styles in `gallery.css`.
 - `voices.js` embeds the generated sample manifest used by the page.
 - `player.js` renders the language picker and audio sample player.
 - `background.js` supports the page background.
@@ -26,7 +32,11 @@ This directory contains the static project page and browser-side examples for Ha
 Regenerate and validate samples with the project maintenance scripts.
 After regeneration, rebuild `voices.js` from `assets/manifest.json` so the static page uses the latest sample metadata.
 
-Preview locally from the repository root:
+Preview the complete website with `task pages` and open
+`http://127.0.0.1:9005/VoxCPMTTS/examples/`. The overview is built from the
+root README, with a shared header and six interface languages.
+
+For the standalone gallery, preview locally from the repository root:
 
 ```powershell
 python -m http.server 9000

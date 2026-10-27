@@ -13,6 +13,8 @@
   <a href="README.es.md">Español</a>
 </p>
 
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=zh"><strong>🎧 收听语音示例</strong></a></p>
+
 # Hangry Labs VoxCPMTTS
 
 开箱即用的多语言文本转语音 Docker 软件包，包含 Nano-vLLM 推理、本地浏览器界面和 HTTP API。

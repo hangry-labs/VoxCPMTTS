@@ -31,3 +31,6 @@ pretrained_models/
 tests/
 voxcpm/tests/
 examples/*.wav
+
+# Website build tools are separate from the inference image
+site/

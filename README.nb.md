@@ -13,6 +13,8 @@
   <a href="README.es.md">Español</a>
 </p>
 
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=nb"><strong>🎧 Lytt til stemmeeksempler</strong></a></p>
+
 # Hangry Labs VoxCPMTTS
 
 En bruksklar Docker-pakke for flerspråklig tekst til tale med Nano-vLLM-inferens, lokalt nettlesergrensesnitt og HTTP-API.

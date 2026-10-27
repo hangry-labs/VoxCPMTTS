@@ -343,3 +343,22 @@ tasks:
       - cmd /c docker rmi -f {{.TINY_IMAGE}} >nul 2>&1
       - cmd /c docker volume rm -f {{.BENCHMARK_CACHE_VOLUME}} >nul 2>&1
       - cmd /c docker volume rm -f {{.DATA_VOLUME}} >nul 2>&1
+
+  pages-build:
+    desc: Build the multilingual README website and integrated listening gallery
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - pwsh -NoProfile -File scripts/pages.ps1 build
+
+  pages:
+    desc: Preview the project website at http://127.0.0.1:9005/VoxCPMTTS/
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - pwsh -NoProfile -File scripts/pages.ps1 preview
+
+  pages-test:
+    desc: Check public Pages staging and language routing without a GPU
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - uv run --no-project --python 3.13 python -m unittest discover -s voxcpm/tests -p test_pages.py
+      - node --test site/tests/*.test.mjs

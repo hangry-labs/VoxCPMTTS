@@ -13,6 +13,8 @@
   <a href="README.es.md">Español</a>
 </p>
 
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=en"><strong>🎧 Listen to voice examples</strong></a></p>
+
 # Hangry Labs VoxCPMTTS
 
 Easy-to-run VoxCPM2 text-to-speech Docker images with Nano-vLLM inference, a browser UI, and an HTTP API included.
@@ -109,7 +111,7 @@ The environment switches are startup defaults. Values saved in the System tab ta
 
 ## Docker Reference
 
-<details>
+<details markdown="1">
 <summary><strong>Image tags, persistence, GPU memory, and runtime tuning</strong></summary>
 
 ### Image Tags
@@ -151,7 +153,7 @@ Reference transcription lazy-loads the pinned multilingual `openai/whisper-base`
 
 ## API Usage
 
-<details>
+<details markdown="1">
 <summary><strong>OpenAI-compatible and native HTTP API examples</strong></summary>
 
 ### OpenAI-compatible speech
@@ -324,7 +326,7 @@ Runtime discovery is available from the local API:
 
 ## Benchmarks
 
-<details>
+<details markdown="1">
 <summary><strong>Baseline results and repeatable benchmark commands</strong></summary>
 
 The checked-in [benchmark suite](benchmarks/BENCHMARKS.md) measures warmed generation speed, GPU and container memory, transcript fidelity, and multi-turn SSML reliability through a fixed Qwen3-ASR comparative judge. Native and Nano backends run sequentially on one GPU with concurrency one, and raw per-call results are retained for regression tracking.
@@ -356,7 +358,7 @@ Benchmarks are intentionally excluded from normal tests, image builds, and relea
 
 ## Local Development
 
-<details>
+<details markdown="1">
 <summary><strong>Docker-first development, testing, and release commands</strong></summary>
 
 This repository is validated primarily through Docker:
@@ -420,14 +422,15 @@ Source licensing and attribution are recorded in [LICENSE](LICENSE) and [NOTICE]
 
 ## Version History
 
-<details>
+<details markdown="1">
 <summary><strong>v1.2 snapshot and v1.1/v1.0 release notes</strong></summary>
 
 Snapshot commands intentionally follow the rolling `latest` tags. Published-release commands retain their readable version tag and pin Docker Hub's immutable top-level OCI digest; that digest is authoritative if a tag is ever changed.
 
 ### v1.2 Snapshot
 
-- No changes yet.
+- Add a multilingual README-based project website with shared navigation, an
+  integrated listening gallery, local gallery styles and accessible motion controls.
 
 The current development snapshot is published through the rolling tags from `main`:
 
@@ -543,7 +546,7 @@ Text, reference audio, and generated speech remain on the machine running the lo
 
 ## Citation
 
-<details>
+<details markdown="1">
 <summary><strong>VoxCPM research citations</strong></summary>
 
 If you use VoxCPM in research, cite the upstream work:

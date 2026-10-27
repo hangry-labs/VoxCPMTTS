@@ -13,6 +13,8 @@
   <strong>Español</strong>
 </p>
 
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=es"><strong>🎧 Escuchar ejemplos de voces</strong></a></p>
+
 # Hangry Labs VoxCPMTTS
 
 Paquete Docker de texto a voz multilingüe listo para usar, con inferencia Nano-vLLM, interfaz local en el navegador y API HTTP.

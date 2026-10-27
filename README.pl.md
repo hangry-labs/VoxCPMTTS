@@ -13,6 +13,8 @@
   <a href="README.es.md">Español</a>
 </p>
 
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=pl"><strong>🎧 Posłuchaj przykładów głosów</strong></a></p>
+
 # Hangry Labs VoxCPMTTS
 
 Gotowy do użycia w Dockerze, wielojęzyczny system zamiany tekstu na mowę z inferencją Nano-vLLM, lokalnym interfejsem przeglądarkowym i API HTTP.

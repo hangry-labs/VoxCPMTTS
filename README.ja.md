@@ -13,6 +13,8 @@
   <a href="README.es.md">Español</a>
 </p>
 
+<p align="center"><a href="https://hangry-labs.github.io/VoxCPMTTS/examples/?lang=ja"><strong>🎧 音声サンプルを聴く</strong></a></p>
+
 # Hangry Labs VoxCPMTTS
 
 Nano-vLLM 推論、ローカルのブラウザー UI、HTTP API を備えた、すぐに実行できる多言語テキスト読み上げ Docker パッケージです。
