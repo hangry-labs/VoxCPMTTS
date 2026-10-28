@@ -431,6 +431,10 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 
 - Add a multilingual README-based project website with shared navigation, an
   integrated listening gallery, local gallery styles and accessible motion controls.
+- Improve optional text normalization to preserve literal comparisons and arithmetic,
+  clean prose Markdown and recognized HTML without reading their formatting aloud,
+  and avoid whitespace-related normalization errors. Chinese greater-than symbols
+  receive the same spoken-symbol handling as less-than symbols.
 
 The current development snapshot is published through the rolling tags from `main`:
 

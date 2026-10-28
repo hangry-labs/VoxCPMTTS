@@ -1,5 +1,9 @@
 # some functions are copied from https://github.com/FunAudioLLM/CosyVoice/blob/main/cosyvoice/utils/frontend_utils.py
+# Modified by Hangry Labs in 2026 for conservative plain-text markup cleanup.
 import re
+from html import unescape
+from html.parser import HTMLParser
+
 import regex
 import inflect
 from wetext import Normalizer
@@ -19,6 +23,7 @@ def replace_corner_mark(text):
     text = text.replace("√", "根号")
     text = text.replace("≈", "约等于")
     text = text.replace("<", "小于")
+    text = text.replace(">", "大于")
     return text
 
 
@@ -121,6 +126,85 @@ def replace_blank(text: str):
     return "".join(out_str)
 
 
+_HTML_BLOCK_TAGS = frozenset(
+    (
+        "article blockquote body dd div dl dt footer h1 h2 h3 h4 h5 h6 header html li main nav ol p pre "
+        "section table tbody td th thead tr ul"
+    ).split()
+)
+_HTML_INLINE_TAGS = frozenset("a b code del em i mark s small span strong sub sup u".split())
+_HTML_VOID_TAGS = frozenset({"br", "hr", "img", "wbr"})
+
+
+class _SpeechMarkupParser(HTMLParser):
+    def __init__(self, source: str):
+        super().__init__(convert_charrefs=False)
+        self.source = source
+        self.line_starts = [0] + [match.end() for match in re.finditer("\n", source)]
+        self.parts: list[str] = []
+        self.open_tags: list[tuple[str, int]] = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+    def handle_starttag(self, tag, attrs):
+        raw = self.get_starttag_text()
+        if tag in _HTML_VOID_TAGS:
+            self.parts.append(" ")
+            return
+        if tag in _HTML_BLOCK_TAGS or tag in _HTML_INLINE_TAGS:
+            self.open_tags.append((tag, len(self.parts)))
+        # Wait for a matching closing tag: a<b and c>d must remain literal text.
+        self.parts.append(raw)
+
+    def handle_endtag(self, tag):
+        for index in range(len(self.open_tags) - 1, -1, -1):
+            open_tag, part_index = self.open_tags[index]
+            if open_tag == tag:
+                separator = " " if tag in _HTML_BLOCK_TAGS else ""
+                self.parts[part_index] = separator
+                self.parts.append(separator)
+                del self.open_tags[index:]
+                return
+        self.parts.append(self._raw_tag())
+
+    def handle_startendtag(self, tag, attrs):
+        if tag in _HTML_VOID_TAGS or tag in _HTML_BLOCK_TAGS:
+            self.parts.append(" ")
+        elif tag not in _HTML_INLINE_TAGS:
+            self.parts.append(self.get_starttag_text())
+
+    def handle_comment(self, data):
+        raw = self._raw_tag()
+        self.parts.append(" " if raw.startswith("<!--") else raw)
+
+    def handle_decl(self, decl):
+        self.parts.append(" ")
+
+    def handle_entityref(self, name):
+        self.parts.append(unescape(f"&{name};"))
+
+    def handle_charref(self, name):
+        self.parts.append(unescape(f"&#{name};"))
+
+    def _raw_tag(self) -> str:
+        line, column = self.getpos()
+        start = self.line_starts[line - 1] + column
+        end = self.source.find(">", start) + 1
+        return self.source[start:end]
+
+
+def _strip_html_markup(text: str) -> str:
+    parser = _SpeechMarkupParser(text)
+    try:
+        parser.feed(text)
+        parser.close()
+    except AssertionError:
+        # HTMLParser rejects malformed declarations; keep ambiguous speech text intact.
+        return text
+    return "".join(parser.parts)
+
+
 def clean_markdown(md_text: str) -> str:
     # 去除代码块 ``` ```（包括多行）
     md_text = re.sub(r"```.*?```", "", md_text, flags=re.DOTALL)
@@ -134,11 +218,23 @@ def clean_markdown(md_text: str) -> str:
     # 去除链接但保留文本 [text](url) -> text
     md_text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", md_text)
 
-    # 替换无序列表符号
-    md_text = re.sub(r"^(\s*)-\s+", r"\1", md_text, flags=re.MULTILINE)
+    # Only unwrap bounded emphasis; exponent operators and identifiers stay literal.
+    for marker in (r"\*\*", "__"):
+        md_text = re.sub(
+            rf"(?<![\w*]){marker}(?=\S)(.+?)(?<=\S){marker}(?![\w*])",
+            r"\1",
+            md_text,
+        )
 
-    # 去除HTML标签
-    md_text = re.sub(r"<[^>]+>", "", md_text)
+    # Only recognize runs of prose items; isolated operators and numeric operands stay literal.
+    prose_item = r"[ \t]*[-*+][ \t]+(?=[^\W\d_]{2,}(?:\W|$))[^\n]+"
+    md_text = re.sub(
+        rf"^{prose_item}(?:\n{prose_item})+",
+        lambda match: re.sub(r"^([ \t]*)[-*+][ \t]+", r"\1", match.group(), flags=re.MULTILINE),
+        md_text,
+        flags=re.MULTILINE,
+    )
+    md_text = _strip_html_markup(md_text)
 
     # 去除标题符号（#）
     md_text = re.sub(r"^#{1,6}\s*", "", md_text, flags=re.MULTILINE)
@@ -159,7 +255,7 @@ def clean_text(text):
     text = text.replace("\n", " ")
     text = text.replace("\t", " ")
     text = text.replace("“", '"').replace("”", '"')
-    return text
+    return " ".join(text.split())
 
 
 class TextNormalizer:
@@ -173,6 +269,8 @@ class TextNormalizer:
         # 去除 Markdown 语法，去除表情符号，去除换行符
         lang = "zh" if contains_chinese(text) else "en"
         text = clean_text(text)
+        if not text:
+            return text
         if lang == "zh":
             text = text.replace(
                 "=", "等于"

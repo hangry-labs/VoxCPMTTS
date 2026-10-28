@@ -46,3 +46,48 @@ def text_normalize(monkeypatch):
 )
 def test_replace_blank_handles_boundaries_and_preserves_interior_rules(text_normalize, source, expected):
     assert text_normalize.replace_blank(source) == expected
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("if a < b and c > d", "if a < b and c > d"),
+        ("if a<b and c>d", "if a<b and c>d"),
+        ("if a <b and c> d", "if a <b and c> d"),
+        ("1<2>0", "1<2>0"),
+        ("We need x<value and y>zero.", "We need x<value and y>zero."),
+        ("Use <name> for the speaker.", "Use <name> for the speaker."),
+        ("The range is <low to high> inclusive.", "The range is <low to high> inclusive."),
+        ("a<b>c", "a<b>c"),
+        ("+ 3", "+ 3"),
+        ("- 3", "- 3"),
+        ("+ x", "+ x"),
+        ("+ value", "+ value"),
+        ("* variable", "* variable"),
+        ("2\n* 3", "2\n* 3"),
+        ("2 * 3", "2 * 3"),
+        ("2 ** 3 ** 4", "2 ** 3 ** 4"),
+        ("2**3**4", "2**3**4"),
+        ("a__b__c", "a__b__c"),
+        ("Say **hello** and __goodbye__.", "Say hello and goodbye."),
+        ("Say **a**.", "Say a."),
+        ("* first\n+ second\n- third", "first\nsecond\nthird"),
+        ("* **first**\n- __second__", "first\nsecond"),
+        ("Read [the guide](https://example.com).", "Read the guide."),
+        ("Hello <b>world</b>.", "Hello world."),
+        ("hel<strong>lo</strong>", "hello"),
+        ('Hello <span\nclass="greeting">world</span>.', "Hello world."),
+        ('Hello <span title="a > b">world</span>.', "Hello world."),
+        ("<p>one</p><p>two</p>", "one  two"),
+        ("hello<br>world", "hello world"),
+        ("hello<!-- editor note -->world", "hello world"),
+        ("<!DOCTYPE html><p>Hello.</p>", "Hello."),
+        ("one &lt; two &gt; zero", "one < two > zero"),
+        ("&lt;b&gt;hello&lt;/b&gt;", "<b>hello</b>"),
+        ("one&nbsp;two", "one\xa0two"),
+        ("Hello <custom>world</custom>.", "Hello <custom>world</custom>."),
+        ("Use <![unknown]> literally.", "Use <![unknown]> literally."),
+    ],
+)
+def test_markdown_cleanup_preserves_speech_content(text_normalize, source, expected):
+    assert text_normalize.clean_markdown(source) == expected

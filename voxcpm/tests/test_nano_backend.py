@@ -148,6 +148,23 @@ def test_streaming_generation_is_bounded_without_retry() -> None:
     assert len(model._server.calls) == 1
 
 
+@pytest.mark.parametrize("normalize", [False, True])
+@pytest.mark.parametrize("streaming", [False, True])
+def test_text_cleanup_is_opt_in_for_both_generation_modes(normalize, streaming) -> None:
+    model = fake_nano({42: 1})
+    text = "Please say **hello** and __goodbye__."
+
+    if streaming:
+        list(model.generate_streaming(text=text, normalize=normalize, seed=42))
+    else:
+        model.generate(text=text, normalize=normalize, seed=42, retry_badcase=False)
+
+    expected = "Please say hello and goodbye." if normalize else text
+    assert model._server.calls[0]["target_text"] == expected
+    assert model._server.calls[0]["seed"] == 42
+    assert (model.text_normalizer is not None) is normalize
+
+
 def test_denoising_reference_audio_does_not_normalize_loudness() -> None:
     model = fake_nano({42: 1})
     denoiser_calls: list[tuple[str, bool]] = []
