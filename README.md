@@ -435,6 +435,9 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
   clean prose Markdown and recognized HTML without reading their formatting aloud,
   and avoid whitespace-related normalization errors. Chinese greater-than symbols
   receive the same spoken-symbol handling as less-than symbols.
+- Return a failing CLI exit status for incomplete batches while continuing remaining
+  entries and retaining successful audio files, so scripts can detect generation or
+  required output-writing failures. Optional timestamp warnings remain non-fatal.
 
 The current development snapshot is published through the rolling tags from `main`:
 

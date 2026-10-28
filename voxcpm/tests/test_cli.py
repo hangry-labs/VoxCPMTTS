@@ -319,6 +319,85 @@ def test_batch_subcommand_applies_control(monkeypatch, tmp_path):
     ]
 
 
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize(
+    "scenario",
+    ["success", "generation", "all-generation", "audio-write", "timestamp-write", "alignment-warning", "alignment-strict"],
+)
+def test_batch_completion_status_and_retained_outputs(monkeypatch, tmp_path, capsys, legacy, scenario):
+    import soundfile
+    import voxcpm.timestamps as timestamps
+
+    texts = ["first", "second", "third"]
+    input_file = tmp_path / "texts.txt"
+    input_file.write_text("\n".join(texts) + "\n", encoding="utf-8")
+    output_dir = tmp_path / "output"
+    attempted = []
+
+    class BatchModel(DummyModel):
+        def generate(self, **kwargs):
+            attempted.append(kwargs["text"])
+            if scenario == "all-generation" or (scenario == "generation" and kwargs["text"] == "second"):
+                raise RuntimeError("Controlled generation failure")
+            return super().generate(**kwargs)
+
+    def write_audio(path, audio, sample_rate):
+        if scenario == "audio-write" and Path(path).stem == "output_002":
+            raise OSError("Controlled audio write failure")
+        soundfile.write(path, audio, sample_rate)
+
+    def align_audio(**kwargs):
+        if scenario in {"alignment-warning", "alignment-strict"} and kwargs["text"] == "second":
+            raise RuntimeError("Controlled alignment failure")
+        return {"text": kwargs["text"], "items": []}
+
+    monkeypatch.setattr(cli, "load_model", lambda args: BatchModel())
+    monkeypatch.setattr(cli, "sf", types.SimpleNamespace(write=write_audio))
+    monkeypatch.setattr(timestamps, "align_audio_file", align_audio)
+    argv = [] if legacy else ["batch"]
+    argv += ["--input", str(input_file), "--output-dir", str(output_dir)]
+    if scenario.startswith("alignment") or scenario == "timestamp-write":
+        argv.append("--timestamps")
+    if scenario == "alignment-strict":
+        argv.append("--timestamp-strict")
+    if scenario == "timestamp-write":
+        output_dir.mkdir()
+        (output_dir / "output_002.timestamps.json").mkdir()
+
+    failed_job = scenario in {"generation", "all-generation", "audio-write", "timestamp-write"}
+    if failed_job:
+        with pytest.raises(SystemExit) as failure:
+            run_main(monkeypatch, argv)
+        assert failure.value.code == 1
+    elif scenario == "alignment-strict":
+        with pytest.raises(SystemExit, match="Timestamp alignment failed"):
+            run_main(monkeypatch, argv)
+    else:
+        run_main(monkeypatch, argv)
+
+    assert attempted == (texts[:2] if scenario == "alignment-strict" else texts)
+    expected_indices = [1, 2, 3]
+    if scenario == "all-generation":
+        expected_indices = []
+    elif scenario in {"generation", "audio-write"}:
+        expected_indices = [1, 3]
+    elif scenario == "alignment-strict":
+        expected_indices = [1, 2]
+    outputs = sorted(output_dir.glob("*.wav"))
+    assert [path.name for path in outputs] == [f"output_{index:03d}.wav" for index in expected_indices]
+    for output in outputs:
+        info = soundfile.info(output)
+        assert (info.frames, info.samplerate, info.channels) == (160, 16000, 1)
+    stderr = capsys.readouterr().err
+    if scenario == "alignment-strict":
+        assert "Batch finished:" not in stderr
+    else:
+        completed = 0 if scenario == "all-generation" else 2 if failed_job else 3
+        assert f"Batch finished: {completed}/3 succeeded" in stderr
+    if scenario == "alignment-warning":
+        assert "Warning: Timestamp alignment failed" in stderr
+
+
 def test_legacy_clone_with_prompt_file_still_works(monkeypatch, tmp_path, capsys):
     dummy_model = DummyModel()
     prompt_audio = tmp_path / "prompt.wav"
