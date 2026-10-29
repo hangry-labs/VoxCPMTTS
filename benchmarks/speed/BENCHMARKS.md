@@ -10,5 +10,6 @@ Warmed multilingual API generation. Lower real-time factor (RTF) is better.
 | 20261022-054748 | nano | 312 | 1730.6s | 461.4s | 0.271 | 0.329 | 3.75x |
 | 20261022-080929 | nano | 312 | 1730.6s | 522.3s | 0.309 | 0.373 | 3.31x |
 | 20261022-085849 | nano | 312 | 1730.6s | 462.4s | 0.272 | 0.328 | 3.74x |
+| 20261029-070100 | nano | 312 | 1730.6s | 449.4s | 0.262 | 0.317 | 3.85x |
 
 See [DETAILS.md](DETAILS.md) for per-language and per-mode results.

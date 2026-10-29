@@ -1,3 +1,4 @@
+# Modified by Hangry Labs in 2026 for runtime compatibility and Chinese tokenization.
 import os
 from typing import List, Optional
 import torch
@@ -58,7 +59,10 @@ def mask_multichar_chinese_tokens(tokenizer: PreTrainedTokenizer):
     """
     # Pre-compute multi-character tokens (length >= 2, pure Chinese characters)
     multichar_tokens = {
-        token for token in tokenizer.vocab.keys() if len(token) >= 2 and all("\u4e00" <= c <= "\u9fff" for c in token)
+        clean
+        for token in tokenizer.vocab.keys()
+        if len(clean := token.replace("\u2581", "")) >= 2
+        and all("\u4e00" <= char <= "\u9fff" for char in clean)
     }
 
     class CharTokenizerWrapper:

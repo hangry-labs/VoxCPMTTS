@@ -1,0 +1,24 @@
+{
+  "description": "Focused VoxCPM2 character-splitting cases. Run with the existing baseline runner, Chinese only, two design sentences, two repeats, and one clone repeat.",
+  "languages": [
+    {
+      "slug": "chinese",
+      "language": "Chinese",
+      "random": [
+        {
+          "text": "这是 公司简介，我们是一家制作本地语音工具的公司。",
+          "control": "warm adult female narrator, clear and friendly"
+        },
+        {
+          "text": "接下来是 个人简介，我喜欢阅读，也喜欢探索新的技术。",
+          "control": "calm adult male narrator, natural pace"
+        }
+      ],
+      "clone": [
+        {
+          "text": "下面是 上映时间，这部电影将在下周五与大家见面。"
+        }
+      ]
+    }
+  ]
+}

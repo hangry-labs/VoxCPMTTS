@@ -10,5 +10,6 @@ Qwen3-ASR is a fixed comparative semantic judge, not ground truth or a replaceme
 | 20261022-054748 | nano | 312 | 42.63% | 95.92% | 23.66% | 18.06% | 0 | Qwen/Qwen3-ASR-0.6B-hf |
 | 20261022-080929 | nano | 312 | 42.63% | 95.92% | 23.66% | 18.06% | 0 | Qwen/Qwen3-ASR-0.6B-hf |
 | 20261022-085849 | nano | 312 | 42.63% | 95.92% | 23.66% | 18.06% | 0 | Qwen/Qwen3-ASR-0.6B-hf |
+| 20261029-070100 | nano | 312 | 42.63% | 95.92% | 23.66% | 18.06% | 0 | Qwen/Qwen3-ASR-0.6B-hf |
 
 Non-exact WAV files are retained locally under the git-ignored `benchmark-artifacts/` directory.

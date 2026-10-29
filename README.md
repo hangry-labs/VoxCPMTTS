@@ -438,6 +438,10 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
 - Return a failing CLI exit status for incomplete batches while continuing remaining
   entries and retaining successful audio files, so scripts can detect generation or
   required output-writing failures. Optional timestamp warnings remain non-fatal.
+- Correct prefixed Chinese word tokenization consistently in Nano inference and
+  generation-length estimates, matching the character-splitting policy bundled
+  with the pinned VoxCPM2 tokenizer. [Qualification results](benchmarks/chinese_tokenization/DETAILS.md)
+  cover targeted Chinese fixes and unchanged output across 312 multilingual calls.
 
 The current development snapshot is published through the rolling tags from `main`:
 

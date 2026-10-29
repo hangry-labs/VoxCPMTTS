@@ -10,6 +10,19 @@ from pathlib import Path
 EXPECTED_VERSION = "2.0.5"
 PACKAGE = "nano-vllm-voxcpm"
 
+ORIGINAL_CHINESE_TOKEN_LOOKUP = r'''    multichar_tokens = {
+        token for token in tokenizer.vocab.keys() if len(token) >= 2 and all("\u4e00" <= c <= "\u9fff" for c in token)
+    }
+'''
+
+PATCHED_CHINESE_TOKEN_LOOKUP = r'''    multichar_tokens = {
+        clean
+        for token in tokenizer.vocab.keys()
+        if len(clean := token.replace("\u2581", "")) >= 2
+        and all("\u4e00" <= char <= "\u9fff" for char in clean)
+    }
+'''
+
 ORIGINAL_ENCODE_LATENTS = '''    def encode_latents(self, wav: torch.Tensor) -> np.ndarray:
         assert wav.ndim == 2, "Invalid shape of wav"
         wav = wav.to(torch.float32).cuda()
@@ -127,6 +140,7 @@ def main() -> None:
     runner = root / "models" / "voxcpm2" / "runner.py"
     engine = root / "engine" / "model_runner.py"
     block_manager = root / "engine" / "block_manager.py"
+    tokenizer = root / "models" / "voxcpm2" / "utils.py"
 
     runner_source = runner.read_text(encoding="utf-8")
     runner_source, allocator_cleanup_changed = replace_once(
@@ -164,7 +178,13 @@ def main() -> None:
     block_manager_changed = any(
         (block_allocation_changed, allocate_publish_changed, append_publish_changed)
     )
-    if not allocator_cleanup_changed and not memory_error_changed and not block_manager_changed:
+    tokenizer_source, tokenizer_changed = replace_once(
+        tokenizer.read_text(encoding="utf-8"),
+        ORIGINAL_CHINESE_TOKEN_LOOKUP,
+        PATCHED_CHINESE_TOKEN_LOOKUP,
+        "Chinese tokenizer lookup",
+    )
+    if not any((allocator_cleanup_changed, memory_error_changed, block_manager_changed, tokenizer_changed)):
         print(f"{root} is already patched")
         return
 
@@ -174,6 +194,8 @@ def main() -> None:
         engine.write_text(engine_source, encoding="utf-8")
     if block_manager_changed:
         block_manager.write_text(block_manager_source, encoding="utf-8")
+    if tokenizer_changed:
+        tokenizer.write_text(tokenizer_source, encoding="utf-8")
     print(f"Patched Nano-vLLM runtime behavior in {root}")
 
 

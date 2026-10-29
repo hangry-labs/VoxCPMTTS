@@ -1,6 +1,6 @@
 # Speech Quality Details
 
-Run `20261022-085849` across 24 common languages.
+Run `20261029-070100` across 24 common languages.
 Text is normalized with Unicode NFKC, case folding, and removal of non-letter/non-number characters.
 Similarity uses a normalized sequence ratio; exact means the normalized transcript equals the prompt.
 Each call uses a stable seed derived from its call ID; repeated cases still measure within-runtime consistency.

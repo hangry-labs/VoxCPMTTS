@@ -74,6 +74,7 @@ tasks:
         docker run --rm --entrypoint sh
         -v "{{.TASKFILE_DIR}}\voxcpm:/workspace/voxcpm:ro"
         -v "{{.TASKFILE_DIR}}\benchmarks:/workspace/benchmarks:ro"
+        -v "{{.TASKFILE_DIR}}\scripts:/workspace/scripts:ro"
         -v "{{.TASKFILE_DIR}}\assets:/workspace/assets:ro"
         -v "{{.TASKFILE_DIR}}\examples:/workspace/examples:ro"
         -v "{{.TASKFILE_DIR}}\VERSION:/workspace/VERSION:ro"
