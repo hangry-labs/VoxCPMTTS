@@ -48,7 +48,8 @@ Major direct runtime dependencies include:
 | --- | --- |
 | CPython | Python Software Foundation License |
 | PyTorch and TorchAudio | BSD-style licenses |
-| Transformers, Hugging Face Hub, Python Multipart, ModelScope, Datasets, WeText, Spaces, Safetensors, SSML-H Tools | Apache-2.0 |
+| Transformers, Hugging Face Hub, Python Multipart, ModelScope, Datasets, WeText, Safetensors, SSML-H Tools | Apache-2.0 |
+| Pillow (optional native runtime) | MIT-CMU and bundled component licenses |
 | FastAPI, Pydantic, Einops, Inflect, Addict | MIT-style licenses |
 | Model Context Protocol Python SDK | MIT |
 | HTTPX | BSD-3-Clause |

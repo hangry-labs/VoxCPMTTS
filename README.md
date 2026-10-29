@@ -101,10 +101,10 @@ Both endpoints are disabled by default and have no separate application authenti
 
 Generation returns metadata and an expiring capability URL rather than embedding audio or base64 in protocol context. The default TTL is one hour and callers can request 60 to 86,400 seconds. Another local service, including speech recognition, can fetch that URL before expiry. Generated files live under `/app/persistent/mcp-output` and are removed after expiry; advanced local-reference tools accept files only from `/app/persistent/mcp-input` or bounded HTTP(S) URLs.
 
-When the client or downstream service connects through another host, set `VOXCPM_MCP_BASE_URL` to the externally reachable origin so returned links are usable from that network:
+When the client or downstream service connects through another host, set `VOXCPM_MCP_BASE_URL` to the externally reachable origin so returned links are usable from that network. Replace `voxcpm.example.com` below with your server's reachable hostname:
 
 ```bash
-docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e VOXCPM_ENABLE_MCP=1 -e VOXCPM_MCP_BASE_URL=http://192.168.1.20:8808 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
+docker run -d --name voxcpmtts --restart unless-stopped -p 8808:8808 --gpus all -e CUDA_VISIBLE_DEVICES=0 -e VOXCPM_ENABLE_MCP=1 -e VOXCPM_MCP_BASE_URL=http://voxcpm.example.com:8808 -v voxcpmtts_data:/app/persistent hangrylabs/voxcpmtts:v1.1@sha256:cc5a1f186cd8baeed3fe777b94ebe8a22648dbd30d5100a498bad46b860210a9
 ```
 
 The environment switches are startup defaults. Values saved in the System tab take precedence afterward. `task mcp-live-test` verifies both catalogs, calls `talk_simple`, follows its temporary URL, and validates the downloaded MP3.
@@ -442,6 +442,10 @@ Snapshot commands intentionally follow the rolling `latest` tags. Published-rele
   generation-length estimates, matching the character-splitting policy bundled
   with the pinned VoxCPM2 tokenizer. [Qualification results](benchmarks/chinese_tokenization/DETAILS.md)
   cover targeted Chinese fixes and unchanged output across 312 multilingual calls.
+- Update optional native image handling to Pillow 13, remove unused Spaces/Gradio
+  dependencies, and slim the local website builder to its pinned renderer/plugins
+  without remote-theme ZIP extraction. The qualified Nano inference stack is
+  unchanged.
 
 The current development snapshot is published through the rolling tags from `main`:
 

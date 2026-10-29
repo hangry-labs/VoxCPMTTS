@@ -5,7 +5,14 @@
 .idea
 .ai
 AGENTS.md
+**/AGENTS.md
 todo
+UPSTREAM_ISSUES.md
+UPSTREAM_PULL_REQUESTS.md
+docs/internal/
+benchmark-artifacts/
+.env
+.env.*
 
 # Python cache/artifacts
 __pycache__/

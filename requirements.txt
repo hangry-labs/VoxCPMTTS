@@ -12,7 +12,6 @@ anyio==4.15.1
 attrs==26.1.0
 audioop-lts==0.2.2
 audioread==3.1.0
-brotli==1.2.0
 certifi==2026.10.19
 cffi==2.1.1
 charset-normalizer==3.5.2
@@ -34,11 +33,7 @@ filelock==4.2.4
 fonttools==4.67.0
 frozenlist==1.8.0
 fsspec==2025.3.0
-gradio==6.30.0
-gradio-client==2.7.2
-groovy==0.1.2
 h11==0.16.0
-hf-gradio==0.4.1
 hf-xet==1.7.0
 httpcore==1.0.9
 httpcore2==2.16.0
@@ -90,10 +85,9 @@ nvidia-nvjitlink-cu12==12.8.93
 nvidia-nvshmem-cu12==3.4.5
 nvidia-nvtx-cu12==12.8.90
 opentelemetry-api==1.45.1
-orjson==3.13.0
 packaging==26.3
 pandas==3.0.6
-pillow==12.3.0
+pillow==13.0.0
 platformdirs==4.13.5
 pooch==1.9.0
 propcache==0.5.4
@@ -102,7 +96,6 @@ pyarrow==26.0.0
 pycparser==3.11
 pydantic==2.12.3
 pydantic-core==2.41.4
-pydub==0.25.1
 pygments==2.21.0
 pyjwt==2.15.1
 pyparsing==3.3.3
@@ -110,18 +103,15 @@ python-dateutil==3.0.0
 python-dotenv==1.2.4
 python-multipart==0.0.32
 python-stretch==0.3.1
-pytz==2026.5
 pyyaml==6.0.3
 referencing==0.37.0
 regex==2026.9.29
 requests==2.34.2
 rich==15.0.0
 rpds-py==2026.9.1
-safehttpx==0.1.7
 safetensors==0.8.0
 scikit-learn==1.9.1
 scipy==1.18.1
-semantic-version==2.10.0
 setuptools==84.2.1
 shellingham==1.5.4
 simplejson==4.2.0
@@ -129,7 +119,6 @@ six==1.17.0
 sortedcontainers==2.4.0
 soundfile==0.13.1
 soxr==1.1.0
-spaces==0.51.3
 sse-starlette==3.5.0
 ssml-h-tools==0.3.1
 standard-aifc==3.13.0
@@ -140,7 +129,6 @@ sympy==1.14.0
 textsearch==0.0.24
 threadpoolctl==3.7.0
 tokenizers==0.23.3
-tomlkit==0.14.0
 torch==2.10.0+cu128
 torchaudio==2.10.0+cu128
 tqdm==4.70.1

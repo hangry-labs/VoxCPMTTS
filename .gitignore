@@ -11,6 +11,9 @@ desktop.ini
 # Local workspace context and instructions
 .ai/
 AGENTS.md
+UPSTREAM_ISSUES.md
+UPSTREAM_PULL_REQUESTS.md
+/docs/internal/
 
 # Python bytecode and caches
 __pycache__/

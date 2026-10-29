@@ -16,6 +16,7 @@ librosa==0.11.0
 python-stretch==0.3.1
 soundfile==0.13.1
 pydantic==2.12.3
+pillow==13.0.0
 einops
 inflect
 addict
@@ -24,6 +25,5 @@ tqdm
 simplejson
 sortedcontainers
 matplotlib
-spaces
 safetensors
 ssml-h-tools==0.3.1

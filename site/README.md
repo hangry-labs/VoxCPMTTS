@@ -17,10 +17,12 @@ preview. `task pages-build` builds without starting the server. These tasks use
 a separate Ruby Docker image and do not start the speech engine or use a GPU.
 The staged build includes local public-file edits and respects Git ignore rules.
 
-`Gemfile.lock` pins GitHub Pages 232 and its dependencies. The container uses the
-same Jekyll 3.10 build as GitHub Pages, with safe mode enabled. The existing
-branch-based Pages deployment can build this configuration without a separate
-Actions workflow.
+`Gemfile.lock` pins Jekyll 3.10 and the plugins used by this theme, with safe mode
+enabled. It deliberately omits the broad `github-pages` bundle, unused remote
+themes and their ZIP extraction dependency. The renderer and plugin versions
+still match GitHub Pages; the existing branch-based Pages deployment can build
+this configuration without a separate Actions workflow. This lock controls the
+local builder, not the dependencies installed by GitHub's managed Pages service.
 
 ## Configuration
 

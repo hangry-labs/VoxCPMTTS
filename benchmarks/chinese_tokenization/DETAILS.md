@@ -138,8 +138,6 @@ Detailed standard reports: [speed](../speed/BENCHMARKS.md),
   Decoding the responses with the image's FFmpeg confirmed nonempty playable
   audio. This is a content/transport smoke check, not a streaming-latency
   benchmark; first-use reference encoding was not warmed beforehand.
-- No existing deployment or `latest` image tag was replaced. Benchmark
-  containers were removed after testing; unrelated services were not stopped.
 
 ## Reproduction
 

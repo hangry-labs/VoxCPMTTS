@@ -57,6 +57,17 @@ class PagesStagingTests(unittest.TestCase):
         self.assertEqual((destination / 'README.md').read_text(), 'Overview')
 
     @patch('scripts.stage_pages.subprocess.check_output', return_value=b'README.md\0')
+    def test_internal_documents_are_rejected_before_clearing_previous_stage(self, listing):
+        (self.root / 'README.md').write_text('Overview', encoding='utf-8')
+        destination = self.build()
+        for private in ('UPSTREAM_ISSUES.md', 'UPSTREAM_PULL_REQUESTS.md', 'docs/internal/security.md'):
+            with self.subTest(private=private):
+                listing.return_value = f'README.md\0{private}\0'.encode('utf-8')
+                with self.assertRaisesRegex(ValueError, 'Private files'):
+                    self.build()
+                self.assertEqual((destination / 'README.md').read_text(), 'Overview')
+
+    @patch('scripts.stage_pages.subprocess.check_output', return_value=b'README.md\0')
     def test_external_symlink_is_rejected_before_clearing_previous_stage(self, listing):
         (self.root / 'README.md').write_text('Overview', encoding='utf-8')
         destination = self.build()

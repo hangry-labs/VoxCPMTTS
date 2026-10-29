@@ -39,6 +39,7 @@ dependencies = [
     "datasets>=3,<4",
     "huggingface-hub>=2.2.0,<3",
     "pydantic",
+    "pillow>=13.0.0,<14",
     "tqdm",
     "simplejson",
     "sortedcontainers",
@@ -46,7 +47,6 @@ dependencies = [
     "librosa",
     "python-stretch==0.3.1",
     "matplotlib",
-    "spaces",
     "safetensors",
     "ssml-h-tools==0.3.1",
 ]

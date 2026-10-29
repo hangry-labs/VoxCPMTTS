@@ -1,8 +1,23 @@
 source "https://rubygems.org"
 
-# Matches GitHub Pages' supported build rather than the TTS runtime.
-gem "github-pages", "232", group: :jekyll_plugins
+# Match the Pages renderer and the plugins this local theme actually uses.
+# The full github-pages bundle also pulls unused remote-theme ZIP extraction.
+gem "jekyll", "3.10.0"
+gem "kramdown-parser-gfm", "1.1.0"
+
+group :jekyll_plugins do
+  gem "jekyll-seo-tag", "2.8.0"
+  gem "jekyll-relative-links", "0.6.1"
+  gem "jekyll-optional-front-matter", "0.3.2"
+  gem "jekyll-readme-index", "0.3.0"
+  gem "jekyll-default-layout", "0.1.5"
+  gem "jekyll-titles-from-headings", "0.5.3"
+end
+
 gem "webrick", "~> 1.9"
 gem "csv", "~> 3.3"
 gem "base64", "~> 0.3"
 gem "logger", "~> 1.7"
+
+# Liquid 4 requires this former default gem on Ruby 3.4.
+gem "bigdecimal", "~> 3.3"

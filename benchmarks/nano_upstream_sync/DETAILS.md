@@ -95,9 +95,11 @@ python benchmarks/run_baseline.py `
   --gpu-index 0 `
   --cache-volume voxcpmtts_hf_cache `
   --asr-url <qwen3-asr-url> `
-  --stop-container brainoven-voxcpm-gateway-engine-1 `
   --comment "<run description>"
 ```
+
+If another model service occupies the selected GPU, stop it before the run or
+pass `--stop-container <your-container-name>` to pause and restore that service.
 
 Raw measurements are retained locally in the git-ignored canonical baseline
 history. This committed report preserves the reviewed comparison, immutable
